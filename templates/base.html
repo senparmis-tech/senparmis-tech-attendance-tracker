@@ -6,6 +6,15 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
 <title>{% block title %}Attendance{% endblock %}</title>
+<script>
+(function() {
+  var saved = localStorage.getItem('theme');
+  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+  if (saved === 'dark' || (!saved && prefersDark)) {
+    document.documentElement.setAttribute('data-theme', 'dark');
+  }
+})();
+</script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"></head><body>
 <header class="top">
   <div class="header-inner">
@@ -22,13 +31,23 @@
       <a href="{{ url_for('download') }}">⬇ Download</a>
       {% if auth_on %}<a href="{{ url_for('logout') }}" style="color:var(--x)">Sign out</a>{% endif %}
     </nav>
-    <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu">☰ Menu</button>
+    <div class="header-actions">
+      <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+      <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu">☰ Menu</button>
+    </div>
     {% elif role == 'student' %}
     <nav class="desktop-nav">
       <a href="{{ url_for('records') }}" class="on">Records</a>
       {% if auth_on %}<a href="{{ url_for('logout') }}" style="color:var(--x)">Sign out</a>{% endif %}
     </nav>
-    <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu">☰ Menu</button>
+    <div class="header-actions">
+      <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+      <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu">☰ Menu</button>
+    </div>
+    {% else %}
+    <div class="header-actions">
+      <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle dark mode" title="Toggle dark mode">🌙</button>
+    </div>
     {% endif %}
   </div>
   {% if role == 'teacher' %}
@@ -60,6 +79,23 @@ const nBtn = document.getElementById('navToggleBtn');
 const nPan = document.getElementById('mobileNavPanel');
 if (nBtn && nPan) {
   nBtn.onclick = () => { nPan.classList.toggle('open'); };
+}
+const tBtn = document.getElementById('themeToggleBtn');
+function syncThemeBtn() {
+  if (!tBtn) return;
+  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+  tBtn.textContent = dark ? '☀️' : '🌙';
+  tBtn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+}
+if (tBtn) {
+  syncThemeBtn();
+  tBtn.onclick = () => {
+    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+    if (next === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+    else document.documentElement.removeAttribute('data-theme');
+    localStorage.setItem('theme', next);
+    syncThemeBtn();
+  };
 }
 </script>
 </body></html>

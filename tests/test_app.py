@@ -85,3 +85,12 @@ def test_cross_origin_post_blocked():
     c = _teacher_client()
     r = c.post("/api/save", json={}, headers={"Origin": "https://evil.example"})
     assert r.status_code == 403
+
+
+def test_dark_mode_toggle_and_css_present():
+    c = _teacher_client()
+    html = c.get("/").get_data(as_text=True)
+    assert 'id="themeToggleBtn"' in html
+    assert "data-theme" in html
+    css = c.get("/static/css/app.css").get_data(as_text=True)
+    assert '[data-theme="dark"]' in css

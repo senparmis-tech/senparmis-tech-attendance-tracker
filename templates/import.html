@@ -6,17 +6,17 @@
 {% if not subject %}<div class="card">Add a subject first.</div>
 {% else %}
 <style>
-.mi td, .mi th { padding: 6px 10px; text-align: left; border-bottom: 1px solid #e5e9f2; }
+.mi td, .mi th { padding: 6px 10px; text-align: left; border-bottom: 1px solid var(--line); }
 .mi select { padding: 5px; font-size: 14px; }
-.mi tr.partial td { background: #fff4d6; }
-.mi tr.gone td.nm { color: #8a1c1c; }
-.mi .muted { color: #667; font-size: 13px; }
+.mi tr.partial td { background: var(--lbg); }
+.mi tr.gone td.nm { color: var(--x); }
+.mi .muted { color: var(--muted); font-size: 13px; }
 </style>
 <div class="card">
   <p><b>{{ review.subject }}</b> · {{ review.date_label }}{% if review.when %} · meeting {{ review.when }}{% endif %}<br>
   <span class="muted">Present = in the call at least {{ review.pct }}% of the meeting (<span id="thr"></span>). Meeting length: <span id="len"></span>.</span></p>
   {% if review.topic %}<p class="muted">Topic: {{ review.topic }}</p>{% endif %}
-  {% if review.existing_date %}<p style="background:#fff4d6;padding:8px;border-radius:8px">This day is already recorded. Saving will replace those marks (R, L and E marks are kept where they still make sense).</p>{% endif %}
+  {% if review.existing_date %}<p style="background:var(--lbg);color:var(--l);padding:8px;border-radius:8px">This day is already recorded. Saving will replace those marks (R, L and E marks are kept where they still make sense).</p>{% endif %}
   <p id="summary"><b></b></p>
 </div>
 <div class="card" style="overflow-x:auto">

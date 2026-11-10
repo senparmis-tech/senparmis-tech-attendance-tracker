@@ -5,9 +5,9 @@
 <div class="card">
   <h2>attendance_records.xlsx</h2>
   <p class="muted" style="margin:0 0 4px">Full location on the computer that runs this site:</p>
-  <p style="margin:0 0 10px"><code id="fpath" style="display:block;padding:10px 12px;background:#f0f3f9;border-radius:8px;word-break:break-all;font-size:14px">{{ xlsx_path }}</code></p>
+  <p style="margin:0 0 10px"><code id="fpath" style="display:block;padding:10px 12px;background:var(--surface);border-radius:8px;word-break:break-all;font-size:14px">{{ xlsx_path }}</code></p>
   <p class="muted" style="margin:0 0 4px">Folder:</p>
-  <p style="margin:0 0 12px"><code id="fdir" style="display:block;padding:10px 12px;background:#f0f3f9;border-radius:8px;word-break:break-all;font-size:14px">{{ folder }}</code></p>
+  <p style="margin:0 0 12px"><code id="fdir" style="display:block;padding:10px 12px;background:var(--surface);border-radius:8px;word-break:break-all;font-size:14px">{{ folder }}</code></p>
   <p style="margin:0 0 12px">
     {% if exists %}<span class="badge done">File exists</span> {{ size }} · last saved {{ modified }}
     {% else %}<span class="badge todo">Not created yet</span> It is created when you first mark attendance or open the site.{% endif %}
