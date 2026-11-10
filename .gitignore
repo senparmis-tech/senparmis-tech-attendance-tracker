@@ -1,0 +1,13 @@
+cat > .gitignore << 'EOF'
+__pycache__/
+*.pyc
+api_key.txt
+secret_key.txt
+passwords.txt
+settings.json
+attendance_records.xlsx
+changes_log.jsonl
+name_aliases.json
+backups/
+subject_images/
+.env
