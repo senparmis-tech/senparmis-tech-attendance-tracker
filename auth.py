@@ -109,7 +109,8 @@ def gate():
     g.role = None
     if request.method == "POST":
         origin = request.headers.get("Origin")
-        if origin and urllib.parse.urlparse(origin).netloc != request.host:
+        allowed_hosts = {request.host, request.headers.get("X-Forwarded-Host", "").split(",")[0].strip()}
+        if origin and urllib.parse.urlparse(origin).netloc not in allowed_hosts:
             msg = "That request came from another site and was blocked."
             return (jsonify(ok=False, error=msg), 403) if request.path.startswith("/api/") else (msg, 403)
     if request.endpoint is None:
