@@ -1,0 +1,14 @@
+{% extends "base.html" %}
+{% block title %}Sign In{% endblock %}
+{% block body %}
+<div class="card" style="max-width:400px;margin:30px auto;padding:24px 20px;text-align:center">
+  <div style="font-size:38px;margin-bottom:8px">🔒</div>
+  <h1 style="font-size:22px;margin:0 0 6px">Attendance Sign In</h1>
+  <p class="muted" style="margin:0 0 16px;font-size:14px">Enter teacher password to manage attendance, or student password to view records.</p>
+  {% if error %}<div class="flash err" style="text-align:left">{{ error }}</div>{% endif %}
+  <form method="post" action="{{ url_for('login') }}">
+    <input type="password" name="password" autofocus autocomplete="current-password" placeholder="Enter password..." required style="width:100%;margin-bottom:14px;padding:12px;font-size:15px;border:1.5px solid var(--line);border-radius:10px;background:#fff;outline:none">
+    <button class="btn primary" type="submit" style="width:100%;padding:12px;font-size:16px;border-radius:10px">Sign In</button>
+  </form>
+</div>
+{% endblock %}

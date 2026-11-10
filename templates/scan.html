@@ -1,0 +1,128 @@
+{% extends "base.html" %}
+{% block title %}Import attendance{% endblock %}
+{% block body %}
+<h1>Import attendance</h1>
+{% if not subject %}
+<div class="card">Add a subject first under <a href="{{ url_for('students') }}">Students &amp; subjects</a>.</div>
+{% elif not students %}
+<div class="card">No students in {{ subject }} yet. <a href="{{ url_for('students', subject=subject) }}">Add the class list</a> first so the sheet can be matched to names.</div>
+{% else %}
+<style>
+.seg { display: flex; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
+.segbtn { padding: 10px 16px; border: 1px solid var(--line); background: #fff; border-radius: 10px; font: inherit; cursor: pointer; }
+.segbtn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
+</style>
+<p class="muted" style="margin-top:0">Where is today's attendance coming from? Pick one, check the result, then save. <b>Nothing is saved until you confirm.</b></p>
+<div class="seg">
+  <button type="button" class="segbtn" id="segCsv">&#128196; Google Meet CSV file</button>
+  <button type="button" class="segbtn" id="segPhoto">&#128247; Photo or screenshot</button>
+</div>
+<div class="card" id="csvPanel">
+  <p class="muted" style="margin-top:0">Upload the attendance <b>CSV</b> exported from your Google Meet extension. No AI key is needed. Present = in the call for at least <b>{{ pct }}%</b> of the meeting, and your recited (R) marks for that day are kept.</p>
+  <form method="post" enctype="multipart/form-data" action="{{ url_for('import_meet') }}">
+    <input type="hidden" name="subject" value="{{ subject }}">
+    <p><input type="file" name="csv" accept=".csv,text/csv" required></p>
+    <div class="toolbar">
+      <input type="text" name="topic" class="grow" maxlength="120" placeholder="Topic for this day (optional)">
+      <label>Date <input type="date" name="date"></label>
+    </div>
+    <p class="muted">Leave the date empty to use the date of the meeting.</p>
+    <button class="btn primary" type="submit">Read the file</button>
+  </form>
+</div>
+<div id="photoPanel">
+{% if not has_key %}
+<div class="card" id="keyCard">
+  <h2>One-time setup</h2>
+  <p>Reading photos needs an API key from either service. Paste whichever you have; the site tells them apart automatically.</p>
+  <ul style="margin-top:0">
+    <li><b>Google Gemini</b> (key starts with <code>AQ.</code> or <code>AIza</code>): create a key in Google AI Studio. It has a free tier, but Google may use content sent on the free tier to improve its products.</li>
+    <li><b>Claude</b> (key starts with <code>sk-ant-</code>): create a key in the Claude Console (docs.claude.com explains how). The account needs a little credit.</li>
+  </ul>
+  <p>The key is saved only on this computer, in <code>api_key.txt</code> next to <code>app.py</code>.</p>
+  <p><input class="txt" type="password" id="keyIn" placeholder="AIza… or sk-ant-…" style="width:100%;max-width:420px" autocomplete="off">
+  <button class="btn primary" id="keySave" type="button">Save key</button></p>
+  <div id="keyMsg" class="muted"></div>
+</div>
+{% endif %}
+<div class="card" id="step1">
+  <p class="muted" style="margin-top:0">Choose a photo of a paper list, or screenshots of an online-meeting attendance report (up to {{ max_images }}, for example when the report is long and you scroll). The AI reads the names and suggests who was present or absent for <b>{{ subject }}</b>. People who are not on this class list (other sections, teachers) are ignored. <b>Nothing is saved to Excel until you confirm.</b> The images, including the names on them, are sent to {{ 'Google' if provider == 'gemini' else 'Anthropic' if provider else 'the AI service you set up' }} to be read.{% if provider == 'gemini' %} On Google's free tier, Google may use it to improve its products; a paid Gemini account does not.{% endif %}</p>
+  <input type="file" id="file" accept="image/*" multiple>
+  <div id="previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
+  <p><button class="btn primary" id="read" type="button" disabled>Read the sheet</button> <span id="busy" class="muted"></span></p>
+  <div id="err" class="flash err" style="display:none"></div>
+</div>
+
+<div id="review" style="display:none">
+  <div class="card">
+    <h2>Check and confirm</h2>
+    <div class="toolbar">
+      <label>Date <input type="date" id="date"></label>
+      <input type="text" id="topic" class="grow" placeholder="Topic for this day (optional)" maxlength="120">
+    </div>
+    <div id="dateNote" class="muted"></div>
+    <div class="toolbar" style="margin-top:10px">
+      <label>How should I read the sheet?
+        <select id="mode" class="slim">
+          <option value="list">Names on the sheet were present. Anyone missing is absent.</option>
+          <option value="marks">Whole class is listed. A signature or tick means present.</option>
+          <option value="percent">Online meeting report. Present if attended enough of the session.</option>
+        </select></label>
+      <span id="thrWrap" style="display:none">at least <input type="number" id="thr" value="75" min="1" max="100" style="width:70px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px"> %</span>
+    </div>
+    <div id="modeNote" class="muted"></div>
+  </div>
+  <div class="card" style="padding:6px 12px"><div id="rows"></div></div>
+  <div class="card" id="unmatchedCard" style="display:none">
+    <details id="unDetails">
+      <summary id="unSummary" style="margin:0"></summary>
+      <p class="muted">These were ignored (other sections, teachers, or names I couldn't match). If one is really a student on your list, say who below, or add them as a new student.</p>
+      <div id="unmatched"></div>
+    </details>
+  </div>
+  <div class="dock">
+    <div class="counts"><span class="s-p" id="cp">P 0</span><span class="s-x" id="cx">A 0</span><span class="s-l" id="cl">L 0</span><span class="s-e" id="ce">E 0</span></div>
+    <button class="btn" id="cancel" type="button">Cancel</button>
+    <button class="btn primary" id="confirm" type="button">Confirm &amp; save to Excel</button>
+  </div>
+</div>
+<div class="card" id="done" style="display:none">
+  <h2>Saved to Excel ✓</h2>
+  <p id="doneMsg"></p>
+  <a class="btn primary" id="doneLink" href="#">View records</a>
+  <button class="btn" id="again" type="button">Scan another sheet</button>
+</div>
+<div class="toast" id="toast"></div>
+</div>
+<script>
+(function () {
+  var src = new URLSearchParams(location.search).get('source');
+  if (src !== 'photo' && src !== 'csv') { src = 'csv'; try { src = localStorage.getItem('importSource') || 'csv'; } catch (e) {} }
+  function show(s, remember) {
+    if (s !== 'photo') s = 'csv';
+    document.getElementById('csvPanel').style.display = s === 'csv' ? '' : 'none';
+    document.getElementById('photoPanel').style.display = s === 'photo' ? '' : 'none';
+    document.getElementById('segCsv').className = 'segbtn' + (s === 'csv' ? ' on' : '');
+    document.getElementById('segPhoto').className = 'segbtn' + (s === 'photo' ? ' on' : '');
+    if (remember) { try { localStorage.setItem('importSource', s); } catch (e) {} }
+  }
+  document.getElementById('segCsv').onclick = function () { show('csv', true); };
+  document.getElementById('segPhoto').onclick = function () { show('photo', true); };
+  show(src, false);
+})();
+</script>
+
+<script>
+const students = {{ students|tojson }};
+const subject = {{ subject|tojson }};
+const recorded = {{ recorded|tojson }};
+const today = {{ today|tojson }};
+const recordsUrl = {{ records_url|tojson }};
+const KEY_URL = {{ key_url|tojson }};
+const MAX_IMAGES_LIMIT = {{ max_images|tojson }};
+const SCAN_URL = {{ scan_url|tojson }};
+const SAVE_URL = {{ save_url|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/scan.js') }}"></script>
+{% endif %}
+{% endblock %}

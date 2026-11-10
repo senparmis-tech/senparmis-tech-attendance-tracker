@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}Records{% endblock %}
+{% block body %}
+<h1>Records</h1>
+<style>
+.recgrid .sticky { box-shadow: 2px 0 4px rgba(15, 23, 42, .08); }
+@media (max-width: 640px) {
+  .scroll { max-height: 78vh; -webkit-overflow-scrolling: touch; }
+  .recgrid th, .recgrid td { padding: 6px 7px; font-size: 13px; }
+  .recgrid .sticky { white-space: normal; width: 108px; min-width: 108px; max-width: 108px; font-size: 12px; line-height: 1.2; padding: 6px 7px; }
+  .recgrid small { max-width: 62px; font-size: 10px; }
+  .recgrid .pill { min-width: 38px; padding: 2px 6px; }
+}
+</style>
+{% if not subject %}<div class="card">No subjects yet.</div>
+{% elif not rows %}<div class="card">No students in {{ subject }} yet.</div>
+{% else %}
+{% if role == 'teacher' %}<p><a class="btn small" href="{{ url_for('print_sheet', subject=subject) }}" target="_blank">&#128424; Print sheet</a></p>{% endif %}
+{% if role == 'teacher' %}<p class="muted">Same view as the Excel sheet. To change a day, use <a href="{{ url_for('mark', subject=subject) }}">Mark attendance</a> and pick that date.</p>
+{% else %}<p class="muted">p = present &middot; x = absent &middot; l = late &middot; e = excused &middot; r = recited. Swipe the table sideways to see every day.</p>{% endif %}
+<div class="scroll"><table class="grid recgrid">
+<thead><tr><th class="sticky">Student</th><th class="n">P</th><th class="n">A</th><th class="n">L</th><th class="n">E</th><th class="n">R</th><th class="n">Rate</th>
+{% for d in dates %}<th class="n">{% if role == 'teacher' %}<a href="{{ url_for('mark', subject=subject, date=d.iso) }}" style="color:inherit;text-decoration:none">{{ d.label }}</a>{% else %}{{ d.label }}{% endif %}{% if role == 'teacher' %}<form method="post" action="{{ url_for('dates_delete') }}" style="display:inline" data-msg="Delete {{ d.label }} from {{ subject }}? Every mark for that day will be removed (a backup copy is saved first)." onsubmit="return confirm(this.dataset.msg)"><input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="date" value="{{ d.iso }}"><button type="submit" title="Delete this date" style="border:0;background:none;color:#c0392b;cursor:pointer;font-size:12px;padding:0 0 0 4px">&#10005;</button></form>{% endif %}{% if d.topic %}<small title="{{ d.topic }}">{{ d.topic }}</small>{% endif %}</th>{% endfor %}</tr></thead>
+<tbody>
+{% for s in rows %}<tr><td class="sticky">{{ s.name }}</td><td class="n">{{ s.p }}</td><td class="n">{{ s.x }}</td><td class="n">{{ s.l }}</td><td class="n">{{ s.e }}</td><td class="n">{{ s.r }}</td>
+<td class="n">{% if s.rate is none %}<span class="pill none">–</span>{% else %}<span class="pill {{ 'low' if s.rate < low }}">{{ (s.rate*100)|round|int }}%</span>{% endif %}</td>
+{% for c in s.codes %}<td class="c {{ c }}">{{ c }}</td>{% endfor %}</tr>{% endfor %}
+</tbody></table></div>
+{% if not dates %}<p class="muted">No days recorded yet.</p>{% endif %}
+{% endif %}
+{% endblock %}

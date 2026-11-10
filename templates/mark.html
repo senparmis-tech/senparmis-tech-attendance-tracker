@@ -1,0 +1,183 @@
+{% extends "base.html" %}
+{% block title %}Mark attendance{% endblock %}
+{% block body %}
+{% if not subject %}
+<div class="card">No subjects yet. Add one under <a href="{{ url_for('students') }}">Students &amp; subjects</a>.</div>
+{% elif not students %}
+<div class="card">No students in {{ subject }} yet. <a href="{{ url_for('students', subject=subject) }}">Add students</a> first.</div>
+{% else %}
+
+<link rel="stylesheet" href="{{ url_for('static', filename='css/mark.css') }}">
+
+<!-- Date & Class Header Card -->
+<div class="mark-card">
+  <div class="date-header-row">
+    <div class="date-nav-group">
+      {% if date_iso %}<a class="btn date-arrow-btn" href="{{ prev_url }}" title="Previous day" aria-label="Previous day">‹</a>{% endif %}
+      <div class="date-input-wrap">
+        <input type="date" id="dateIn" value="{{ date_iso }}">
+      </div>
+      {% if date_iso %}<a class="btn date-arrow-btn" href="{{ next_url }}" title="Next day" aria-label="Next day">›</a>{% endif %}
+      {% if today_url %}<a class="btn small today-chip" href="{{ today_url }}">Today</a>{% endif %}
+    </div>
+    <div class="date-meta">
+      {% if subject_img_url %}
+      <img src="{{ subject_img_url }}" alt="{{ subject }}" style="width:36px;height:36px;border-radius:9px;object-fit:cover;border:1.5px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+      {% endif %}
+      <span class="date-title-text">{{ date_label }}</span>
+      <span class="date-badge-slot">
+        {% if recorded %}<span class="badge done">✓ Saved in Excel</span>{% else %}<span class="badge todo">⚪ Not saved yet</span>{% endif %}
+      </span>
+    </div>
+  </div>
+  {% if date_iso %}
+  <div class="topic-container">
+    <input type="text" id="topic" class="topic-field" placeholder="Topic for this lesson (optional)" value="{{ topic }}" maxlength="120">
+  </div>
+  {% endif %}
+</div>
+
+{% if not date_iso %}
+<div class="card" style="text-align:center;padding:28px 16px">
+  <div style="font-size:32px;margin-bottom:8px">📅</div>
+  <p>Pick a date above, or tap <b>Today</b>, to start marking attendance for <b>{{ subject }}</b>.</p>
+</div>
+<script>
+document.getElementById('dateIn').onchange = e => {
+  if (e.target.value) location.href = {{ base_url|tojson }} + '&date=' + e.target.value;
+};
+</script>
+{% else %}
+
+<!-- View Switcher (List vs Roll-Call) -->
+<div class="mode-switch-wrap">
+  <div class="mode-segmented">
+    <button type="button" id="btnModeList" class="mode-btn on">☰ List View</button>
+    <button type="button" id="btnModeRoll" class="mode-btn">🎯 Roll-Call Mode</button>
+  </div>
+</div>
+
+<!-- ================= LIST VIEW ================= -->
+<div id="listViewArea">
+  <!-- Search & Fast Actions -->
+  <div class="list-toolbar">
+    <div class="search-wrapper">
+      <input type="text" id="search" placeholder="Search student name..." autocomplete="off">
+      <button type="button" id="clearSearch" class="search-clear-btn" style="display:none">✕</button>
+    </div>
+    <div class="fast-actions-wrap">
+      <button class="btn fast-btn pres" type="button" id="allP">⚡ All Present</button>
+      <button class="btn fast-btn" type="button" id="clearAll">↺ Reset</button>
+      <a class="btn fast-btn" href="{{ url_for('scan', subject=subject) }}">📥 Import</a>
+    </div>
+  </div>
+
+  <!-- Filter Pills Bar -->
+  <div class="filter-pills-bar" id="filterPills">
+    <button type="button" class="fpill on" data-filter="all">All <span class="fpill-count" id="fcount-all">0</span></button>
+    <button type="button" class="fpill" data-filter="unmarked">Unmarked <span class="fpill-count" id="fcount-unmarked">0</span></button>
+    <button type="button" class="fpill p" data-filter="p">Present <span class="fpill-count" id="fcount-p">0</span></button>
+    <button type="button" class="fpill x" data-filter="x">Absent <span class="fpill-count" id="fcount-x">0</span></button>
+    <button type="button" class="fpill l" data-filter="l">Late <span class="fpill-count" id="fcount-l">0</span></button>
+    <button type="button" class="fpill e" data-filter="e">Excused <span class="fpill-count" id="fcount-e">0</span></button>
+    <button type="button" class="fpill r" data-filter="r">Recited <span class="fpill-count" id="fcount-r">0</span></button>
+  </div>
+
+  <!-- Student Cards List -->
+  <div class="students-list-wrap" id="studentsList"></div>
+  <div id="emptyFilterMsg" class="card" style="display:none;text-align:center;padding:24px;color:var(--muted)">No students match this filter.</div>
+</div>
+
+<!-- ================= ROLL-CALL FLASHCARD VIEW ================= -->
+<div id="rollCallArea" style="display:none">
+  <div class="card rc-progress-card">
+    <div class="rc-progress-meta">
+      <span id="rollCounterText" style="font-weight:700">Student 1 of 28</span>
+      <span id="rollPercentText" class="muted">0%</span>
+    </div>
+    <div class="rc-progress-track">
+      <div class="rc-progress-bar" id="rollProgressBar" style="width:0%"></div>
+    </div>
+  </div>
+
+  <div class="card rc-flashcard" id="rollCardMain">
+    <div class="rc-flashcard-index" id="rcStudentIndex">Student #1</div>
+    <div class="rc-flashcard-name" id="rcStudentName">Student Name</div>
+    <div class="rc-current-badge-slot">
+      <span class="rc-current-pill" id="rcCurrentPill">Currently: Present</span>
+    </div>
+
+    <!-- Large Thumb Buttons with Auto-Advance -->
+    <div class="rc-buttons-grid">
+      <button type="button" class="rc-big-btn p" data-code="p">
+        <span class="rc-code">✓ P</span>
+        <span class="rc-label">Present</span>
+      </button>
+      <button type="button" class="rc-big-btn x" data-code="x">
+        <span class="rc-code">✗ A</span>
+        <span class="rc-label">Absent</span>
+      </button>
+      <button type="button" class="rc-big-btn l" data-code="l">
+        <span class="rc-code">⏱ L</span>
+        <span class="rc-label">Late</span>
+      </button>
+      <button type="button" class="rc-big-btn e" data-code="e">
+        <span class="rc-code">✉ E</span>
+        <span class="rc-label">Excused</span>
+      </button>
+      <button type="button" class="rc-big-btn r" data-code="r">
+        <span class="rc-code">★ R</span>
+        <span class="rc-label">Recited</span>
+      </button>
+    </div>
+
+    <div class="rc-nav-row">
+      <button type="button" class="btn" id="rcBtnPrev">‹ Previous</button>
+      <button type="button" class="btn" id="rcBtnSkip">Skip ›</button>
+      <button type="button" class="btn" id="rcBtnSwitchList">Switch to List</button>
+    </div>
+  </div>
+
+  <!-- Roll Call Finished -->
+  <div class="card rc-done-card" id="rollCardDone" style="display:none">
+    <div style="font-size:36px;margin-bottom:8px">🎉</div>
+    <h2 style="font-size:22px;margin:4px 0">Roll-Call Complete!</h2>
+    <p class="muted" style="margin-bottom:12px">All students have been reviewed for this date.</p>
+    <div class="done-stats-summary" id="doneStatsSummary"></div>
+    <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
+      <button type="button" class="btn primary" id="doneSaveBtn" style="padding:12px 24px;font-size:16px">💾 Save to Excel</button>
+      <button type="button" class="btn" id="doneReviewBtn">Review List</button>
+    </div>
+  </div>
+</div>
+
+<!-- ================= FLOATING MOBILE ACTION DOCK ================= -->
+<div class="mobile-dock" id="mobileDock">
+  <div class="dock-counts" id="dockCounts">
+    <span class="dcount s-p" id="cp">P 0</span>
+    <span class="dcount s-x" id="cx">A 0</span>
+    <span class="dcount s-l" id="cl">L 0</span>
+    <span class="dcount s-e" id="ce">E 0</span>
+    <span class="dcount s-r" id="cr">R 0</span>
+  </div>
+  <button class="btn primary save-btn" id="save" type="button">
+    <span class="save-status-dot" id="saveDot"></span>
+    <span id="saveBtnText">Save to Excel</span>
+  </button>
+</div>
+
+<!-- Floating Toast -->
+<div class="toast" id="toast"></div>
+
+<script>
+const students = {{ students|tojson }};
+const subject = {{ subject|tojson }};
+const dateIso = {{ date_iso|tojson }};
+let wasRecorded = {{ recorded|tojson }};
+const baseUrl = {{ base_url|tojson }};
+const saveUrl = {{ save_url|tojson }};
+</script>
+<script src="{{ url_for('static', filename='js/mark.js') }}"></script>
+{% endif %}
+{% endif %}
+{% endblock %}

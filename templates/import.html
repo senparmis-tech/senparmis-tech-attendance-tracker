@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Import Meet CSV{% endblock %}
+{% block body %}
+<h1>Import attendance</h1>
+<p class="muted" style="margin-top:0">Reading a <b>Google Meet CSV</b>. &nbsp;<a href="{{ url_for('scan', subject=subject) }}">&larr; Choose another file</a> &middot; <a href="{{ url_for('scan', subject=subject, source='photo') }}">Use a photo instead</a></p>
+{% if not subject %}<div class="card">Add a subject first.</div>
+{% else %}
+<style>
+.mi td, .mi th { padding: 6px 10px; text-align: left; border-bottom: 1px solid #e5e9f2; }
+.mi select { padding: 5px; font-size: 14px; }
+.mi tr.partial td { background: #fff4d6; }
+.mi tr.gone td.nm { color: #8a1c1c; }
+.mi .muted { color: #667; font-size: 13px; }
+</style>
+<div class="card">
+  <p><b>{{ review.subject }}</b> · {{ review.date_label }}{% if review.when %} · meeting {{ review.when }}{% endif %}<br>
+  <span class="muted">Present = in the call at least {{ review.pct }}% of the meeting (<span id="thr"></span>). Meeting length: <span id="len"></span>.</span></p>
+  {% if review.topic %}<p class="muted">Topic: {{ review.topic }}</p>{% endif %}
+  {% if review.existing_date %}<p style="background:#fff4d6;padding:8px;border-radius:8px">This day is already recorded. Saving will replace those marks (R, L and E marks are kept where they still make sense).</p>{% endif %}
+  <p id="summary"><b></b></p>
+</div>
+<div class="card" style="overflow-x:auto">
+  <table class="mi" style="width:100%;border-collapse:collapse"><thead><tr><th>#</th><th>Student</th><th>Meet name</th><th>In call</th><th>Mark</th></tr></thead><tbody id="rows"></tbody></table>
+</div>
+<div class="card" id="ucard" style="overflow-x:auto">
+  <p><b>Names in the file that I could not match</b><br><span class="muted">If one of these is a student on your list (for example a nickname or a shared account), pick them. I will remember it for next time. Leave the rest as they are.</span></p>
+  <table class="mi" style="width:100%;border-collapse:collapse"><tbody id="urows"></tbody></table>
+</div>
+<p><button class="btn primary" type="button" id="saveBtn">Save attendance</button>
+<a class="btn" href="{{ url_for('scan', subject=review.subject) }}">Start over</a>
+<span id="msg" class="muted" style="margin-left:10px"></span></p>
+<script type="application/json" id="meetData">{{ review|tojson }}</script>
+<script src="{{ url_for('static', filename='js/import.js') }}"></script>
+{% endif %}
+{% endblock %}

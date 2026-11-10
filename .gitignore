@@ -1,13 +1,16 @@
-cat > .gitignore << 'EOF'
 __pycache__/
 *.pyc
+.pytest_cache/
+.env
 api_key.txt
 secret_key.txt
 passwords.txt
 settings.json
 attendance_records.xlsx
+attendance_records.xlsx.tmp
+*.tmp
 changes_log.jsonl
+meet_aliases.json
 name_aliases.json
 backups/
 subject_images/
-.env

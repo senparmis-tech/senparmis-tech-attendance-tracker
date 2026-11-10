@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="theme-color" content="#2563eb">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<title>{% block title %}Attendance{% endblock %}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"></head><body>
+<header class="top">
+  <div class="header-inner">
+    <a href="{{ url_for('dashboard') if role == 'teacher' else (url_for('records') if role == 'student' else url_for('login')) }}" class="brand">📋 Attendance</a>
+    {% if role == 'teacher' %}
+    <nav class="desktop-nav">
+      <a href="{{ url_for('dashboard') }}" class="{{ 'on' if page=='dashboard' }}">Dashboard</a>
+      <a href="{{ url_for('mark') }}" class="{{ 'on' if page=='mark' }}">Mark attendance</a>
+      <a href="{{ url_for('scan') }}" class="{{ 'on' if page=='scan' }}">📥 Import</a>
+      <a href="{{ url_for('records') }}" class="{{ 'on' if page=='records' }}">Records</a>
+      <a href="{{ url_for('students') }}" class="{{ 'on' if page=='students' }}">Students</a>
+      <a href="{{ url_for('log_page') }}" class="{{ 'on' if page=='log' }}">Log</a>
+      <a href="{{ url_for('files_page') }}" class="{{ 'on' if page=='files' }}">📁 File</a>
+      <a href="{{ url_for('download') }}">⬇ Download</a>
+      {% if auth_on %}<a href="{{ url_for('logout') }}" style="color:var(--x)">Sign out</a>{% endif %}
+    </nav>
+    <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu">☰ Menu</button>
+    {% elif role == 'student' %}
+    <nav class="desktop-nav">
+      <a href="{{ url_for('records') }}" class="on">Records</a>
+      {% if auth_on %}<a href="{{ url_for('logout') }}" style="color:var(--x)">Sign out</a>{% endif %}
+    </nav>
+    <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu">☰ Menu</button>
+    {% endif %}
+  </div>
+  {% if role == 'teacher' %}
+  <div class="mobile-nav-panel" id="mobileNavPanel">
+    <a href="{{ url_for('mark') }}" class="{{ 'on' if page=='mark' }}">📋 Mark attendance</a>
+    <a href="{{ url_for('records') }}" class="{{ 'on' if page=='records' }}">📊 Records</a>
+    <a href="{{ url_for('scan') }}" class="{{ 'on' if page=='scan' }}">📥 Import attendance</a>
+    <a href="{{ url_for('dashboard') }}" class="{{ 'on' if page=='dashboard' }}">🏠 Dashboard</a>
+    <a href="{{ url_for('students') }}" class="{{ 'on' if page=='students' }}">👥 Students &amp; subjects</a>
+    <a href="{{ url_for('log_page') }}" class="{{ 'on' if page=='log' }}">📝 Changes log</a>
+    <a href="{{ url_for('files_page') }}" class="{{ 'on' if page=='files' }}">📁 Excel file</a>
+    <a href="{{ url_for('download') }}">⬇ Download copy</a>
+    {% if auth_on %}<a href="{{ url_for('logout') }}" style="color:var(--x)">🚪 Sign out</a>{% endif %}
+  </div>
+  {% elif role == 'student' %}
+  <div class="mobile-nav-panel" id="mobileNavPanel">
+    <a href="{{ url_for('records') }}" class="on">📊 Records</a>
+    {% if auth_on %}<a href="{{ url_for('logout') }}" style="color:var(--x)">🚪 Sign out</a>{% endif %}
+  </div>
+  {% endif %}
+</header>
+<main>
+{% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+{% if tabs %}<div class="tabs">{% for t in tabs %}<a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
+{% block body %}{% endblock %}
+</main>
+<script>
+const nBtn = document.getElementById('navToggleBtn');
+const nPan = document.getElementById('mobileNavPanel');
+if (nBtn && nPan) {
+  nBtn.onclick = () => { nPan.classList.toggle('open'); };
+}
+</script>
+</body></html>

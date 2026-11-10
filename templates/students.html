@@ -1,0 +1,85 @@
+{% extends "base.html" %}
+{% block title %}Students &amp; subjects{% endblock %}
+{% block body %}
+<h1>Students &amp; subjects</h1>
+{% if subjects %}
+<div class="grid2">
+<div class="card">
+  <h2>Add students</h2>
+  <form method="post" action="{{ url_for('students_add') }}">
+    <textarea name="names" rows="5" style="width:100%" placeholder="One name per line" required></textarea>
+    <p>{% for s in subjects %}<label class="chk"><input type="checkbox" name="subjects" value="{{ s }}" {{ 'checked' if s==subject or not subject }}> {{ s }}</label>{% endfor %}</p>
+    <button class="btn primary" type="submit">Add</button>
+  </form>
+</div>
+<div class="card">
+  <h2>Add a subject</h2>
+  <form method="post" action="{{ url_for('subjects_add') }}">
+    <p><input class="txt" type="text" name="name" placeholder="Subject name" maxlength="31" required style="width:100%"></p>
+    <p><select name="copy_from" style="width:100%"><option value="">Start with an empty class list</option>
+      {% for s in subjects %}<option value="{{ s }}">Copy the students from {{ s }}</option>{% endfor %}</select></p>
+    <button class="btn primary" type="submit">Create subject</button>
+  </form>
+</div>
+</div>
+{% else %}
+<div class="card"><h2>Add your first subject</h2>
+  <form method="post" action="{{ url_for('subjects_add') }}">
+    <input class="txt" type="text" name="name" placeholder="Subject name" maxlength="31" required>
+    <button class="btn primary" type="submit">Create subject</button>
+  </form></div>
+{% endif %}
+{% if subject %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:12px;margin-bottom:14px;padding-bottom:12px;border-bottom:1px solid var(--line)">
+    <div style="display:flex;align-items:center;gap:12px">
+      {% if subject_img_url %}
+      <img src="{{ subject_img_url }}" alt="{{ subject }}" style="width:52px;height:52px;border-radius:12px;object-fit:cover;border:1.5px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,0.08)">
+      {% else %}
+      <div style="width:52px;height:52px;border-radius:12px;background:var(--ebg);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:24px;border:1.5px solid var(--line)">📖</div>
+      {% endif %}
+      <div>
+        <h2 style="margin:0;font-size:19px">{{ subject }}</h2>
+        <span class="muted" style="font-size:13px">{{ rows|length }} students enrolled</span>
+      </div>
+    </div>
+    <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+      <form class="inline" method="post" action="{{ url_for('subjects_delete') }}" onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject and all its attendance records from Excel. Are you sure?')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <button class="btn small danger" type="submit">🗑 Delete Subject</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Custom Subject Picture Uploader -->
+  <details style="margin-bottom:16px;background:#f8fafc;padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+    <summary style="font-weight:700;cursor:pointer;color:var(--brand);font-size:14px">📷 Customize Picture for {{ subject }}</summary>
+    <div style="margin-top:10px;display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+      <form method="post" action="{{ url_for('subjects_upload_image') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <input type="file" name="image" accept="image/*" required style="font-size:13px">
+        <button class="btn small primary" type="submit">Upload Picture</button>
+      </form>
+      {% if subject_img_url %}
+      <form class="inline" method="post" action="{{ url_for('subjects_delete_image') }}" onsubmit="return confirm('Remove custom picture for {{ subject|e }}?')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <button class="btn small danger" type="submit">Remove Picture</button>
+      </form>
+      {% endif %}
+    </div>
+  </details>
+  {% if not rows %}<p class="muted">No students yet.</p>{% endif %}
+  <table>{% for s in rows %}<tr>
+    <td class="n" style="width:40px">{{ loop.index }}</td><td>{{ s.name }}</td>
+    <td class="n" style="width:90px"><span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}">{{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}</span></td>
+    <td style="text-align:right;white-space:nowrap">
+      <form class="inline" method="post" action="{{ url_for('students_remove') }}" onsubmit="return confirm('Remove {{ s.name|e }} from {{ subject|e }}? Their marks for this subject are deleted.')">
+        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="row" value="{{ s.row }}"><input type="hidden" name="name" value="{{ s.name }}">
+        <button class="btn small danger" type="submit">Remove</button></form>
+      <form class="inline" method="post" action="{{ url_for('students_remove') }}" onsubmit="return confirm('Remove {{ s.name|e }} from ALL subjects? Their marks are deleted everywhere.')">
+        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="name" value="{{ s.name }}"><input type="hidden" name="everywhere" value="1">
+        <button class="btn small danger" type="submit">Remove from all</button></form>
+    </td></tr>{% endfor %}</table>
+</div>
+{% endif %}
+{% endblock %}

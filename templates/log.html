@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Changes log{% endblock %}
+{% block body %}
+<h1>Changes log</h1>
+<p class="muted">Every change made from this website: who, when, and what. Changes you make directly in Excel are not recorded here.{% if total > shown|length %} Showing the latest {{ shown|length }} of {{ total }}.{% endif %}</p>
+{% if not shown %}
+<div class="card">Nothing yet. Changes will appear here from now on.</div>
+{% else %}
+<div class="toolbar"><input type="text" id="q" class="grow" placeholder="Search the log (name, subject, date…)"></div>
+<div class="card" style="padding:6px 12px;overflow:auto">
+<table id="logt">
+<thead><tr><th>When</th><th>What</th><th>Subject</th><th>Details</th><th>From</th></tr></thead>
+<tbody>
+{% for e in shown %}<tr><td style="white-space:nowrap">{{ e.when }}</td><td style="white-space:nowrap"><b>{{ e.action }}</b></td><td>{{ e.subject }}</td><td>{{ e.detail }}</td><td style="white-space:nowrap">{{ e.who }}</td></tr>{% endfor %}
+</tbody></table></div>
+<script>
+document.getElementById('q').oninput = e => {
+  const q = e.target.value.trim().toLowerCase();
+  document.querySelectorAll('#logt tbody tr').forEach(r => r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none');
+};
+</script>
+{% endif %}
+{% endblock %}

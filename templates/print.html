@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Print sheet - {{ subject }}</title>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/print.css') }}">
+<style id="pageStyle"></style></head><body>
+<div class="bar">
+  <button type="button" onclick="window.print()">&#128424; Print</button>
+  <a href="{{ url_for('records', subject=subject) }}" style="margin-left:12px">&larr; Back to records</a>
+  <div class="subj" style="margin-top:8px">Subject:
+    {% for s in subjects %}<a class="{{ 'on' if s == subject }}" href="{{ url_for('print_sheet', subject=s) }}">{{ s }}</a>{% endfor %}
+  </div>
+  <div style="margin-top:6px">
+    <label>Paper <select id="inPaper"><option value="a4">A4 landscape</option><option value="long">Long bond 8.5 x 13 in, landscape</option><option value="letter">Letter (short) 8.5 x 11 in, landscape</option></select></label>
+    <label>School <input id="inSchool" size="26"></label>
+    <label>Section <input id="inSection" size="12" placeholder="e.g. BS CS 1-A"></label>
+    <label>Semester <input id="inSem" size="16" placeholder="e.g. 1st Sem 2026"></label>
+  </div>
+  <div style="margin-top:8px"><label><input type="checkbox" id="chkTot"> <b>Show TOTAL and REC columns</b> (use this for the final copy you hand in)</label>
+    <span class="note">Classes held so far: <b>{{ held }}</b>.{% if skipped %} Not counted (no marks at all): {{ skipped|join(', ') }}.{% endif %}</span></div>
+  {% if unmarked %}<div class="warn"><b>Check before printing:</b> some cells have no mark, and the teacher's sheet reads a blank as <b>present</b>.
+    {% for u in unmarked %}<span style="white-space:nowrap">{{ u.label }}: {{ u.n }}{{ ',' if not loop.last }}</span> {% endfor %}</div>{% endif %}
+  {% if extra_l or extra_e %}<div class="note">{% if extra_l %}{{ extra_l }} late mark(s) print as blank (present). {% endif %}{% if extra_e %}{{ extra_e }} excused mark(s) print as E. {% endif %}</div>{% endif %}
+  <div class="note">Tip: pick the paper above first. In the print window the paper and landscape are already set; keep margins <b>Default</b> and turn on <b>Background graphics</b> so the blue shows. To make a PDF, choose <b>Save as PDF</b> as the printer.</div>
+</div>
+{% for pg in pages %}
+<div class="sheet">
+  <div class="head blue">
+    <div class="left"><div class="title">CLASS ATTENDANCE MONITORING</div><div class="school o-school"></div></div>
+    <div class="right"><div class="section o-section"></div><div class="line"><div class="sem o-sem"></div><div class="subj">{{ subject }}{% if pages|length > 1 %} &middot; page {{ loop.index }} of {{ pages|length }}{% endif %}</div></div></div>
+  </div>
+  <table>
+    <colgroup><col style="width:7mm"><col style="width:70mm"><col style="width:8mm">{% for c in pg.cols %}<col class="dc">{% endfor %}<col class="tot t1"><col class="tot t2">{% for i in range(pg.pad) %}<col class="dc{{ ' padtot' if i < 2 }}">{% endfor %}</colgroup>
+    <thead>
+      <tr class="blue"><th class="namehead" rowspan="2" colspan="2">NAME</th><th class="lab">DATE</th>
+        {% for c in pg.cols %}<th class="date"><div class="fit">{{ c.label }}</div></th>{% endfor %}<th class="tot" rowspan="2">TOTAL</th><th class="tot" rowspan="2">REC</th>{% for i in range(pg.pad) %}<th class="date{{ ' padtot' if i < 2 }}"></th>{% endfor %}</tr>
+      <tr class="blue"><th class="lab">TOPIC</th>
+        {% for c in pg.cols %}<th class="topic" title="{{ c.topic }}"><div class="tc"><span class="fit">{{ c.topic }}</span></div></th>{% endfor %}{% for i in range(pg.pad) %}<th class="topic{{ ' padtot' if i < 2 }}"></th>{% endfor %}</tr>
+    </thead>
+    <tbody>
+    {% for r in pg.rows %}<tr><td class="nn">{{ r.n }}</td><td class="nm">{{ r.name }}</td><td class="stripe"></td>
+      {% for m in r.marks %}<td>{{ m }}</td>{% endfor %}<td class="tot">{{ r.total }}</td><td class="tot">{{ r.rec }}</td>{% for i in range(pg.pad) %}<td class="{{ 'padtot' if i < 2 }}"></td>{% endfor %}</tr>{% endfor %}
+    </tbody>
+  </table>
+  <div class="legend">Blank = present &nbsp;&middot;&nbsp; X = absent &nbsp;&middot;&nbsp; R = recited<span class="totn"> &nbsp;&middot;&nbsp; TOTAL = days present / classes held (R counts as present) &nbsp;&middot;&nbsp; REC = times recited</span></div>
+</div>
+{% endfor %}
+{% if not pages %}<div class="bar">No students or days recorded yet.</div>{% endif %}
+<script>
+(function () {
+  var K = {school: "sheet_school", section: "sheet_section", sem: "sheet_semester"};
+  var D = {school: "ECLARO ACADEMY, INC.", section: "", sem: ""};
+  function get(k) { try { var v = localStorage.getItem(K[k]); return v === null ? D[k] : v; } catch (e) { return D[k]; } }
+  function put(k, v) { try { localStorage.setItem(K[k], v); } catch (e) {} }
+  function paint(k, cls) { var v = get(k); document.querySelectorAll(cls).forEach(function (n) { n.textContent = v; }); }
+  function fit() {
+    document.querySelectorAll(".fit").forEach(function (el) {
+      el.style.fontSize = "";
+      var s = parseFloat(getComputedStyle(el).fontSize) * 0.75;
+      while ((el.scrollWidth > el.clientWidth + 0.5 || el.scrollHeight > el.clientHeight + 0.5) && s > 3.5) {
+        s -= 0.25; el.style.fontSize = s + "pt";
+      }
+    });
+  }
+  fit(); window.addEventListener("beforeprint", fit);
+  var PAPER = {a4: [297, 210], long: [330.2, 215.9], letter: [279.4, 215.9]};
+  var paperSel = document.getElementById("inPaper");
+  function setPaper(k) {
+    var p = PAPER[k] || PAPER.a4;
+    document.getElementById("pageStyle").textContent = "@page { size: " + p[0] + "mm " + p[1] + "mm; margin: 8mm; }";
+    document.body.style.setProperty("--sw", (p[0] - 16) + "mm");
+    fit();
+  }
+  try { paperSel.value = localStorage.getItem("sheet_paper") || "a4"; } catch (e) {}
+  if (!paperSel.value) paperSel.value = "a4";
+  setPaper(paperSel.value);
+  paperSel.addEventListener("change", function () { setPaper(paperSel.value); try { localStorage.setItem("sheet_paper", paperSel.value); } catch (e) {} });
+  var chk = document.getElementById("chkTot");
+  function setTot(on) { document.body.classList.toggle("showtotals", on); }
+  try { chk.checked = localStorage.getItem("sheet_totals") === "1"; } catch (e) {}
+  setTot(chk.checked);
+  chk.addEventListener("change", function () { setTot(chk.checked); try { localStorage.setItem("sheet_totals", chk.checked ? "1" : "0"); } catch (e) {} });
+  [["school", "inSchool", ".o-school"], ["section", "inSection", ".o-section"], ["sem", "inSem", ".o-sem"]].forEach(function (t) {
+    var inp = document.getElementById(t[1]);
+    inp.value = get(t[0]); paint(t[0], t[2]);
+    inp.addEventListener("input", function () { put(t[0], inp.value); paint(t[0], t[2]); });
+  });
+})();
+</script>
+</body></html>
