@@ -104,9 +104,38 @@
   </details>
   {% if not rows %}<p class="muted">No students yet.</p>{% endif %}
   <table>{% for s in rows %}<tr>
-    <td class="n" style="width:40px">{{ loop.index }}</td><td>{{ s.name }}</td>
-    <td class="n" style="width:90px"><span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}">{{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}</span></td>
-    <td style="text-align:right;white-space:nowrap">
+    <td class="n" style="width:40px;vertical-align:top">{{ loop.index }}</td>
+    <td>
+      <div>
+        <a href="{{ url_for('lookup', student=s.name) }}" style="color:inherit;text-decoration:none"><b>{{ s.name }}</b></a>
+        {% if s.student_no %}<span class="badge done" style="font-size:11px;margin-left:6px">{{ s.student_no }}</span>{% endif %}
+      </div>
+      {% if s.guardian_name or s.guardian_phone or s.email or s.address %}
+      <div class="muted" style="font-size:12px;margin-top:2px">
+        {% if s.guardian_name %}Guardian: {{ s.guardian_name }}{% endif %}
+        {% if s.guardian_phone %} · 📞 {{ s.guardian_phone }}{% endif %}
+        {% if s.email %} · ✉️ {{ s.email }}{% endif %}
+        {% if s.address %} · 📍 {{ s.address }}{% endif %}
+      </div>
+      {% endif %}
+      <details style="margin-top:6px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--brand)">✏️ Edit student info &amp; guardian contact</summary>
+        <form method="post" action="{{ url_for('students_profile') }}" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;background:var(--surface);padding:10px;border-radius:8px;border:1px solid var(--line)">
+          <input type="hidden" name="old_name" value="{{ s.name }}">
+          <input type="hidden" name="subject" value="{{ subject }}">
+          <input type="hidden" name="section" value="{{ section or '' }}">
+          <input class="txt" type="text" name="name" value="{{ s.name }}" placeholder="Full name" required style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="student_no" value="{{ s.student_no or '' }}" placeholder="Student ID / No." style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="guardian_name" value="{{ s.guardian_name or '' }}" placeholder="Guardian name" style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="guardian_phone" value="{{ s.guardian_phone or '' }}" placeholder="Guardian phone / contact" style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="email" name="email" value="{{ s.email or '' }}" placeholder="Student email" style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="address" value="{{ s.address or '' }}" placeholder="Home address" style="font-size:13px;padding:6px 8px;grid-column:1 / -1">
+          <div style="grid-column:1 / -1"><button class="btn small primary" type="submit">Save Profile</button></div>
+        </form>
+      </details>
+    </td>
+    <td class="n" style="width:90px;vertical-align:top"><span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}">{{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}</span></td>
+    <td style="text-align:right;white-space:nowrap;vertical-align:top">
       <form class="inline" method="post" action="{{ url_for('students_remove') }}" onsubmit="return confirm('Remove {{ s.name|e }} from {{ subject|e }} ({{ section|e }})? Their marks for this section are deleted.')">
         <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="row" value="{{ s.row }}"><input type="hidden" name="name" value="{{ s.name }}">
         <button class="btn small danger" type="submit">Remove</button></form>

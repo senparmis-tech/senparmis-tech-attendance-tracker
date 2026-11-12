@@ -21,7 +21,8 @@ from store import (FileLocked, add_section, add_students, add_subject,
                    delete_subject, ensure_db, get_subject_image_file,
                    list_backups, load_data, reimport_from_excel,
                    remove_student, remove_subject_image, rename_section,
-                   restore_backup, student_stats, subject_image_url)
+                   restore_backup, student_stats, subject_image_url,
+                   update_student_profile)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
@@ -451,6 +452,33 @@ def students_remove():
     if removed:
         log_change("Student removed", "All subjects" if everywhere else f"{subject} ({section or ''})", name)
     flash(f"Removed {name}." if removed else f"{name} was not found.", "ok" if removed else "err")
+    return redirect(url_for("students", subject=subject, section=section))
+
+
+@app.route("/students/profile", methods=["POST"])
+def students_profile():
+    old_name = clean_name(request.form.get("old_name", ""))
+    new_name = clean_name(request.form.get("name", "")) or old_name
+    student_no = request.form.get("student_no", "")
+    guardian_name = request.form.get("guardian_name", "")
+    guardian_phone = request.form.get("guardian_phone", "")
+    email = request.form.get("email", "")
+    address = request.form.get("address", "")
+    subject = request.form.get("subject", "")
+    section = request.form.get("section", "")
+    next_page = request.form.get("next", "")
+    try:
+        saved_name = update_student_profile(
+            old_name, new_name=new_name, student_no=student_no,
+            guardian_name=guardian_name, guardian_phone=guardian_phone,
+            email=email, address=address)
+        log_change("Student profile updated", subject, f"{saved_name} (ID: {student_no or '—'})")
+        flash(f"Saved profile for {saved_name}.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+        saved_name = old_name
+    if next_page == "lookup":
+        return redirect(url_for("lookup", q=request.form.get("q", ""), subject=subject, section=section, student=saved_name))
     return redirect(url_for("students", subject=subject, section=section))
 
 

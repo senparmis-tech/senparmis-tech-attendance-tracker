@@ -1,5 +1,5 @@
 """
-Student lookup: search a student by name or section and see their attendance in every subject.
+Student lookup: search a student by name, ID, or section and see their attendance and contact info in every subject.
 Teacher-only (the auth gate only lets students open the Records page).
 """
 from flask import render_template, request
@@ -15,7 +15,7 @@ def _key(name):
 
 
 def build_index(data):
-    """Map each student (by lowercase name) to their stats and history in every subject and section."""
+    """Map each student (by lowercase name) to their profile, stats, and history in every subject and section."""
     people = {}
     all_sections = []
     for subject, sd in data.items():
@@ -24,7 +24,16 @@ def build_index(data):
             if sec_name not in all_sections:
                 all_sections.append(sec_name)
             for st in student_stats(sec_sd):
-                p = people.setdefault(_key(st["name"]), {"name": st["name"], "subjects": [], "sections": []})
+                p = people.setdefault(_key(st["name"]), {
+                    "name": st["name"],
+                    "student_no": st.get("student_no", ""),
+                    "guardian_name": st.get("guardian_name", ""),
+                    "guardian_phone": st.get("guardian_phone", ""),
+                    "email": st.get("email", ""),
+                    "address": st.get("address", ""),
+                    "subjects": [],
+                    "sections": [],
+                })
                 if sec_name not in p["sections"]:
                     p["sections"].append(sec_name)
                 history = []
@@ -54,8 +63,12 @@ def lookup():
     section = request.args.get("section", "")
     pick = request.args.get("student", "")
     results = []
+    q_low = q.casefold()
     for key, p in people.items():
-        if q and q.casefold() not in key and not any(q.casefold() in sec.casefold() for sec in p["sections"]):
+        if q_low and (q_low not in key
+                      and q_low not in p["student_no"].casefold()
+                      and q_low not in p["guardian_name"].casefold()
+                      and not any(q_low in sec.casefold() for sec in p["sections"])):
             continue
         if subject and not any(s["subject"] == subject for s in p["subjects"]):
             continue

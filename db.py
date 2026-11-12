@@ -72,6 +72,14 @@ MIGRATIONS = [
         WHERE s2.subject_id = sections.subject_id AND s2.name = 'BSCS-1A'
       );
     """,
+    # 4: student profile fields (student number, guardian, contact, email, address).
+    """
+    ALTER TABLE students ADD COLUMN student_no TEXT DEFAULT '';
+    ALTER TABLE students ADD COLUMN guardian_name TEXT DEFAULT '';
+    ALTER TABLE students ADD COLUMN guardian_phone TEXT DEFAULT '';
+    ALTER TABLE students ADD COLUMN email TEXT DEFAULT '';
+    ALTER TABLE students ADD COLUMN address TEXT DEFAULT '';
+    """,
 ]
 
 

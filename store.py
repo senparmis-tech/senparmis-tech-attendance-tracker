@@ -192,8 +192,20 @@ def load_data(teacher_id=None, is_admin=None):
                 sec = sec_row["id"]
                 sec_name = sec_row["name"]
                 section_names.append(sec_name)
-                students = [{"row": r["id"], "name": r["name"], "section": sec_name} for r in conn.execute(
-                    "SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
+                students = [{
+                    "row": r["id"],
+                    "student_id": r["student_id"],
+                    "name": r["name"],
+                    "section": sec_name,
+                    "student_no": r["student_no"] or "",
+                    "guardian_name": r["guardian_name"] or "",
+                    "guardian_phone": r["guardian_phone"] or "",
+                    "email": r["email"] or "",
+                    "address": r["address"] or "",
+                } for r in conn.execute(
+                    "SELECT e.id, e.student_id, st.name, st.student_no, st.guardian_name, "
+                    "st.guardian_phone, st.email, st.address "
+                    "FROM enrollments e JOIN students st ON st.id = e.student_id "
                     "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
                 dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
                          for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? ORDER BY date", (sec,))]
@@ -729,4 +741,32 @@ def assign_subject_teacher(subject_name, teacher_id):
         if not cur.rowcount:
             raise ValueError("Subject not found.")
     mutate(run)
+
+
+# -------------------------------------------------------- student profiles
+def update_student_profile(name, new_name=None, student_no="", guardian_name="",
+                           guardian_phone="", email="", address=""):
+    old_k = key_of(name)
+    cleaned_new = safe_text(new_name or name) or clean_name(name)
+    new_k = key_of(cleaned_new)
+    s_no = safe_text(student_no)[:60]
+    g_name = safe_text(guardian_name)[:120]
+    g_phone = safe_text(guardian_phone)[:60]
+    em = safe_text(email)[:120]
+    addr = safe_text(address)[:240]
+
+    def run(conn):
+        row = conn.execute("SELECT id FROM students WHERE name_key = ?", (old_k,)).fetchone()
+        if not row:
+            raise ValueError("Student was not found.")
+        if new_k != old_k and conn.execute("SELECT 1 FROM students WHERE name_key = ? AND id != ?",
+                                           (new_k, row["id"])).fetchone():
+            raise ValueError("Another student already has that name.")
+        conn.execute(
+            "UPDATE students SET name = ?, name_key = ?, student_no = ?, guardian_name = ?, "
+            "guardian_phone = ?, email = ?, address = ? WHERE id = ?",
+            (cleaned_new, new_k, s_no, g_name, g_phone, em, addr, row["id"]))
+        return cleaned_new
+    return mutate(run)
+
 

@@ -241,4 +241,26 @@ def test_delete_subject_and_restore_from_log():
     c.post("/subjects/delete", data={"subject": "RestoreMe"})
 
 
+def test_student_profile_and_guardian_contact():
+    c = _teacher_client()
+    r = c.post("/students/profile", data={
+        "old_name": "Sample Student A",
+        "name": "Sample Student A",
+        "student_no": "2026-00101",
+        "guardian_name": "Elena Santos",
+        "guardian_phone": "0917-555-0199",
+        "email": "student.a@school.edu",
+        "address": "123 Rizal St, Quezon City",
+        "subject": "MMW",
+        "next": "lookup",
+    })
+    assert r.status_code == 302
+    lk = c.get("/lookup?q=2026-00101").get_data(as_text=True)
+    assert "Sample Student A" in lk
+    assert "Elena Santos" in lk
+    assert "0917-555-0199" in lk
+    assert "123 Rizal St, Quezon City" in lk
+
+
+
 

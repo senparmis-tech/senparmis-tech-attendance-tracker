@@ -4,7 +4,7 @@
 <h1>Student lookup</h1>
 <div class="card no-print">
   <form method="get" action="{{ url_for('lookup') }}" style="display:flex;gap:10px;flex-wrap:wrap">
-    <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search student name or section (e.g. BSCS-1A)" autofocus style="flex:1;min-width:200px">
+    <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search student name, ID, guardian, or section (e.g. BSCS-1A)" autofocus style="flex:1;min-width:220px">
     <select name="subject">
       <option value="">All subjects</option>
       {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject }}>{{ s }}</option>{% endfor %}
@@ -24,6 +24,7 @@
 <div class="card no-print">
   {% for p in results %}
   <p style="margin:6px 0"><a href="{{ url_for('lookup', q=q, subject=subject, section=section, student=p.name) }}"><b>{{ p.name }}</b></a>
+    {% if p.student_no %}<span class="badge done" style="font-size:11px;margin-left:4px">{{ p.student_no }}</span>{% endif %}
     <small>
       {% for s in p.subjects %}{{ s.subject }} ({{ s.section }}){{ ', ' if not loop.last }}{% endfor %}
       {% if p.avg is not none %} &middot; avg {{ (p.avg*100)|round|int }}%{% endif %}
@@ -32,18 +33,48 @@
   {% else %}<p>No student matches that search.</p>{% endfor %}
 </div>
 {% else %}
-<p class="no-print">Type a name or pick a section to find a student's attendance in every subject.</p>
+<p class="no-print">Type a name, student ID, or pick a section to view a student's attendance, contact info, and printable slip.</p>
 {% endif %}
 
 {% if selected %}
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line)">
     <div>
-      <h2 style="margin:0">{{ selected.name }}</h2>
-      {% if selected.sections %}<div class="muted" style="font-size:13px">Section: <b>{{ selected.sections|join(', ') }}</b></div>{% endif %}
+      <h2 style="margin:0">{{ selected.name }}
+        {% if selected.student_no %}<span class="badge done" style="font-size:13px;vertical-align:middle;margin-left:6px">ID: {{ selected.student_no }}</span>{% endif %}
+      </h2>
+      {% if selected.sections %}<div class="muted" style="font-size:13px;margin-top:2px">Section: <b>{{ selected.sections|join(', ') }}</b></div>{% endif %}
     </div>
-    <button class="btn small no-print" type="button" onclick="window.print()">Print slip</button>
+    <button class="btn small primary no-print" type="button" onclick="window.print()">🖨️ Print slip</button>
   </div>
+
+  <!-- Contact & Guardian Info -->
+  <div style="margin:12px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;background:var(--surface);padding:12px;border-radius:10px;border:1px solid var(--line)">
+    <div><small class="muted">Student ID / No.</small><div><b>{{ selected.student_no or '—' }}</b></div></div>
+    <div><small class="muted">Student Email</small><div><b>{{ selected.email or '—' }}</b></div></div>
+    <div><small class="muted">Guardian Name</small><div><b>{{ selected.guardian_name or '—' }}</b></div></div>
+    <div><small class="muted">Guardian Contact</small><div><b>{{ selected.guardian_phone or '—' }}</b></div></div>
+    <div style="grid-column:1 / -1"><small class="muted">Home Address</small><div><b>{{ selected.address or '—' }}</b></div></div>
+  </div>
+
+  <details class="no-print" style="margin-bottom:14px">
+    <summary style="cursor:pointer;font-size:13px;color:var(--brand);font-weight:700">✏️ Edit student profile &amp; guardian contact</summary>
+    <form method="post" action="{{ url_for('students_profile') }}" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;background:var(--surface);padding:12px;border-radius:10px;border:1px solid var(--line)">
+      <input type="hidden" name="old_name" value="{{ selected.name }}">
+      <input type="hidden" name="next" value="lookup">
+      <input type="hidden" name="q" value="{{ q }}">
+      <input type="hidden" name="subject" value="{{ subject }}">
+      <input type="hidden" name="section" value="{{ section }}">
+      <label style="font-size:12px">Full Name<input class="txt" type="text" name="name" value="{{ selected.name }}" required style="width:100%"></label>
+      <label style="font-size:12px">Student ID / No.<input class="txt" type="text" name="student_no" value="{{ selected.student_no }}" placeholder="e.g. 2026-00123" style="width:100%"></label>
+      <label style="font-size:12px">Guardian Name<input class="txt" type="text" name="guardian_name" value="{{ selected.guardian_name }}" placeholder="Parent / Guardian" style="width:100%"></label>
+      <label style="font-size:12px">Guardian Contact No.<input class="txt" type="text" name="guardian_phone" value="{{ selected.guardian_phone }}" placeholder="09xx-xxx-xxxx" style="width:100%"></label>
+      <label style="font-size:12px">Student Email<input class="txt" type="email" name="email" value="{{ selected.email }}" placeholder="student@example.com" style="width:100%"></label>
+      <label style="font-size:12px;grid-column:1 / -1">Home Address<input class="txt" type="text" name="address" value="{{ selected.address }}" placeholder="Street, Barangay, City" style="width:100%"></label>
+      <div style="grid-column:1 / -1"><button class="btn small primary" type="submit">Save Profile</button></div>
+    </form>
+  </details>
+
   {% if selected.avg is not none %}
   <p>Overall attendance: <b style="{{ 'color:var(--x)' if selected.low }}">{{ (selected.avg*100)|round|int }}%</b>
     {% if selected.low %}(below {{ (low*100)|round|int }}% &ndash; needs attention){% endif %}</p>
