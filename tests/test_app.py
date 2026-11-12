@@ -193,3 +193,33 @@ def test_per_teacher_accounts_and_subject_isolation():
     assert admin.post("/subjects/delete", data={"subject": "Data Structures"}).status_code == 302
     assert admin.post("/teachers/delete", data={"teacher_id": str(santos["id"])}).status_code == 302
 
+
+def test_sections_management_and_lookup_filter():
+    c = _teacher_client()
+    data = store.load_data()
+    assert data["MMW"]["section"] == "BSCS-1A"
+
+    # Add a second section BSCS-1B to MMW
+    r = c.post("/sections/add", data={"subject": "MMW", "section": "BSCS-1B", "copy_from_section": ""})
+    assert r.status_code == 302
+    assert c.post("/students/add", data={"names": "Juan Dela Cruz", "subjects": ["MMW"], "section": "BSCS-1B"}).status_code == 302
+
+    # Mark attendance in BSCS-1B and ensure BSCS-1A is unaffected
+    r = c.post("/api/save", json={
+        "subject": "MMW", "section": "BSCS-1B", "date": "2026-11-12", "topic": "Pointers",
+        "marks": [{"name": "Juan Dela Cruz", "code": "p"}],
+    })
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+
+    # Lookup by section BSCS-1B finds Juan Dela Cruz
+    lk = c.get("/lookup?section=BSCS-1B").get_data(as_text=True)
+    assert "Juan Dela Cruz" in lk
+    assert "BSCS-1B" in lk
+
+    # Rename BSCS-1B -> BSCS-1C and then delete it
+    assert c.post("/sections/rename", data={"subject": "MMW", "old_section": "BSCS-1B", "new_section": "BSCS-1C"}).status_code == 302
+    assert "BSCS-1C" in store.load_data()["MMW"]["section_names"]
+    assert c.post("/sections/delete", data={"subject": "MMW", "section": "BSCS-1C"}).status_code == 302
+    assert "BSCS-1C" not in store.load_data()["MMW"]["section_names"]
+
+

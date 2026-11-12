@@ -171,6 +171,12 @@
 <main>
 {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
 {% if tabs %}<div class="tabs">{% for t in tabs %}<a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
+{% if section_tabs and section_tabs|length > 1 %}
+<div class="tabs" style="margin-top:-6px;margin-bottom:12px;gap:6px">
+  <span class="muted" style="font-size:12px;font-weight:700;align-self:center;margin-right:4px">SECTION:</span>
+  {% for st in section_tabs %}<a class="tab {{ 'on' if st.active }}" style="padding:5px 12px;font-size:13px" href="{{ st.url }}">{{ st.name }}</a>{% endfor %}
+</div>
+{% endif %}
 {% block body %}{% endblock %}
 </main>
 <script>

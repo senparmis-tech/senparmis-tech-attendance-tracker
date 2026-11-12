@@ -63,6 +63,15 @@ MIGRATIONS = [
     ALTER TABLE subjects ADD COLUMN teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL;
     CREATE INDEX idx_subjects_teacher ON subjects(teacher_id);
     """,
+    # 3: rename legacy 'Main' sections to 'BSCS-1A'.
+    """
+    UPDATE sections SET name = 'BSCS-1A'
+    WHERE name = 'Main'
+      AND NOT EXISTS (
+        SELECT 1 FROM sections s2
+        WHERE s2.subject_id = sections.subject_id AND s2.name = 'BSCS-1A'
+      );
+    """,
 ]
 
 

@@ -50,7 +50,7 @@ $('file').onchange = async e => {
 $('read').onclick = async () => {
   if (!blobs.length) return;
   $('read').disabled = true; $('busy').textContent = 'Reading… this can take up to a minute if the AI service is busy.'; showErr('');
-  const fd = new FormData(); fd.append('subject', subject);
+  const fd = new FormData(); fd.append('subject', subject); if (typeof section !== 'undefined' && section) fd.append('section', section);
   blobs.forEach((b, i) => fd.append('image', b, 'sheet' + (i + 1) + '.jpg'));
   try {
     const r = await fetch(SCAN_URL, {method: 'POST', body: fd});
@@ -163,7 +163,7 @@ $('confirm').onclick = async () => {
   const rows = rowsData(), btn = $('confirm'); btn.disabled = true;
   try {
     const r = await fetch(SAVE_URL, {method: 'POST', headers: {'Content-Type': 'application/json'},
-      body: JSON.stringify({subject, date: d, topic: $('topic').value, source: 'scan',
+      body: JSON.stringify({subject, section: (typeof section !== 'undefined' ? section : ''), date: d, topic: $('topic').value, source: 'scan',
         new_students: rows.filter(x => x.isNew).map(x => x.name),
         marks: rows.map(x => ({row: x.row, name: x.name, code: x.code}))})});
     const j = await r.json();

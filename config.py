@@ -14,6 +14,7 @@ DB_FILE = os.path.join(DATA_DIR, "attendance.db")           # the SQLite databas
 
 SAMPLE_SUBJECTS = ["College Algebra", "MMW"]
 SAMPLE_STUDENTS = ["Sample Student A", "Sample Student B", "Sample Student C"]
+DEFAULT_SECTION = "BSCS-1A"
 LOW_RATE = 0.80             # attendance rates below this are shown in red
 
 # AI sheet scanning (optional). The key comes from the ANTHROPIC_API_KEY environment

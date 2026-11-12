@@ -353,6 +353,7 @@ async function saveAttendance() {
   try {
     const payload = {
       subject,
+      section: typeof section !== 'undefined' ? section : '',
       date: dateIso,
       topic: topicEl ? topicEl.value : '',
       marks: students.map(s => ({

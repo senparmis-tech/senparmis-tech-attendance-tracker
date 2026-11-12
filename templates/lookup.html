@@ -4,35 +4,44 @@
 <h1>Student lookup</h1>
 <div class="card no-print">
   <form method="get" action="{{ url_for('lookup') }}" style="display:flex;gap:10px;flex-wrap:wrap">
-    <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search student name" autofocus style="flex:1;min-width:200px">
+    <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search student name or section (e.g. BSCS-1A)" autofocus style="flex:1;min-width:200px">
     <select name="subject">
       <option value="">All subjects</option>
       {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject }}>{{ s }}</option>{% endfor %}
     </select>
+    {% if sections %}
+    <select name="section">
+      <option value="">All sections</option>
+      {% for sec in sections %}<option value="{{ sec }}" {{ 'selected' if sec==section }}>{{ sec }}</option>{% endfor %}
+    </select>
+    {% endif %}
     <button class="btn primary" type="submit">Search</button>
   </form>
 </div>
 
-{% if q or subject %}
+{% if q or subject or section %}
 <p class="no-print">{{ total_matches }} student{{ '' if total_matches==1 else 's' }} found{{ ' (showing first 100)' if total_matches>100 }}.</p>
 <div class="card no-print">
   {% for p in results %}
-  <p style="margin:6px 0"><a href="{{ url_for('lookup', q=q, subject=subject, student=p.name) }}"><b>{{ p.name }}</b></a>
+  <p style="margin:6px 0"><a href="{{ url_for('lookup', q=q, subject=subject, section=section, student=p.name) }}"><b>{{ p.name }}</b></a>
     <small>
-      {% for s in p.subjects %}{{ s.subject }}{{ ', ' if not loop.last }}{% endfor %}
+      {% for s in p.subjects %}{{ s.subject }} ({{ s.section }}){{ ', ' if not loop.last }}{% endfor %}
       {% if p.avg is not none %} &middot; avg {{ (p.avg*100)|round|int }}%{% endif %}
       {% if p.low %} &middot; <span style="color:var(--x)">low attendance</span>{% endif %}
     </small></p>
   {% else %}<p>No student matches that search.</p>{% endfor %}
 </div>
 {% else %}
-<p class="no-print">Type a name to find a student's attendance in every subject.</p>
+<p class="no-print">Type a name or pick a section to find a student's attendance in every subject.</p>
 {% endif %}
 
 {% if selected %}
 <div class="card">
   <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-    <h2 style="margin:0">{{ selected.name }}</h2>
+    <div>
+      <h2 style="margin:0">{{ selected.name }}</h2>
+      {% if selected.sections %}<div class="muted" style="font-size:13px">Section: <b>{{ selected.sections|join(', ') }}</b></div>{% endif %}
+    </div>
     <button class="btn small no-print" type="button" onclick="window.print()">Print slip</button>
   </div>
   {% if selected.avg is not none %}
@@ -40,7 +49,7 @@
     {% if selected.low %}(below {{ (low*100)|round|int }}% &ndash; needs attention){% endif %}</p>
   {% endif %}
   {% for s in selected.subjects %}
-  <h3>{{ s.subject }}</h3>
+  <h3>{{ s.subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ s.section }}</span></h3>
   {% if s.total %}
   <p>Rate <b style="{{ 'color:var(--x)' if s.low }}">{{ (s.rate*100)|round|int }}%</b>
     &middot; Present {{ s.p + s.r }} &middot; Absent {{ s.x }} &middot; Late {{ s.l }} &middot; Excused {{ s.e }}

@@ -66,7 +66,7 @@
     U.forEach(function (u, k) { if (assign[k] >= 0) aliases.push({meet: u.meet, student: S[assign[k]].name}); });
     var marks = S.map(function (s, i) { return {row: s.row, name: s.name, code: sels[i].value}; });
     (aliases.length ? post(D.alias_url, {aliases: aliases}) : Promise.resolve({ok: true}))
-      .then(function () { return post(D.save_url, {subject: D.subject, date: D.date_iso, topic: D.topic, marks: marks, source: 'meet'}); })
+      .then(function () { return post(D.save_url, {subject: D.subject, section: D.section || '', date: D.date_iso, topic: D.topic, marks: marks, source: 'meet'}); })
       .then(function (r) { if (r.ok) { location.href = D.records_url; } else { msg.textContent = r.error || 'Could not save.'; btn.disabled = false; } })
       .catch(function () { msg.textContent = 'Could not reach the site.'; btn.disabled = false; });
   });

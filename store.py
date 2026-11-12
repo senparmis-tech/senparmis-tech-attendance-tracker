@@ -18,8 +18,8 @@ from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
 from config import (BACKUP_DIR, BACKUP_EVERY_MIN, BACKUP_KEEP, DB_FILE,
-                    MIN_PASSWORD, SAMPLE_STUDENTS, SAMPLE_SUBJECTS,
-                    SUBJECT_IMG_DIR, XLSX)
+                    DEFAULT_SECTION, MIN_PASSWORD, SAMPLE_STUDENTS,
+                    SAMPLE_SUBJECTS, SUBJECT_IMG_DIR, XLSX)
 from helpers import clean_name, clean_sheet_name, norm_code, safe_text
 
 write_lock = threading.RLock()
@@ -44,11 +44,12 @@ def _current_teacher_filter():
     return None, True
 
 
-def _insert_subject(conn, name, teacher_id=None):
+def _insert_subject(conn, name, teacher_id=None, section_name=None):
     pos = conn.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM subjects").fetchone()[0]
     sid = conn.execute("INSERT INTO subjects (name, position, teacher_id) VALUES (?, ?, ?)",
                        (name, pos, teacher_id)).lastrowid
-    return conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, 'Main')", (sid,)).lastrowid
+    sec_label = clean_name(section_name or DEFAULT_SECTION) or DEFAULT_SECTION
+    return conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)", (sid, sec_label)).lastrowid
 
 
 def _student_id(conn, name):
@@ -147,15 +148,24 @@ class _Tx:
 
 
 # ------------------------------------------------------------ reading data
-def _section_of(conn, subject):
+def _section_of(conn, subject, section=None):
     tid, is_adm = _current_teacher_filter()
-    row = conn.execute(
-        "SELECT sec.id, s.teacher_id FROM sections sec JOIN subjects s ON s.id = sec.subject_id "
-        "WHERE s.name = ? ORDER BY sec.id LIMIT 1", (subject,)).fetchone()
-    if not row:
+    srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
+    if not srow:
         raise ValueError("That subject was not found.")
-    if not is_adm and tid is not None and row["teacher_id"] != tid:
+    if not is_adm and tid is not None and srow["teacher_id"] != tid:
         raise ValueError("You do not have permission to modify that subject.")
+    sec_name = clean_name(section or "")
+    if sec_name:
+        row = conn.execute("SELECT id FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE",
+                           (srow["id"], sec_name)).fetchone()
+        if not row:
+            raise ValueError("That section was not found in this subject.")
+        return row["id"]
+    row = conn.execute("SELECT id FROM sections WHERE subject_id = ? ORDER BY id LIMIT 1",
+                       (srow["id"],)).fetchone()
+    if not row:
+        raise ValueError("That subject has no sections.")
     return row["id"]
 
 
@@ -166,23 +176,40 @@ def load_data(teacher_id=None, is_admin=None):
         out = {}
         if not is_admin and teacher_id is not None:
             subjects = conn.execute(
-                "SELECT s.name, (SELECT MIN(id) FROM sections WHERE subject_id = s.id) AS section_id "
-                "FROM subjects s WHERE s.teacher_id = ? ORDER BY s.position, s.id", (teacher_id,)).fetchall()
+                "SELECT s.id, s.name FROM subjects s WHERE s.teacher_id = ? ORDER BY s.position, s.id",
+                (teacher_id,)).fetchall()
         else:
             subjects = conn.execute(
-                "SELECT s.name, (SELECT MIN(id) FROM sections WHERE subject_id = s.id) AS section_id "
-                "FROM subjects s ORDER BY s.position, s.id").fetchall()
+                "SELECT s.id, s.name FROM subjects s ORDER BY s.position, s.id").fetchall()
         for sub in subjects:
-            sec = sub["section_id"]
-            students = [{"row": r["id"], "name": r["name"]} for r in conn.execute(
-                "SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
-                "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
-            dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
-                     for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? ORDER BY date", (sec,))]
-            cells = {(r["enrollment_id"], r["session_id"]): r["code"] for r in conn.execute(
-                "SELECT a.enrollment_id, a.session_id, a.code FROM attendance a "
-                "JOIN sessions se ON se.id = a.session_id WHERE se.section_id = ?", (sec,))}
-            out[sub["name"]] = {"students": students, "dates": dates, "cells": cells}
+            secs = conn.execute(
+                "SELECT id, name FROM sections WHERE subject_id = ? ORDER BY id", (sub["id"],)).fetchall()
+            if not secs:
+                continue
+            sections_map = {}
+            section_names = []
+            for sec_row in secs:
+                sec = sec_row["id"]
+                sec_name = sec_row["name"]
+                section_names.append(sec_name)
+                students = [{"row": r["id"], "name": r["name"], "section": sec_name} for r in conn.execute(
+                    "SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
+                    "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
+                dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
+                         for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? ORDER BY date", (sec,))]
+                cells = {(r["enrollment_id"], r["session_id"]): r["code"] for r in conn.execute(
+                    "SELECT a.enrollment_id, a.session_id, a.code FROM attendance a "
+                    "JOIN sessions se ON se.id = a.session_id WHERE se.section_id = ?", (sec,))}
+                sections_map[sec_name] = {
+                    "section": sec_name,
+                    "students": students,
+                    "dates": dates,
+                    "cells": cells,
+                    "section_names": section_names,
+                    "sections": sections_map,
+                }
+            first_sec = sections_map[section_names[0]]
+            out[sub["name"]] = dict(first_sec)
         return out
 
 
@@ -252,9 +279,9 @@ def mutate(fn):
 
 
 # ------------------------------------------------------------ writing data
-def apply_marks(subject, d, topic, items, new_names=()):
+def apply_marks(subject, d, topic, items, new_names=(), section=None):
     def run(conn):
-        sec = _section_of(conn, subject)
+        sec = _section_of(conn, subject, section)
         iso = d.isoformat()
         row = conn.execute("SELECT id FROM sessions WHERE section_id = ? AND date = ?", (sec, iso)).fetchone()
         created = row is None
@@ -309,10 +336,10 @@ def apply_marks(subject, d, topic, items, new_names=()):
     return mutate(run)
 
 
-def delete_date(subject, d):
+def delete_date(subject, d, section=None):
     """Remove one class date (topic and every mark) from a subject."""
     def run(conn):
-        sec = _section_of(conn, subject)
+        sec = _section_of(conn, subject, section)
         row = conn.execute("SELECT id, topic FROM sessions WHERE section_id = ? AND date = ?",
                            (sec, d.isoformat())).fetchone()
         if not row:
@@ -323,11 +350,14 @@ def delete_date(subject, d):
     return mutate(run)
 
 
-def add_students(subjects, names):
+def add_students(subjects, names, section=None):
     def run(conn):
         added, skipped = 0, []
         for sub in subjects:
-            sec = _section_of(conn, sub)
+            try:
+                sec = _section_of(conn, sub, section) if section else _section_of(conn, sub)
+            except ValueError:
+                sec = _section_of(conn, sub)
             for n in names:
                 if _enroll(conn, _student_id(conn, n), sec):
                     added += 1
@@ -337,27 +367,40 @@ def add_students(subjects, names):
     return mutate(run)
 
 
-def remove_student(subject, row, name, everywhere):
+def remove_student(subject, row, name, everywhere, section=None):
     def run(conn):
-        targets = [r["name"] for r in conn.execute("SELECT name FROM subjects")] if everywhere else [subject]
-        removed = 0
-        for sub in targets:
-            sec = _section_of(conn, sub)
-            hit = None
-            if not everywhere and isinstance(row, int):
-                r = conn.execute("SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
-                                 "WHERE e.id = ? AND e.section_id = ?", (row, sec)).fetchone()
-                if r and key_of(r["name"]) == key_of(name):
-                    hit = r["id"]
-            if hit is None:
-                r = conn.execute("SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
-                                 "WHERE e.section_id = ? AND st.name_key = ?", (sec, key_of(name))).fetchone()
-                hit = r["id"] if r else None
-            if hit:
-                conn.execute("DELETE FROM enrollments WHERE id = ?", (hit,))
-                removed += 1
-        conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
-        return removed
+        if everywhere:
+            tid, is_adm = _current_teacher_filter()
+            if not is_adm and tid is not None:
+                rows = conn.execute(
+                    "SELECT e.id FROM enrollments e JOIN sections sec ON sec.id = e.section_id "
+                    "JOIN subjects s ON s.id = sec.subject_id JOIN students st ON st.id = e.student_id "
+                    "WHERE s.teacher_id = ? AND st.name_key = ?", (tid, key_of(name))).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
+                    "WHERE st.name_key = ?", (key_of(name),)).fetchall()
+            for r in rows:
+                conn.execute("DELETE FROM enrollments WHERE id = ?", (r["id"],))
+            conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
+            return len(rows)
+
+        sec = _section_of(conn, subject, section)
+        hit = None
+        if isinstance(row, int):
+            r = conn.execute("SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
+                             "WHERE e.id = ? AND e.section_id = ?", (row, sec)).fetchone()
+            if r and key_of(r["name"]) == key_of(name):
+                hit = r["id"]
+        if hit is None:
+            r = conn.execute("SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
+                             "WHERE e.section_id = ? AND st.name_key = ?", (sec, key_of(name))).fetchone()
+            hit = r["id"] if r else None
+        if hit:
+            conn.execute("DELETE FROM enrollments WHERE id = ?", (hit,))
+            conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
+            return 1
+        return 0
     return mutate(run)
 
 
@@ -407,7 +450,7 @@ def delete_subject(name):
     remove_subject_image(name)
 
 
-def add_subject(name, copy_from, teacher_id=None):
+def add_subject(name, copy_from, teacher_id=None, section_name=None):
     def run(conn):
         tid, is_adm = _current_teacher_filter()
         owner = teacher_id if is_adm else (tid or teacher_id)
@@ -418,11 +461,71 @@ def add_subject(name, copy_from, teacher_id=None):
             src = _section_of(conn, copy_from)
             source = [r["student_id"] for r in conn.execute(
                 "SELECT student_id FROM enrollments WHERE section_id = ? ORDER BY id", (src,))]
-        sec = _insert_subject(conn, name, owner)
+        sec = _insert_subject(conn, name, owner, section_name=section_name)
         for sid in source:
             _enroll(conn, sid, sec)
         return len(source)
     return mutate(run)
+
+
+def add_section(subject, section_name, copy_from_section=None):
+    sec_label = clean_sheet_name(section_name)
+    if not sec_label:
+        raise ValueError("Please enter a valid section name (e.g. BSCS-1A).")
+
+    def run(conn):
+        tid, is_adm = _current_teacher_filter()
+        srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
+        if not srow:
+            raise ValueError("That subject was not found.")
+        if not is_adm and tid is not None and srow["teacher_id"] != tid:
+            raise ValueError("You do not have permission to modify that subject.")
+        if conn.execute("SELECT 1 FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE",
+                        (srow["id"], sec_label)).fetchone():
+            raise ValueError(f"Section '{sec_label}' already exists in {subject}.")
+        source = []
+        if copy_from_section:
+            src_row = conn.execute("SELECT id FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE",
+                                   (srow["id"], copy_from_section)).fetchone()
+            if src_row:
+                source = [r["student_id"] for r in conn.execute(
+                    "SELECT student_id FROM enrollments WHERE section_id = ? ORDER BY id", (src_row["id"],))]
+        new_sec = conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)",
+                               (srow["id"], sec_label)).lastrowid
+        for sid in source:
+            _enroll(conn, sid, new_sec)
+        return len(source)
+    return mutate(run)
+
+
+def rename_section(subject, old_name, new_name):
+    new_label = clean_sheet_name(new_name)
+    if not new_label:
+        raise ValueError("Please enter a valid section name.")
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, old_name)
+        srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        conflict = conn.execute(
+            "SELECT id FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE AND id != ?",
+            (srow["subject_id"], new_label, sec_id)).fetchone()
+        if conflict:
+            raise ValueError(f"Section '{new_label}' already exists in {subject}.")
+        conn.execute("UPDATE sections SET name = ? WHERE id = ?", (new_label, sec_id))
+        return new_label
+    return mutate(run)
+
+
+def delete_section(subject, section_name):
+    def run(conn):
+        sec_id = _section_of(conn, subject, section_name)
+        srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        count = conn.execute("SELECT COUNT(*) FROM sections WHERE subject_id = ?", (srow["subject_id"],)).fetchone()[0]
+        if count <= 1:
+            raise ValueError("Cannot delete the only section of a subject (rename it or delete the subject instead).")
+        conn.execute("DELETE FROM sections WHERE id = ?", (sec_id,))
+        conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
+    mutate(run)
 
 
 # -------------------------------------------------------- teacher accounts
