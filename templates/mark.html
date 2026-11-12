@@ -44,7 +44,7 @@
 </div>
 <script>
 document.getElementById('dateIn').onchange = e => {
-  if (e.target.value) location.href = {{ base_url|tojson }} + '&date=' + e.target.value;
+  if (e.target.value) location.href = {{ base_url|tojson }} + ({{ base_url|tojson }}.includes('?') ? '&date=' : '?date=') + e.target.value;
 };
 </script>
 {% else %}
@@ -68,7 +68,7 @@ document.getElementById('dateIn').onchange = e => {
     <div class="fast-actions-wrap">
       <button class="btn fast-btn pres" type="button" id="allP">⚡ All Present</button>
       <button class="btn fast-btn" type="button" id="clearAll">↺ Reset</button>
-      <a class="btn fast-btn" href="{{ url_for('scan', subject=subject) }}">📥 Import</a>
+      <a class="btn fast-btn" href="{{ url_for('scan', subject=subject, section=section) }}">📥 Import</a>
     </div>
   </div>
 
@@ -172,6 +172,7 @@ document.getElementById('dateIn').onchange = e => {
 <script>
 const students = {{ students|tojson }};
 const subject = {{ subject|tojson }};
+const section = {{ section|tojson }};
 const dateIso = {{ date_iso|tojson }};
 let wasRecorded = {{ recorded|tojson }};
 const baseUrl = {{ base_url|tojson }};

@@ -13,10 +13,12 @@ import threading
 import time
 from datetime import date, datetime
 
-from flask import url_for
+from flask import g, has_request_context, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
-from config import (BACKUP_DIR, BACKUP_EVERY_MIN, BACKUP_KEEP, DB_FILE, SAMPLE_STUDENTS,
+from config import (BACKUP_DIR, BACKUP_EVERY_MIN, BACKUP_KEEP, DB_FILE,
+                    DEFAULT_SECTION, MIN_PASSWORD, SAMPLE_STUDENTS,
                     SAMPLE_SUBJECTS, SUBJECT_IMG_DIR, XLSX)
 from helpers import clean_name, clean_sheet_name, norm_code, safe_text
 
@@ -33,10 +35,21 @@ def key_of(name):
 
 
 # ------------------------------------------------------------------ set-up
-def _insert_subject(conn, name):
+def _current_teacher_filter():
+    """Return (teacher_id, is_admin) from Flask request context if a non-admin teacher is logged in."""
+    if has_request_context():
+        tid = getattr(g, "teacher_id", None)
+        is_adm = getattr(g, "is_admin", True)
+        return tid, bool(is_adm)
+    return None, True
+
+
+def _insert_subject(conn, name, teacher_id=None, section_name=None):
     pos = conn.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM subjects").fetchone()[0]
-    sid = conn.execute("INSERT INTO subjects (name, position) VALUES (?, ?)", (name, pos)).lastrowid
-    return conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, 'Main')", (sid,)).lastrowid
+    sid = conn.execute("INSERT INTO subjects (name, position, teacher_id) VALUES (?, ?, ?)",
+                       (name, pos, teacher_id)).lastrowid
+    sec_label = clean_name(section_name or DEFAULT_SECTION) or DEFAULT_SECTION
+    return conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)", (sid, sec_label)).lastrowid
 
 
 def _student_id(conn, name):
@@ -135,32 +148,80 @@ class _Tx:
 
 
 # ------------------------------------------------------------ reading data
-def _section_of(conn, subject):
-    row = conn.execute(
-        "SELECT sec.id FROM sections sec JOIN subjects s ON s.id = sec.subject_id "
-        "WHERE s.name = ? ORDER BY sec.id LIMIT 1", (subject,)).fetchone()
-    if not row:
+def _section_of(conn, subject, section=None):
+    tid, is_adm = _current_teacher_filter()
+    srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
+    if not srow:
         raise ValueError("That subject was not found.")
+    if not is_adm and tid is not None and srow["teacher_id"] != tid:
+        raise ValueError("You do not have permission to modify that subject.")
+    sec_name = clean_name(section or "")
+    if sec_name:
+        row = conn.execute("SELECT id FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE",
+                           (srow["id"], sec_name)).fetchone()
+        if not row:
+            raise ValueError("That section was not found in this subject.")
+        return row["id"]
+    row = conn.execute("SELECT id FROM sections WHERE subject_id = ? ORDER BY id LIMIT 1",
+                       (srow["id"],)).fetchone()
+    if not row:
+        raise ValueError("That subject has no sections.")
     return row["id"]
 
 
-def load_data():
+def load_data(teacher_id=None, is_admin=None):
+    if teacher_id is None and is_admin is None:
+        teacher_id, is_admin = _current_teacher_filter()
     with _Tx() as conn:
         out = {}
-        subjects = conn.execute(
-            "SELECT s.name, (SELECT MIN(id) FROM sections WHERE subject_id = s.id) AS section_id "
-            "FROM subjects s ORDER BY s.position, s.id").fetchall()
+        if not is_admin and teacher_id is not None:
+            subjects = conn.execute(
+                "SELECT s.id, s.name FROM subjects s WHERE s.teacher_id = ? ORDER BY s.position, s.id",
+                (teacher_id,)).fetchall()
+        else:
+            subjects = conn.execute(
+                "SELECT s.id, s.name FROM subjects s ORDER BY s.position, s.id").fetchall()
         for sub in subjects:
-            sec = sub["section_id"]
-            students = [{"row": r["id"], "name": r["name"]} for r in conn.execute(
-                "SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
-                "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
-            dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
-                     for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? ORDER BY date", (sec,))]
-            cells = {(r["enrollment_id"], r["session_id"]): r["code"] for r in conn.execute(
-                "SELECT a.enrollment_id, a.session_id, a.code FROM attendance a "
-                "JOIN sessions se ON se.id = a.session_id WHERE se.section_id = ?", (sec,))}
-            out[sub["name"]] = {"students": students, "dates": dates, "cells": cells}
+            secs = conn.execute(
+                "SELECT id, name FROM sections WHERE subject_id = ? ORDER BY id", (sub["id"],)).fetchall()
+            if not secs:
+                continue
+            sections_map = {}
+            section_names = []
+            for sec_row in secs:
+                sec = sec_row["id"]
+                sec_name = sec_row["name"]
+                section_names.append(sec_name)
+                students = [{
+                    "row": r["id"],
+                    "student_id": r["student_id"],
+                    "name": r["name"],
+                    "section": sec_name,
+                    "student_no": r["student_no"] or "",
+                    "guardian_name": r["guardian_name"] or "",
+                    "guardian_phone": r["guardian_phone"] or "",
+                    "email": r["email"] or "",
+                    "address": r["address"] or "",
+                } for r in conn.execute(
+                    "SELECT e.id, e.student_id, st.name, st.student_no, st.guardian_name, "
+                    "st.guardian_phone, st.email, st.address "
+                    "FROM enrollments e JOIN students st ON st.id = e.student_id "
+                    "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
+                dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
+                         for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? ORDER BY date", (sec,))]
+                cells = {(r["enrollment_id"], r["session_id"]): r["code"] for r in conn.execute(
+                    "SELECT a.enrollment_id, a.session_id, a.code FROM attendance a "
+                    "JOIN sessions se ON se.id = a.session_id WHERE se.section_id = ?", (sec,))}
+                sections_map[sec_name] = {
+                    "section": sec_name,
+                    "students": students,
+                    "dates": dates,
+                    "cells": cells,
+                    "section_names": section_names,
+                    "sections": sections_map,
+                }
+            first_sec = sections_map[section_names[0]]
+            out[sub["name"]] = dict(first_sec)
         return out
 
 
@@ -218,6 +279,108 @@ def _copy_db(target):
         src.close()
 
 
+def list_backups():
+    """Return all timestamped .db snapshots in the backups folder, newest first."""
+    out = []
+    if not os.path.exists(BACKUP_DIR):
+        return out
+    labels = {
+        "auto": "Automatic snapshot",
+        "before_delete_date": "Before deleting a date",
+        "before_delete_subject": "Before deleting a subject",
+        "before_delete_section": "Before deleting a section",
+        "before_restore": "Before a restore",
+    }
+    try:
+        files = [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db") and f != "attendance_LATEST.db"]
+    except OSError:
+        return out
+    for fn in files:
+        full = os.path.join(BACKUP_DIR, fn)
+        try:
+            st = os.stat(full)
+        except OSError:
+            continue
+        m = re.match(r"^attendance_(.+)_(\d{8}_\d{6})\.db$", fn)
+        tag = m.group(1) if m else "snapshot"
+        dt = datetime.fromtimestamp(st.st_mtime)
+        subjects = []
+        try:
+            conn = sqlite3.connect(full)
+            subjects = [r[0] for r in conn.execute("SELECT name FROM subjects ORDER BY position, id").fetchall()]
+            conn.close()
+        except sqlite3.Error:
+            pass
+        out.append({
+            "filename": fn,
+            "kind": labels.get(tag, tag.replace("_", " ").capitalize()),
+            "when": dt.strftime("%b %d, %Y %I:%M:%S %p").replace(" 0", " "),
+            "mtime": st.st_mtime,
+            "subjects": subjects,
+        })
+    out.sort(key=lambda x: x["mtime"], reverse=True)
+    return out
+
+
+def restore_backup(filename):
+    """Restore a snapshot from the backups folder (saves a safety backup of the current database first)."""
+    safe_fn = os.path.basename(filename or "")
+    if not safe_fn.endswith(".db") or safe_fn == "attendance_LATEST.db":
+        raise ValueError("Invalid backup file.")
+    src_path = os.path.join(BACKUP_DIR, safe_fn)
+    if not os.path.isfile(src_path):
+        raise ValueError("That backup file was not found.")
+    with write_lock:
+        backup_workbook("before_restore", min_gap_min=0)
+        src = sqlite3.connect(src_path)
+        dst = sqlite3.connect(DB_FILE)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        conn = db.connect()
+        try:
+            db.migrate(conn)
+        finally:
+            conn.close()
+        backup_latest()
+
+
+def reimport_from_excel():
+    """Import subjects/students/marks from attendance_records.xlsx if missing in the database."""
+    if not os.path.isfile(XLSX):
+        raise ValueError("No attendance_records.xlsx file was found on the server.")
+    from excel_io import read_workbook
+    excel_data = read_workbook(XLSX)
+
+    def run(conn):
+        restored = []
+        for subject, sd in excel_data.items():
+            if conn.execute("SELECT 1 FROM subjects WHERE name = ?", (subject,)).fetchone():
+                continue
+            section = _insert_subject(conn, subject)
+            enr = {}
+            for s in sd["students"]:
+                eid = _enroll(conn, _student_id(conn, s["name"]), section)
+                if eid:
+                    enr[s["row"]] = eid
+            for dd in sd["dates"]:
+                iso = dd["date"].isoformat()
+                sess = conn.execute("INSERT INTO sessions (section_id, date, topic) VALUES (?, ?, ?)",
+                                    (section, iso, dd["topic"] or None)).lastrowid
+                for row, eid in enr.items():
+                    code = sd["cells"].get((row, dd["col"]))
+                    if code:
+                        conn.execute("INSERT INTO attendance (enrollment_id, session_id, code) VALUES (?, ?, ?)",
+                                     (eid, sess, code))
+            restored.append(subject)
+        return restored
+    with write_lock:
+        backup_workbook("before_restore", min_gap_min=0)
+    return mutate(run)
+
+
 def mutate(fn):
     """Run ``fn(conn)`` as one all-or-nothing change, with backups around it."""
     ensure_db()
@@ -230,9 +393,9 @@ def mutate(fn):
 
 
 # ------------------------------------------------------------ writing data
-def apply_marks(subject, d, topic, items, new_names=()):
+def apply_marks(subject, d, topic, items, new_names=(), section=None):
     def run(conn):
-        sec = _section_of(conn, subject)
+        sec = _section_of(conn, subject, section)
         iso = d.isoformat()
         row = conn.execute("SELECT id FROM sessions WHERE section_id = ? AND date = ?", (sec, iso)).fetchone()
         created = row is None
@@ -287,10 +450,10 @@ def apply_marks(subject, d, topic, items, new_names=()):
     return mutate(run)
 
 
-def delete_date(subject, d):
+def delete_date(subject, d, section=None):
     """Remove one class date (topic and every mark) from a subject."""
     def run(conn):
-        sec = _section_of(conn, subject)
+        sec = _section_of(conn, subject, section)
         row = conn.execute("SELECT id, topic FROM sessions WHERE section_id = ? AND date = ?",
                            (sec, d.isoformat())).fetchone()
         if not row:
@@ -301,11 +464,14 @@ def delete_date(subject, d):
     return mutate(run)
 
 
-def add_students(subjects, names):
+def add_students(subjects, names, section=None):
     def run(conn):
         added, skipped = 0, []
         for sub in subjects:
-            sec = _section_of(conn, sub)
+            try:
+                sec = _section_of(conn, sub, section) if section else _section_of(conn, sub)
+            except ValueError:
+                sec = _section_of(conn, sub)
             for n in names:
                 if _enroll(conn, _student_id(conn, n), sec):
                     added += 1
@@ -315,27 +481,40 @@ def add_students(subjects, names):
     return mutate(run)
 
 
-def remove_student(subject, row, name, everywhere):
+def remove_student(subject, row, name, everywhere, section=None):
     def run(conn):
-        targets = [r["name"] for r in conn.execute("SELECT name FROM subjects")] if everywhere else [subject]
-        removed = 0
-        for sub in targets:
-            sec = _section_of(conn, sub)
-            hit = None
-            if not everywhere and isinstance(row, int):
-                r = conn.execute("SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
-                                 "WHERE e.id = ? AND e.section_id = ?", (row, sec)).fetchone()
-                if r and key_of(r["name"]) == key_of(name):
-                    hit = r["id"]
-            if hit is None:
-                r = conn.execute("SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
-                                 "WHERE e.section_id = ? AND st.name_key = ?", (sec, key_of(name))).fetchone()
-                hit = r["id"] if r else None
-            if hit:
-                conn.execute("DELETE FROM enrollments WHERE id = ?", (hit,))
-                removed += 1
-        conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
-        return removed
+        if everywhere:
+            tid, is_adm = _current_teacher_filter()
+            if not is_adm and tid is not None:
+                rows = conn.execute(
+                    "SELECT e.id FROM enrollments e JOIN sections sec ON sec.id = e.section_id "
+                    "JOIN subjects s ON s.id = sec.subject_id JOIN students st ON st.id = e.student_id "
+                    "WHERE s.teacher_id = ? AND st.name_key = ?", (tid, key_of(name))).fetchall()
+            else:
+                rows = conn.execute(
+                    "SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
+                    "WHERE st.name_key = ?", (key_of(name),)).fetchall()
+            for r in rows:
+                conn.execute("DELETE FROM enrollments WHERE id = ?", (r["id"],))
+            conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
+            return len(rows)
+
+        sec = _section_of(conn, subject, section)
+        hit = None
+        if isinstance(row, int):
+            r = conn.execute("SELECT e.id, st.name FROM enrollments e JOIN students st ON st.id = e.student_id "
+                             "WHERE e.id = ? AND e.section_id = ?", (row, sec)).fetchone()
+            if r and key_of(r["name"]) == key_of(name):
+                hit = r["id"]
+        if hit is None:
+            r = conn.execute("SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
+                             "WHERE e.section_id = ? AND st.name_key = ?", (sec, key_of(name))).fetchone()
+            hit = r["id"] if r else None
+        if hit:
+            conn.execute("DELETE FROM enrollments WHERE id = ?", (hit,))
+            conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
+            return 1
+        return 0
     return mutate(run)
 
 
@@ -372,18 +551,26 @@ def remove_subject_image(subject):
 
 
 def delete_subject(name):
+    ensure_db()
+    backup_workbook("before_delete_subject", min_gap_min=0)
+
     def run(conn):
-        row = conn.execute("SELECT id FROM subjects WHERE name = ?", (name,)).fetchone()
+        tid, is_adm = _current_teacher_filter()
+        row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
         if not row:
             raise ValueError("That subject was not found.")
+        if not is_adm and tid is not None and row["teacher_id"] != tid:
+            raise ValueError("You do not have permission to delete that subject.")
         conn.execute("DELETE FROM subjects WHERE id = ?", (row["id"],))
         conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
     mutate(run)
     remove_subject_image(name)
 
 
-def add_subject(name, copy_from):
+def add_subject(name, copy_from, teacher_id=None, section_name=None):
     def run(conn):
+        tid, is_adm = _current_teacher_filter()
+        owner = teacher_id if is_adm else (tid or teacher_id)
         if conn.execute("SELECT 1 FROM subjects WHERE name = ?", (name,)).fetchone():
             raise ValueError("A subject with that name already exists.")
         source = []
@@ -391,8 +578,387 @@ def add_subject(name, copy_from):
             src = _section_of(conn, copy_from)
             source = [r["student_id"] for r in conn.execute(
                 "SELECT student_id FROM enrollments WHERE section_id = ? ORDER BY id", (src,))]
-        sec = _insert_subject(conn, name)
+        sec = _insert_subject(conn, name, owner, section_name=section_name)
         for sid in source:
             _enroll(conn, sid, sec)
         return len(source)
     return mutate(run)
+
+
+def add_section(subject, section_name, copy_from_section=None):
+    sec_label = clean_sheet_name(section_name)
+    if not sec_label:
+        raise ValueError("Please enter a valid section name (e.g. BSCS-1A).")
+
+    def run(conn):
+        tid, is_adm = _current_teacher_filter()
+        srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
+        if not srow:
+            raise ValueError("That subject was not found.")
+        if not is_adm and tid is not None and srow["teacher_id"] != tid:
+            raise ValueError("You do not have permission to modify that subject.")
+        if conn.execute("SELECT 1 FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE",
+                        (srow["id"], sec_label)).fetchone():
+            raise ValueError(f"Section '{sec_label}' already exists in {subject}.")
+        source = []
+        if copy_from_section:
+            src_row = conn.execute("SELECT id FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE",
+                                   (srow["id"], copy_from_section)).fetchone()
+            if src_row:
+                source = [r["student_id"] for r in conn.execute(
+                    "SELECT student_id FROM enrollments WHERE section_id = ? ORDER BY id", (src_row["id"],))]
+        new_sec = conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)",
+                               (srow["id"], sec_label)).lastrowid
+        for sid in source:
+            _enroll(conn, sid, new_sec)
+        return len(source)
+    return mutate(run)
+
+
+def rename_section(subject, old_name, new_name):
+    new_label = clean_sheet_name(new_name)
+    if not new_label:
+        raise ValueError("Please enter a valid section name.")
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, old_name)
+        srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        conflict = conn.execute(
+            "SELECT id FROM sections WHERE subject_id = ? AND name = ? COLLATE NOCASE AND id != ?",
+            (srow["subject_id"], new_label, sec_id)).fetchone()
+        if conflict:
+            raise ValueError(f"Section '{new_label}' already exists in {subject}.")
+        conn.execute("UPDATE sections SET name = ? WHERE id = ?", (new_label, sec_id))
+        return new_label
+    return mutate(run)
+
+
+def delete_section(subject, section_name):
+    ensure_db()
+    backup_workbook("before_delete_section", min_gap_min=0)
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, section_name)
+        srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        count = conn.execute("SELECT COUNT(*) FROM sections WHERE subject_id = ?", (srow["subject_id"],)).fetchone()[0]
+        if count <= 1:
+            raise ValueError("Cannot delete the only section of a subject (rename it or delete the subject instead).")
+        conn.execute("DELETE FROM sections WHERE id = ?", (sec_id,))
+        conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
+    mutate(run)
+
+
+# -------------------------------------------------------- teacher accounts
+def list_teachers():
+    with _Tx() as conn:
+        rows = conn.execute(
+            "SELECT t.id, t.username, t.display_name, t.is_admin, t.created_at, "
+            "(SELECT COUNT(*) FROM subjects s WHERE s.teacher_id = t.id) AS n_subjects "
+            "FROM teachers t ORDER BY t.is_admin DESC, t.display_name, t.username").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_teacher(teacher_id):
+    with _Tx() as conn:
+        row = conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers WHERE id = ?",
+                           (teacher_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def verify_teacher(username_or_pw, password=None):
+    """Verify a teacher by (username, password), or if username is blank, check password against all teachers."""
+    with _Tx() as conn:
+        if password is not None and username_or_pw:
+            row = conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers "
+                               "WHERE username = ?", (username_or_pw.strip(),)).fetchone()
+            if row and check_password_hash(row["password_hash"], password):
+                return dict(row)
+            return None
+        pw = password if password is not None else username_or_pw
+        for row in conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers"):
+            if check_password_hash(row["password_hash"], pw):
+                return dict(row)
+        return None
+
+
+def create_teacher(username, display_name, password, is_admin=False):
+    uname = re.sub(r"[^a-zA-Z0-9_.\-]", "", (username or "").strip()).lower()
+    dname = clean_name(display_name or uname)
+    if not uname or len(uname) < 2:
+        raise ValueError("Username must be at least 2 characters (letters, numbers, _, ., -).")
+    if not password or len(password) < MIN_PASSWORD:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
+    pw_hash = generate_password_hash(password)
+
+    def run(conn):
+        if conn.execute("SELECT 1 FROM teachers WHERE username = ?", (uname,)).fetchone():
+            raise ValueError("That username is already taken.")
+        return conn.execute(
+            "INSERT INTO teachers (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)",
+            (uname, dname, pw_hash, 1 if is_admin else 0)).lastrowid
+    return mutate(run)
+
+
+def update_teacher_password(teacher_id, new_password):
+    if not new_password or len(new_password) < MIN_PASSWORD:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
+    pw_hash = generate_password_hash(new_password)
+
+    def run(conn):
+        cur = conn.execute("UPDATE teachers SET password_hash = ? WHERE id = ?", (pw_hash, int(teacher_id)))
+        if not cur.rowcount:
+            raise ValueError("Teacher account not found.")
+    mutate(run)
+
+
+def delete_teacher(teacher_id):
+    def run(conn):
+        row = conn.execute("SELECT is_admin FROM teachers WHERE id = ?", (int(teacher_id),)).fetchone()
+        if not row:
+            raise ValueError("Teacher account not found.")
+        if row["is_admin"]:
+            admins = conn.execute("SELECT COUNT(*) FROM teachers WHERE is_admin = 1").fetchone()[0]
+            if admins <= 1:
+                raise ValueError("Cannot delete the last admin account.")
+        conn.execute("DELETE FROM teachers WHERE id = ?", (int(teacher_id),))
+    mutate(run)
+
+
+def list_subjects_with_owners():
+    with _Tx() as conn:
+        rows = conn.execute(
+            "SELECT s.id, s.name, s.teacher_id, t.username AS teacher_username, t.display_name AS teacher_name "
+            "FROM subjects s LEFT JOIN teachers t ON t.id = s.teacher_id ORDER BY s.position, s.id").fetchall()
+        return [dict(r) for r in rows]
+
+
+def assign_subject_teacher(subject_name, teacher_id):
+    def run(conn):
+        tid = int(teacher_id) if teacher_id not in (None, "", "0", 0) else None
+        if tid is not None and not conn.execute("SELECT 1 FROM teachers WHERE id = ?", (tid,)).fetchone():
+            raise ValueError("Selected teacher does not exist.")
+        cur = conn.execute("UPDATE subjects SET teacher_id = ? WHERE name = ?", (tid, subject_name))
+        if not cur.rowcount:
+            raise ValueError("Subject not found.")
+    mutate(run)
+
+
+# -------------------------------------------------------- student profiles
+def update_student_profile(name, new_name=None, student_no="", guardian_name="",
+                           guardian_phone="", email="", address=""):
+    old_k = key_of(name)
+    cleaned_new = safe_text(new_name or name) or clean_name(name)
+    new_k = key_of(cleaned_new)
+    s_no = safe_text(student_no)[:60]
+    g_name = safe_text(guardian_name)[:120]
+    g_phone = safe_text(guardian_phone)[:60]
+    em = safe_text(email)[:120]
+    addr = safe_text(address)[:240]
+
+    def run(conn):
+        row = conn.execute("SELECT id FROM students WHERE name_key = ?", (old_k,)).fetchone()
+        if not row:
+            raise ValueError("Student was not found.")
+        if new_k != old_k and conn.execute("SELECT 1 FROM students WHERE name_key = ? AND id != ?",
+                                           (new_k, row["id"])).fetchone():
+            raise ValueError("Another student already has that name.")
+        conn.execute(
+            "UPDATE students SET name = ?, name_key = ?, student_no = ?, guardian_name = ?, "
+            "guardian_phone = ?, email = ?, address = ? WHERE id = ?",
+            (cleaned_new, new_k, s_no, g_name, g_phone, em, addr, row["id"]))
+        return cleaned_new
+    return mutate(run)
+
+
+# --------------------------------------------------------------- grades
+GRADE_CATEGORIES = ("exam", "quiz", "activity")
+CATEGORY_LABELS = {"exam": "Exam", "quiz": "Quiz", "activity": "Activity"}
+
+
+def pct_to_scale(pct):
+    """Convert a 0-100 percentage to standard Philippine 1.00 - 5.00 college grade scale."""
+    if pct is None:
+        return None
+    p = round(float(pct), 2)
+    if p >= 96:
+        return "1.00"
+    if p >= 93:
+        return "1.25"
+    if p >= 90:
+        return "1.50"
+    if p >= 87:
+        return "1.75"
+    if p >= 84:
+        return "2.00"
+    if p >= 81:
+        return "2.25"
+    if p >= 78:
+        return "2.50"
+    if p >= 75:
+        return "2.75"
+    if p >= 70:
+        return "3.00"
+    return "5.00"
+
+
+def load_grades(subject, section=None):
+    """Load gradebook for (subject, section): weights, lock state, items, student scores, and computed standing."""
+    with _Tx() as conn:
+        sec_id = _section_of(conn, subject, section)
+        sec_row = conn.execute(
+            "SELECT id, name, exam_weight, quiz_weight, activity_weight, weights_locked "
+            "FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        weights = {
+            "exam": float(sec_row["exam_weight"]),
+            "quiz": float(sec_row["quiz_weight"]),
+            "activity": float(sec_row["activity_weight"]),
+        }
+        locked = bool(sec_row["weights_locked"])
+        items = [dict(r) for r in conn.execute(
+            "SELECT id, category, title, max_score, date FROM grade_items "
+            "WHERE section_id = ? ORDER BY CASE category WHEN 'exam' THEN 1 WHEN 'quiz' THEN 2 ELSE 3 END, id",
+            (sec_id,)).fetchall()]
+        for it in items:
+            it["label"] = CATEGORY_LABELS.get(it["category"], it["category"].capitalize())
+        students = [dict(r) for r in conn.execute(
+            "SELECT e.id AS enrollment_id, st.name, st.student_no FROM enrollments e "
+            "JOIN students st ON st.id = e.student_id WHERE e.section_id = ? ORDER BY e.id",
+            (sec_id,)).fetchall()]
+        scores = {}
+        for r in conn.execute(
+                "SELECT g.grade_item_id, g.enrollment_id, g.score FROM grades g "
+                "JOIN grade_items gi ON gi.id = g.grade_item_id WHERE gi.section_id = ?", (sec_id,)):
+            scores[(r["enrollment_id"], r["grade_item_id"])] = float(r["score"])
+
+        items_by_cat = {cat: [it for it in items if it["category"] == cat] for cat in GRADE_CATEGORIES}
+        cat_max = {cat: sum(float(it["max_score"]) for it in items_by_cat[cat]) for cat in GRADE_CATEGORIES}
+
+        rows = []
+        for s in students:
+            eid = s["enrollment_id"]
+            cat_pct = {}
+            cat_earned = {}
+            for cat in GRADE_CATEGORIES:
+                if cat_max[cat] > 0:
+                    earned = sum(scores.get((eid, it["id"]), 0.0) for it in items_by_cat[cat])
+                    cat_earned[cat] = earned
+                    cat_pct[cat] = (earned / cat_max[cat]) * 100.0
+                else:
+                    cat_earned[cat] = None
+                    cat_pct[cat] = None
+            active_weight = sum(weights[c] for c in GRADE_CATEGORIES if cat_pct[c] is not None and weights[c] > 0)
+            if active_weight > 0:
+                final_pct = sum(cat_pct[c] * weights[c] for c in GRADE_CATEGORIES if cat_pct[c] is not None) / active_weight
+            else:
+                final_pct = None
+            rows.append({
+                "enrollment_id": eid,
+                "name": s["name"],
+                "student_no": s["student_no"] or "",
+                "scores": {it["id"]: scores.get((eid, it["id"])) for it in items},
+                "cat_earned": cat_earned,
+                "cat_max": cat_max,
+                "cat_pct": cat_pct,
+                "final_pct": final_pct,
+                "scale": pct_to_scale(final_pct),
+                "passing": (final_pct >= 70.0) if final_pct is not None else None,
+            })
+        return {
+            "section": sec_row["name"],
+            "weights": weights,
+            "locked": locked,
+            "items": items,
+            "items_by_cat": items_by_cat,
+            "cat_max": cat_max,
+            "rows": rows,
+        }
+
+
+def save_grade_weights(subject, section, exam_w, quiz_w, activity_w):
+    try:
+        ew, qw, aw = float(exam_w), float(quiz_w), float(activity_w)
+    except (TypeError, ValueError):
+        raise ValueError("Weights must be valid numbers.")
+    if ew < 0 or qw < 0 or aw < 0 or abs((ew + qw + aw) - 100.0) > 0.05:
+        raise ValueError("Exam, Quiz, and Activity weights must be non-negative and add up to 100%.")
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        locked = conn.execute("SELECT weights_locked FROM sections WHERE id = ?", (sec_id,)).fetchone()["weights_locked"]
+        if locked:
+            raise ValueError("Grade weights are locked. Unlock them first before changing percentages.")
+        conn.execute(
+            "UPDATE sections SET exam_weight = ?, quiz_weight = ?, activity_weight = ? WHERE id = ?",
+            (ew, qw, aw, sec_id))
+    mutate(run)
+
+
+def set_weights_lock(subject, section, locked):
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        conn.execute("UPDATE sections SET weights_locked = ? WHERE id = ?", (1 if locked else 0, sec_id))
+    mutate(run)
+
+
+def add_grade_item(subject, section, category, title, max_score, date_str=""):
+    cat = (category or "").strip().lower()
+    if cat not in GRADE_CATEGORIES:
+        raise ValueError("Choose Exam, Quiz, or Activity.")
+    t = safe_text(title)[:80]
+    if not t:
+        raise ValueError("Enter a title (e.g. Quiz 1 or Midterm Exam).")
+    try:
+        mx = float(max_score)
+    except (TypeError, ValueError):
+        raise ValueError("Max score must be a number greater than 0.")
+    if mx <= 0 or mx > 10000:
+        raise ValueError("Max score must be between 1 and 10,000.")
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        return conn.execute(
+            "INSERT INTO grade_items (section_id, category, title, max_score, date) VALUES (?, ?, ?, ?, ?)",
+            (sec_id, cat, t, mx, safe_text(date_str)[:20])).lastrowid
+    return mutate(run)
+
+
+def delete_grade_item(subject, section, item_id):
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        row = conn.execute("SELECT id, title FROM grade_items WHERE id = ? AND section_id = ?",
+                           (int(item_id), sec_id)).fetchone()
+        if not row:
+            raise ValueError("Grade item not found.")
+        conn.execute("DELETE FROM grade_items WHERE id = ?", (row["id"],))
+        return row["title"]
+    return mutate(run)
+
+
+def save_grade_scores(subject, section, entries):
+    """Save [(enrollment_id, item_id, score_or_none), ...] for a section."""
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        valid_items = {r["id"]: float(r["max_score"]) for r in conn.execute(
+            "SELECT id, max_score FROM grade_items WHERE section_id = ?", (sec_id,))}
+        valid_enr = {r["id"] for r in conn.execute(
+            "SELECT id FROM enrollments WHERE section_id = ?", (sec_id,))}
+        saved = 0
+        for eid, iid, val in entries:
+            if eid not in valid_enr or iid not in valid_items:
+                continue
+            if val is None or val == "":
+                conn.execute("DELETE FROM grades WHERE grade_item_id = ? AND enrollment_id = ?", (iid, eid))
+            else:
+                sc = float(val)
+                if sc < 0 or sc > valid_items[iid]:
+                    raise ValueError(f"Score {sc:g} is outside 0 to {valid_items[iid]:g}.")
+                conn.execute(
+                    "INSERT INTO grades (grade_item_id, enrollment_id, score) VALUES (?, ?, ?) "
+                    "ON CONFLICT (grade_item_id, enrollment_id) DO UPDATE SET score = excluded.score",
+                    (iid, eid, sc))
+                saved += 1
+        return saved
+    return mutate(run)
+
+
+

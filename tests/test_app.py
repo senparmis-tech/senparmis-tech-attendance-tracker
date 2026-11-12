@@ -149,3 +149,169 @@ def test_student_lookup():
     stu = app.test_client()
     stu.post("/login", data={"password": "studentpass1"})
     assert stu.get("/lookup").status_code == 302
+
+
+def test_per_teacher_accounts_and_subject_isolation():
+    admin = _teacher_client()
+    assert admin.get("/teachers").status_code == 200
+    r = admin.post("/teachers/add", data={
+        "username": "msantos", "display_name": "Prof. Santos", "password": "santospassword1",
+    })
+    assert r.status_code == 302
+    teachers = store.list_teachers()
+    santos = next(t for t in teachers if t["username"] == "msantos")
+    assert not santos["is_admin"]
+
+    # Assign MMW to Prof. Santos; College Algebra remains unassigned (admin-only when signed in as non-admin)
+    assert admin.post("/teachers/assign_subject",
+                      data={"subject": "MMW", "teacher_id": str(santos["id"])}).status_code == 302
+
+    # Sign in as Prof. Santos
+    tc = app.test_client()
+    r = tc.post("/login", data={"username": "msantos", "password": "santospassword1"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")
+    dash = tc.get("/").get_data(as_text=True)
+    assert "MMW" in dash
+    assert "College Algebra" not in dash
+
+    # Non-admin teacher cannot modify an unassigned / other teacher's subject
+    r_forbid = tc.post("/api/save", json={
+        "subject": "College Algebra", "date": "2026-11-11", "topic": "Forbidden",
+        "marks": [{"name": "Sample Student A", "code": "p"}],
+    })
+    assert r_forbid.status_code == 400
+
+    # Non-admin teacher can create their own subject and it is automatically owned by them
+    assert tc.post("/subjects/add", data={"name": "Data Structures", "copy_from": "MMW"}).status_code == 302
+    assert "Data Structures" in tc.get("/").get_data(as_text=True)
+
+    # Non-admin cannot create another teacher account
+    tc.post("/teachers/add", data={"username": "hacker", "password": "hackerpassword1"})
+    assert not any(t["username"] == "hacker" for t in store.list_teachers())
+
+    # Clean up test subject and teacher
+    assert admin.post("/subjects/delete", data={"subject": "Data Structures"}).status_code == 302
+    assert admin.post("/teachers/delete", data={"teacher_id": str(santos["id"])}).status_code == 302
+
+
+def test_sections_management_and_lookup_filter():
+    c = _teacher_client()
+    data = store.load_data()
+    assert data["MMW"]["section"] == "BSCS-1A"
+
+    # Add a second section BSCS-1B to MMW
+    r = c.post("/sections/add", data={"subject": "MMW", "section": "BSCS-1B", "copy_from_section": ""})
+    assert r.status_code == 302
+    assert c.post("/students/add", data={"names": "Juan Dela Cruz", "subjects": ["MMW"], "section": "BSCS-1B"}).status_code == 302
+
+    # Mark attendance in BSCS-1B and ensure BSCS-1A is unaffected
+    r = c.post("/api/save", json={
+        "subject": "MMW", "section": "BSCS-1B", "date": "2026-11-12", "topic": "Pointers",
+        "marks": [{"name": "Juan Dela Cruz", "code": "p"}],
+    })
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+
+    # Lookup by section BSCS-1B finds Juan Dela Cruz
+    lk = c.get("/lookup?section=BSCS-1B").get_data(as_text=True)
+    assert "Juan Dela Cruz" in lk
+    assert "BSCS-1B" in lk
+
+    # Rename BSCS-1B -> BSCS-1C and then delete it
+    assert c.post("/sections/rename", data={"subject": "MMW", "old_section": "BSCS-1B", "new_section": "BSCS-1C"}).status_code == 302
+    assert "BSCS-1C" in store.load_data()["MMW"]["section_names"]
+    assert c.post("/sections/delete", data={"subject": "MMW", "section": "BSCS-1C"}).status_code == 302
+    assert "BSCS-1C" not in store.load_data()["MMW"]["section_names"]
+
+
+def test_delete_subject_and_restore_from_log():
+    c = _teacher_client()
+    assert c.post("/subjects/add", data={"name": "RestoreMe"}).status_code == 302
+    assert "RestoreMe" in store.load_data()
+
+    # Delete the subject (creates a before_delete_subject snapshot)
+    assert c.post("/subjects/delete", data={"subject": "RestoreMe"}).status_code == 302
+    assert "RestoreMe" not in store.load_data()
+
+    backups = store.list_backups()
+    snap = next(b for b in backups if "RestoreMe" in b["subjects"])
+    assert c.post("/backups/restore", data={"filename": snap["filename"]}).status_code == 302
+    assert "RestoreMe" in store.load_data()
+
+    # Clean up
+    c.post("/subjects/delete", data={"subject": "RestoreMe"})
+
+
+def test_student_profile_and_guardian_contact():
+    c = _teacher_client()
+    r = c.post("/students/profile", data={
+        "old_name": "Sample Student A",
+        "name": "Sample Student A",
+        "student_no": "2026-00101",
+        "guardian_name": "Elena Santos",
+        "guardian_phone": "0917-555-0199",
+        "email": "student.a@school.edu",
+        "address": "123 Rizal St, Quezon City",
+        "subject": "MMW",
+        "next": "lookup",
+    })
+    assert r.status_code == 302
+    lk = c.get("/lookup?q=2026-00101").get_data(as_text=True)
+    assert "Sample Student A" in lk
+    assert "Elena Santos" in lk
+    assert "0917-555-0199" in lk
+    assert "123 Rizal St, Quezon City" in lk
+
+
+def test_grades_weights_lock_and_scale():
+    c = _teacher_client()
+    assert c.get("/grades?subject=MMW").status_code == 200
+
+    # Change weights to 40 / 40 / 20 and lock them
+    assert c.post("/grades/weights", data={
+        "subject": "MMW", "section": "BSCS-1A",
+        "exam_weight": "40", "quiz_weight": "40", "activity_weight": "20",
+    }).status_code == 302
+    assert c.post("/grades/lock", data={"subject": "MMW", "section": "BSCS-1A", "locked": "1"}).status_code == 302
+    gb = store.load_grades("MMW", "BSCS-1A")
+    assert gb["locked"] is True and gb["weights"]["exam"] == 40.0
+
+    # Attempting to change weights while locked does not alter them
+    c.post("/grades/weights", data={
+        "subject": "MMW", "section": "BSCS-1A",
+        "exam_weight": "60", "quiz_weight": "20", "activity_weight": "20",
+    })
+    assert store.load_grades("MMW", "BSCS-1A")["weights"]["exam"] == 40.0
+
+    # Add Exam, Quiz, and Activity items
+    c.post("/grades/items/add", data={"subject": "MMW", "section": "BSCS-1A", "category": "exam", "title": "Midterm", "max_score": "100"})
+    c.post("/grades/items/add", data={"subject": "MMW", "section": "BSCS-1A", "category": "quiz", "title": "Quiz 1", "max_score": "50"})
+    c.post("/grades/items/add", data={"subject": "MMW", "section": "BSCS-1A", "category": "activity", "title": "Lab 1", "max_score": "20"})
+
+    gb = store.load_grades("MMW", "BSCS-1A")
+    stu_a = next(r for r in gb["rows"] if r["name"] == "Sample Student A")
+    eid = stu_a["enrollment_id"]
+    items = {it["title"]: it["id"] for it in gb["items"]}
+
+    # Enter scores for Sample Student A: 95/100 exam (95%), 45/50 quiz (90%), 20/20 activity (100%)
+    # Weighted: 95*0.4 + 90*0.4 + 100*0.2 = 38 + 36 + 20 = 94.0% -> 1.25
+    form_data = {
+        "subject": "MMW", "section": "BSCS-1A",
+        f"score_{eid}_{items['Midterm']}": "95",
+        f"score_{eid}_{items['Quiz 1']}": "45",
+        f"score_{eid}_{items['Lab 1']}": "20",
+    }
+    assert c.post("/grades/scores", data=form_data).status_code == 302
+    gb2 = store.load_grades("MMW", "BSCS-1A")
+    stu_a2 = next(r for r in gb2["rows"] if r["name"] == "Sample Student A")
+    assert round(stu_a2["final_pct"], 1) == 94.0
+    assert stu_a2["scale"] == "1.25"
+
+    # Student Lookup displays the computed grade standing and breakdown
+    lk = c.get("/lookup?student=Sample+Student+A").get_data(as_text=True)
+    assert "94.0% (1.25)" in lk
+    assert "Midterm" in lk
+
+
+
+
+

@@ -7,8 +7,10 @@
 <div class="card">
   <h2>Add students</h2>
   <form method="post" action="{{ url_for('students_add') }}">
+    <input type="hidden" name="section" value="{{ section or '' }}">
     <textarea name="names" rows="5" style="width:100%" placeholder="One name per line" required></textarea>
     <p>{% for s in subjects %}<label class="chk"><input type="checkbox" name="subjects" value="{{ s }}" {{ 'checked' if s==subject or not subject }}> {{ s }}</label>{% endfor %}</p>
+    {% if section %}<p class="muted" style="font-size:12px;margin-top:-6px">Adding to section <b>{{ section }}</b>.</p>{% endif %}
     <button class="btn primary" type="submit">Add</button>
   </form>
 </div>
@@ -16,6 +18,7 @@
   <h2>Add a subject</h2>
   <form method="post" action="{{ url_for('subjects_add') }}">
     <p><input class="txt" type="text" name="name" placeholder="Subject name" maxlength="31" required style="width:100%"></p>
+    <p><input class="txt" type="text" name="section_name" placeholder="First section (default: BSCS-1A)" maxlength="31" style="width:100%"></p>
     <p><select name="copy_from" style="width:100%"><option value="">Start with an empty class list</option>
       {% for s in subjects %}<option value="{{ s }}">Copy the students from {{ s }}</option>{% endfor %}</select></p>
     <button class="btn primary" type="submit">Create subject</button>
@@ -39,17 +42,48 @@
       <div style="width:52px;height:52px;border-radius:12px;background:var(--ebg);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:24px;border:1.5px solid var(--line)">📖</div>
       {% endif %}
       <div>
-        <h2 style="margin:0;font-size:19px">{{ subject }}</h2>
-        <span class="muted" style="font-size:13px">{{ rows|length }} students enrolled</span>
+        <h2 style="margin:0;font-size:19px">{{ subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ section }}</span></h2>
+        <span class="muted" style="font-size:13px">{{ rows|length }} students enrolled in {{ section }}</span>
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <form class="inline" method="post" action="{{ url_for('subjects_delete') }}" onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject and all its attendance records. Are you sure?')">
+      <form class="inline" method="post" action="{{ url_for('subjects_delete') }}" onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject, all its sections, and all its attendance records. Are you sure?')">
         <input type="hidden" name="subject" value="{{ subject }}">
         <button class="btn small danger" type="submit">🗑 Delete Subject</button>
       </form>
     </div>
   </div>
+
+  <!-- Sections Manager -->
+  <details style="margin-bottom:12px;background:var(--surface);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
+    <summary style="font-weight:700;cursor:pointer;color:var(--brand);font-size:14px">🏷️ Manage Sections for {{ subject }} (current: {{ section }})</summary>
+    <div style="margin-top:10px;display:flex;flex-direction:column;gap:10px">
+      <form method="post" action="{{ url_for('sections_rename') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <input type="hidden" name="old_section" value="{{ section }}">
+        <label style="font-size:13px">Rename <b>{{ section }}</b> to:</label>
+        <input class="txt" type="text" name="new_section" value="{{ section }}" maxlength="31" required style="width:160px;padding:6px 10px;font-size:13px">
+        <button class="btn small" type="submit">Rename</button>
+      </form>
+      <form method="post" action="{{ url_for('sections_add') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <label style="font-size:13px">Add another section:</label>
+        <input class="txt" type="text" name="section" placeholder="e.g. BSCS-1B" maxlength="31" required style="width:150px;padding:6px 10px;font-size:13px">
+        <select name="copy_from_section" style="padding:6px 10px;font-size:13px">
+          <option value="">Empty student list</option>
+          {% for sec_n in section_names %}<option value="{{ sec_n }}">Copy students from {{ sec_n }}</option>{% endfor %}
+        </select>
+        <button class="btn small primary" type="submit">+ Add Section</button>
+      </form>
+      {% if section_names and section_names|length > 1 %}
+      <form method="post" action="{{ url_for('sections_delete') }}" onsubmit="return confirm('Delete section {{ section|e }} from {{ subject|e }}? All marks for this section will be removed.')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <input type="hidden" name="section" value="{{ section }}">
+        <button class="btn small danger" type="submit">🗑 Delete Section {{ section }}</button>
+      </form>
+      {% endif %}
+    </div>
+  </details>
 
   <!-- Custom Subject Picture Uploader -->
   <details style="margin-bottom:16px;background:var(--surface);padding:12px 14px;border-radius:10px;border:1px solid var(--line)">
@@ -70,14 +104,43 @@
   </details>
   {% if not rows %}<p class="muted">No students yet.</p>{% endif %}
   <table>{% for s in rows %}<tr>
-    <td class="n" style="width:40px">{{ loop.index }}</td><td>{{ s.name }}</td>
-    <td class="n" style="width:90px"><span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}">{{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}</span></td>
-    <td style="text-align:right;white-space:nowrap">
-      <form class="inline" method="post" action="{{ url_for('students_remove') }}" onsubmit="return confirm('Remove {{ s.name|e }} from {{ subject|e }}? Their marks for this subject are deleted.')">
-        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="row" value="{{ s.row }}"><input type="hidden" name="name" value="{{ s.name }}">
+    <td class="n" style="width:40px;vertical-align:top">{{ loop.index }}</td>
+    <td>
+      <div>
+        <a href="{{ url_for('lookup', student=s.name) }}" style="color:inherit;text-decoration:none"><b>{{ s.name }}</b></a>
+        {% if s.student_no %}<span class="badge done" style="font-size:11px;margin-left:6px">{{ s.student_no }}</span>{% endif %}
+      </div>
+      {% if s.guardian_name or s.guardian_phone or s.email or s.address %}
+      <div class="muted" style="font-size:12px;margin-top:2px">
+        {% if s.guardian_name %}Guardian: {{ s.guardian_name }}{% endif %}
+        {% if s.guardian_phone %} · 📞 {{ s.guardian_phone }}{% endif %}
+        {% if s.email %} · ✉️ {{ s.email }}{% endif %}
+        {% if s.address %} · 📍 {{ s.address }}{% endif %}
+      </div>
+      {% endif %}
+      <details style="margin-top:6px">
+        <summary style="cursor:pointer;font-size:12px;color:var(--brand)">✏️ Edit student info &amp; guardian contact</summary>
+        <form method="post" action="{{ url_for('students_profile') }}" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;background:var(--surface);padding:10px;border-radius:8px;border:1px solid var(--line)">
+          <input type="hidden" name="old_name" value="{{ s.name }}">
+          <input type="hidden" name="subject" value="{{ subject }}">
+          <input type="hidden" name="section" value="{{ section or '' }}">
+          <input class="txt" type="text" name="name" value="{{ s.name }}" placeholder="Full name" required style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="student_no" value="{{ s.student_no or '' }}" placeholder="Student ID / No." style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="guardian_name" value="{{ s.guardian_name or '' }}" placeholder="Guardian name" style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="guardian_phone" value="{{ s.guardian_phone or '' }}" placeholder="Guardian phone / contact" style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="email" name="email" value="{{ s.email or '' }}" placeholder="Student email" style="font-size:13px;padding:6px 8px">
+          <input class="txt" type="text" name="address" value="{{ s.address or '' }}" placeholder="Home address" style="font-size:13px;padding:6px 8px;grid-column:1 / -1">
+          <div style="grid-column:1 / -1"><button class="btn small primary" type="submit">Save Profile</button></div>
+        </form>
+      </details>
+    </td>
+    <td class="n" style="width:90px;vertical-align:top"><span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}">{{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}</span></td>
+    <td style="text-align:right;white-space:nowrap;vertical-align:top">
+      <form class="inline" method="post" action="{{ url_for('students_remove') }}" onsubmit="return confirm('Remove {{ s.name|e }} from {{ subject|e }} ({{ section|e }})? Their marks for this section are deleted.')">
+        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="row" value="{{ s.row }}"><input type="hidden" name="name" value="{{ s.name }}">
         <button class="btn small danger" type="submit">Remove</button></form>
       <form class="inline" method="post" action="{{ url_for('students_remove') }}" onsubmit="return confirm('Remove {{ s.name|e }} from ALL subjects? Their marks are deleted everywhere.')">
-        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="name" value="{{ s.name }}"><input type="hidden" name="everywhere" value="1">
+        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="name" value="{{ s.name }}"><input type="hidden" name="everywhere" value="1">
         <button class="btn small danger" type="submit">Remove from all</button></form>
     </td></tr>{% endfor %}</table>
 </div>

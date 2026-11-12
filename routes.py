@@ -9,17 +9,21 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta
 
-from flask import flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import flash, g, jsonify, redirect, render_template, request, send_file, url_for
 
 from ai_scan import AIError, call_ai, get_api_key, normalize_scan, provider_of
-from config import (API_KEY_FILE, LOG_FILE, LOW_RATE, MAX_CSV, MAX_IMAGES,
-                    MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR, DB_FILE)
+from config import (API_KEY_FILE, DB_FILE, LOG_FILE, LOW_RATE, MAX_CSV,
+                    MAX_IMAGES, MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR,
+                    XLSX)
 from excel_io import build_workbook
-from store import (FileLocked, add_students, add_subject, apply_marks,
-                   backup_workbook, delete_date, delete_subject,
-                   ensure_db, get_subject_image_file, load_data,
-                   remove_student, remove_subject_image, student_stats,
-                   subject_image_url)
+from store import (FileLocked, add_grade_item, add_section, add_students,
+                   add_subject, apply_marks, backup_workbook, delete_date,
+                   delete_grade_item, delete_section, delete_subject,
+                   ensure_db, get_subject_image_file, list_backups, load_data,
+                   load_grades, reimport_from_excel, remove_student,
+                   remove_subject_image, rename_section, restore_backup,
+                   save_grade_scores, save_grade_weights, set_weights_lock,
+                   student_stats, subject_image_url, update_student_profile)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
@@ -33,10 +37,28 @@ def make_tabs(subjects, current, endpoint, **extra):
     return [{"name": s, "active": s == current, "url": url_for(endpoint, subject=s, **extra)} for s in subjects]
 
 
+def make_section_tabs(section_names, current_section, subject, endpoint, **extra):
+    if not subject or not section_names:
+        return []
+    return [{"name": sec, "active": sec == current_section,
+             "url": url_for(endpoint, subject=subject, section=sec, **extra)} for sec in section_names]
+
+
 def pick_subject(data):
     subjects = list(data.keys())
     wanted = request.args.get("subject") or request.form.get("subject")
     return subjects, (wanted if wanted in data else (subjects[0] if subjects else None))
+
+
+def pick_section(sd):
+    if not sd:
+        return [], None, {"students": [], "dates": [], "cells": {}}
+    secs_map = sd.get("sections") or {sd.get("section", "BSCS-1A"): sd}
+    sec_names = sd.get("section_names") or list(secs_map.keys())
+    wanted = (request.args.get("section") or request.form.get("section") or "").strip()
+    matched = next((s for s in sec_names if s.lower() == wanted.lower()), None) if wanted else None
+    cur = matched or (sec_names[0] if sec_names else None)
+    return sec_names, cur, (secs_map[cur] if cur else sd)
 
 
 @app.errorhandler(FileLocked)
@@ -78,23 +100,25 @@ def dashboard():
 def mark():
     data = load_data()
     subjects, subject = pick_subject(data)
+    sec_names, section, sd = pick_section(data.get(subject))
     d = parse_iso(request.args.get("date"))          # no date unless you pick one
     today = date.today()
     extra = {"date": d.isoformat()} if d else {}
-    today_url = url_for("mark", subject=subject, date=today.isoformat()) if subject else ""
-    ctx = dict(page="mark", subject=subject, tabs=make_tabs(subjects, subject, "mark", **extra),
+    today_url = url_for("mark", subject=subject, section=section, date=today.isoformat()) if subject else ""
+    ctx = dict(page="mark", subject=subject, section=section, section_names=sec_names,
+               tabs=make_tabs(subjects, subject, "mark", **extra),
+               section_tabs=make_section_tabs(sec_names, section, subject, "mark", **extra),
                students=[], date_iso=d.isoformat() if d else "", recorded=False, topic="", today_url=today_url)
     if subject:
-        sd = data[subject]
         col = next((x["col"] for x in sd["dates"] if x["date"] == d), None) if d else None
         topic = next((x["topic"] for x in sd["dates"] if x["date"] == d), "") if d else ""
         ctx["students"] = [{"row": s["row"], "name": s["name"],
                             "code": (sd["cells"].get((s["row"], col), "") if col else "") or "p"}
                            for s in sd["students"]]
         ctx.update(recorded=col is not None, topic=topic, subject_img_url=subject_image_url(subject),
-                   base_url=url_for("mark", subject=subject), save_url=url_for("api_save"),
-                   prev_url=url_for("mark", subject=subject, date=(d - timedelta(days=1)).isoformat()) if d else "",
-                   next_url=url_for("mark", subject=subject, date=(d + timedelta(days=1)).isoformat()) if d else "",
+                   base_url=url_for("mark", subject=subject, section=section), save_url=url_for("api_save"),
+                   prev_url=url_for("mark", subject=subject, section=section, date=(d - timedelta(days=1)).isoformat()) if d else "",
+                   next_url=url_for("mark", subject=subject, section=section, date=(d + timedelta(days=1)).isoformat()) if d else "",
                    date_label=d.strftime("%A, %B %d, %Y").replace(" 0", " ") if d else "")
     return render_template("mark.html", **ctx)
 
@@ -110,11 +134,14 @@ def api_save():
              for it in items if isinstance(it, dict)]
     new_raw = body.get("new_students")
     new_names = [str(n)[:80] for n in new_raw[:100]] if isinstance(new_raw, list) else []
+    section = clean_name(str(body.get("section") or "")) or None
     try:
-        res = apply_marks(str(body.get("subject", "")), d, str(body.get("topic", ""))[:120], clean, new_names)
+        res = apply_marks(str(body.get("subject", "")), d, str(body.get("topic", ""))[:120],
+                          clean, new_names, section=section)
     except ValueError as err:
         return jsonify(ok=False, error=str(err)), 400
     subject = str(body.get("subject", ""))
+    sec_tag = f" ({section})" if section else ""
     counts = {"p": 0, "x": 0, "l": 0, "e": 0, "r": 0, "": 0}
     for name, old, new in res["changes"]:
         if new in counts:
@@ -137,7 +164,7 @@ def api_save():
         detail += " · Changed: " + (short_list(diffs, 25) if diffs else "nothing (same as before)")
     if res["added"]:
         detail += " · New students added: " + short_list(res["added"], 15)
-    log_change(action, subject, detail)
+    log_change(action, subject + sec_tag, detail)
     return jsonify(ok=True, saved=res["saved"])
 
 
@@ -150,13 +177,15 @@ def too_big(_e):
 def scan():
     data = load_data()
     subjects, subject = pick_subject(data)
-    sd = data[subject] if subject else {"students": [], "dates": []}
+    sec_names, section, sd = pick_section(data.get(subject))
     return render_template(
-        "scan.html", page="scan", subject=subject, tabs=make_tabs(subjects, subject, "scan"),
+        "scan.html", page="scan", subject=subject, section=section,
+        tabs=make_tabs(subjects, subject, "scan"),
+        section_tabs=make_section_tabs(sec_names, section, subject, "scan"),
         students=[{"name": s["name"], "row": s["row"]} for s in sd["students"]],
         recorded=[x["date"].isoformat() for x in sd["dates"]], today=date.today().isoformat(),
         has_key=bool(get_api_key()), provider=provider_of(get_api_key()) if get_api_key() else "",
-        records_url=url_for("records", subject=subject) if subject else "",
+        records_url=url_for("records", subject=subject, section=section) if subject else "",
         scan_url=url_for("api_scan"), save_url=url_for("api_save"), key_url=url_for("api_set_key"),
         max_images=MAX_IMAGES, pct=int(MEET_PRESENT_PCT * 100))
 
@@ -178,7 +207,8 @@ def api_scan():
             return jsonify(ok=False, error="One of the photos is empty or too large."), 400
         media = f.mimetype if f.mimetype in ("image/jpeg", "image/png", "image/webp", "image/gif") else "image/jpeg"
         images.append((base64.b64encode(raw).decode("ascii"), media))
-    roster = [s["name"] for s in data[subject]["students"]]
+    _, _, sd = pick_section(data[subject])
+    roster = [s["name"] for s in sd["students"]]
     try:
         result = call_ai(images, roster)
     except AIError as err:
@@ -208,16 +238,18 @@ def api_set_key():
 def records():
     data = load_data()
     subjects, subject = pick_subject(data)
+    sec_names, section, sd = pick_section(data.get(subject))
     rows, dates = [], []
     if subject:
-        sd = data[subject]
         dates = [{"label": x["date"].strftime("%b %d").replace(" 0", " "), "iso": x["date"].isoformat(),
                   "topic": x["topic"]} for x in sd["dates"]]
         for s in student_stats(sd):
             s["codes"] = [sd["cells"].get((s["row"], x["col"]), "") for x in sd["dates"]]
             rows.append(s)
-    return render_template("records.html", page="records", subject=subject, rows=rows, dates=dates,
-                           low=LOW_RATE, tabs=make_tabs(subjects, subject, "records"))
+    return render_template("records.html", page="records", subject=subject, section=section,
+                           rows=rows, dates=dates, low=LOW_RATE,
+                           tabs=make_tabs(subjects, subject, "records"),
+                           section_tabs=make_section_tabs(sec_names, section, subject, "records"))
 
 
 GRID_COLS = 25               # date columns in the printed grid (blank ones are left for future days)
@@ -234,7 +266,7 @@ def print_sheet():
     if not subject:
         flash("Add a subject first.", "err")
         return redirect(url_for("dashboard"))
-    sd = data[subject]
+    sec_names, section, sd = pick_section(data[subject])
     dates, students, cells = sd["dates"], sd["students"], sd["cells"]
     unmarked = []
     for dd in dates:
@@ -261,7 +293,7 @@ def print_sheet():
                 rows.append({"n": n, "name": "", "total": "", "rec": "", "marks": [""] * len(chunk)})
             pages.append({"rows": rows, "pad": GRID_COLS - len(chunk),
                           "cols": [{"label": f"{d['date'].month}/{d['date'].day}", "topic": d["topic"]} for d in chunk]})
-    return render_template("print.html", subject=subject, subjects=subjects, pages=pages,
+    return render_template("print.html", subject=subject, section=section, subjects=subjects, pages=pages,
                            unmarked=unmarked, held=held, skipped=skipped,
                            extra_l=codes.count("l"), extra_e=codes.count("e"))
 
@@ -269,45 +301,46 @@ def print_sheet():
 @app.route("/dates/delete", methods=["POST"])
 def dates_delete():
     subject = request.form.get("subject", "")
+    section = request.form.get("section", "") or None
     d = parse_iso(request.form.get("date", ""))
     if not d:
         flash("That date was not understood.", "err")
-        return redirect(url_for("records", subject=subject))
+        return redirect(url_for("records", subject=subject, section=section))
     try:
         ensure_db()
         backup_workbook("before_delete_date")
-        marks, topic = delete_date(subject, d)
+        marks, topic = delete_date(subject, d, section=section)
     except ValueError as err:
         flash(str(err), "err")
-        return redirect(url_for("records", subject=subject))
+        return redirect(url_for("records", subject=subject, section=section))
     log_change("Date deleted", subject, f"{d.isoformat()}" + (f" ({topic})" if topic else "")
                + f" · {marks} mark(s) removed")
     flash(f"Deleted {d.strftime('%b')} {d.day} from {subject}. A backup copy was saved in the backups folder.", "ok")
-    return redirect(url_for("records", subject=subject))
+    return redirect(url_for("records", subject=subject, section=section))
 
 
 @app.route("/import", methods=["GET", "POST"])
 def import_meet():
     data = load_data()
     subjects, subject = pick_subject(data)
+    sec_names, section, sd = pick_section(data.get(subject))
     if request.method == "GET" or not subject:       # the upload form lives on the Import (scan) page
         if subject:
-            return redirect(url_for("scan", subject=subject))
+            return redirect(url_for("scan", subject=subject, section=section))
         return render_template("import.html", page="scan", subject=None, review=None, tabs=None)
     f = request.files.get("csv")
     raw = f.read(MAX_CSV + 1) if f and f.filename else b""
     if not raw:
         flash("Choose the Meet CSV file first.", "err")
-        return redirect(url_for("scan", subject=subject))
+        return redirect(url_for("scan", subject=subject, section=section))
     if len(raw) > MAX_CSV:
         flash("That file is too big to be a Meet attendance list.", "err")
-        return redirect(url_for("scan", subject=subject))
+        return redirect(url_for("scan", subject=subject, section=section))
     try:
         meet = parse_meet_csv(raw)
     except ValueError as err:
         flash(str(err), "err")
-        return redirect(url_for("scan", subject=subject))
-    sd = data[subject]
+        return redirect(url_for("scan", subject=subject, section=section))
     roster = [s["name"] for s in sd["students"]]
     tokens = {n: name_tokens(n) for n in roster}
     aliases = read_aliases()
@@ -330,12 +363,12 @@ def import_meet():
     when = ""
     if meet["created"] and meet["ended"]:
         when = f"{meet['created'].strftime('%I:%M %p').lstrip('0')} to {meet['ended'].strftime('%I:%M %p').lstrip('0')}"
-    review = {"subject": subject, "date_iso": d.isoformat(), "date_label": d.strftime("%A, %B ") + str(d.day) + d.strftime(", %Y"),
+    review = {"subject": subject, "section": section, "date_iso": d.isoformat(), "date_label": d.strftime("%A, %B ") + str(d.day) + d.strftime(", %Y"),
               "topic": safe_text(request.form.get("topic", ""))[:120], "length": meet["length"],
               "threshold": int(meet["length"] * MEET_PRESENT_PCT), "pct": int(MEET_PRESENT_PCT * 100), "when": when,
               "students": students, "unmatched": unmatched, "existing_date": col is not None,
               "save_url": url_for("api_save"), "alias_url": url_for("api_meet_alias"),
-              "records_url": url_for("records", subject=subject)}
+              "records_url": url_for("records", subject=subject, section=section)}
     return render_template("import.html", page="scan", subject=subject, review=review, tabs=None)
 
 
@@ -345,7 +378,10 @@ def api_meet_alias():
     items = body.get("aliases")
     if not isinstance(items, list) or len(items) > 200:
         return jsonify(ok=False, error="That request was not understood."), 400
-    allnames = {s["name"].lower(): s["name"] for sd in load_data().values() for s in sd["students"]}
+    allnames = {s["name"].lower(): s["name"]
+                for sd in load_data().values()
+                for sec_sd in (sd.get("sections") or {"_": sd}).values()
+                for s in sec_sd["students"]}
     aliases = read_aliases()
     for it in items:
         if not isinstance(it, dict):
@@ -362,10 +398,13 @@ def api_meet_alias():
 def students():
     data = load_data()
     subjects, subject = pick_subject(data)
-    rows = student_stats(data[subject]) if subject else []
+    sec_names, section, sd = pick_section(data.get(subject))
+    rows = student_stats(sd) if subject else []
     subj_img = subject_image_url(subject) if subject else None
     return render_template("students.html", page="students", subjects=subjects, subject=subject,
+                           section=section, section_names=sec_names,
                            rows=rows, low=LOW_RATE, tabs=make_tabs(subjects, subject, "students"),
+                           section_tabs=make_section_tabs(sec_names, section, subject, "students"),
                            subject_img_url=subj_img)
 
 
@@ -377,27 +416,29 @@ def students_add():
         if n and n.lower() not in [x.lower() for x in names]:
             names.append(n)
     subs = request.form.getlist("subjects")
+    section = clean_name(request.form.get("section", "")) or None
     if not names or not subs:
         flash("Enter at least one name and tick at least one subject.", "err")
-        return redirect(url_for("students", subject=subs[0] if subs else None))
+        return redirect(url_for("students", subject=subs[0] if subs else None, section=section))
     try:
-        added, skipped = add_students(subs, names)
+        added, skipped = add_students(subs, names, section=section)
     except ValueError as err:
         flash(str(err), "err")
         return redirect(url_for("students"))
     if added:
-        log_change("Students added", ", ".join(subs), short_list(names, 30)
-                   + (" · Already on the list: " + short_list(skipped, 10) if skipped else ""))
+        log_change("Students added", ", ".join(subs) + (f" ({section})" if section else ""),
+                   short_list(names, 30) + (" · Already on the list: " + short_list(skipped, 10) if skipped else ""))
     msg = f"Added {added} student entr{'y' if added == 1 else 'ies'}."
     if skipped:
         msg += " Already on the list: " + ", ".join(skipped) + "."
     flash(msg, "ok")
-    return redirect(url_for("students", subject=subs[0]))
+    return redirect(url_for("students", subject=subs[0], section=section))
 
 
 @app.route("/students/remove", methods=["POST"])
 def students_remove():
     subject = request.form.get("subject", "")
+    section = clean_name(request.form.get("section", "")) or None
     name = clean_name(request.form.get("name", ""))
     try:
         row = int(request.form.get("row", ""))
@@ -405,14 +446,152 @@ def students_remove():
         row = None
     everywhere = request.form.get("everywhere") == "1"
     try:
-        removed = remove_student(subject, row, name, everywhere)
+        removed = remove_student(subject, row, name, everywhere, section=section)
     except ValueError as err:
         flash(str(err), "err")
         return redirect(url_for("students"))
     if removed:
-        log_change("Student removed", "All subjects" if everywhere else subject, name)
+        log_change("Student removed", "All subjects" if everywhere else f"{subject} ({section or ''})", name)
     flash(f"Removed {name}." if removed else f"{name} was not found.", "ok" if removed else "err")
-    return redirect(url_for("students", subject=subject))
+    return redirect(url_for("students", subject=subject, section=section))
+
+
+@app.route("/students/profile", methods=["POST"])
+def students_profile():
+    old_name = clean_name(request.form.get("old_name", ""))
+    new_name = clean_name(request.form.get("name", "")) or old_name
+    student_no = request.form.get("student_no", "")
+    guardian_name = request.form.get("guardian_name", "")
+    guardian_phone = request.form.get("guardian_phone", "")
+    email = request.form.get("email", "")
+    address = request.form.get("address", "")
+    subject = request.form.get("subject", "")
+    section = request.form.get("section", "")
+    next_page = request.form.get("next", "")
+    try:
+        saved_name = update_student_profile(
+            old_name, new_name=new_name, student_no=student_no,
+            guardian_name=guardian_name, guardian_phone=guardian_phone,
+            email=email, address=address)
+        log_change("Student profile updated", subject, f"{saved_name} (ID: {student_no or '—'})")
+        flash(f"Saved profile for {saved_name}.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+        saved_name = old_name
+    if next_page == "lookup":
+        return redirect(url_for("lookup", q=request.form.get("q", ""), subject=subject, section=section, student=saved_name))
+    return redirect(url_for("students", subject=subject, section=section))
+
+
+# --------------------------------------------------------------- grades
+@app.route("/grades")
+def grades_page():
+    data = load_data()
+    subjects, subject = pick_subject(data)
+    sec_names, section, _ = pick_section(data.get(subject))
+    gb = load_grades(subject, section) if subject else None
+    return render_template(
+        "grades.html", page="grades", subjects=subjects, subject=subject,
+        section=section, section_names=sec_names, gb=gb,
+        tabs=make_tabs(subjects, subject, "grades_page"),
+        section_tabs=make_section_tabs(sec_names, section, subject, "grades_page"))
+
+
+@app.route("/grades/weights", methods=["POST"])
+def grades_weights():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    try:
+        save_grade_weights(
+            subject, section,
+            request.form.get("exam_weight"),
+            request.form.get("quiz_weight"),
+            request.form.get("activity_weight"),
+        )
+        log_change("Grade weights updated", f"{subject} ({section or ''})",
+                   f"Exam {request.form.get('exam_weight')}% · Quiz {request.form.get('quiz_weight')}% · Activity {request.form.get('activity_weight')}%")
+        flash("Saved grade category weights.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/lock", methods=["POST"])
+def grades_lock():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    lock_on = request.form.get("locked") == "1"
+    try:
+        set_weights_lock(subject, section, lock_on)
+        log_change("Grade weights " + ("locked" if lock_on else "unlocked"), f"{subject} ({section or ''})", "")
+        flash("Grade weights are now " + ("locked 🔒." if lock_on else "unlocked 🔓."), "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/items/add", methods=["POST"])
+def grades_item_add():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    category = request.form.get("category", "").strip()
+    title = request.form.get("title", "").strip()
+    max_score = request.form.get("max_score", "").strip()
+    date_str = request.form.get("date", "").strip()
+    try:
+        add_grade_item(subject, section, category, title, max_score, date_str=date_str)
+        log_change("Grade item added", f"{subject} ({section or ''})", f"{category.capitalize()}: {title} (max {max_score})")
+        flash(f"Added {category.capitalize()} '{title}'.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/items/delete", methods=["POST"])
+def grades_item_delete():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    item_id = request.form.get("item_id", "").strip()
+    try:
+        title = delete_grade_item(subject, section, item_id)
+        log_change("Grade item deleted", f"{subject} ({section or ''})", title)
+        flash(f"Deleted '{title}'.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/scores", methods=["POST"])
+def grades_scores():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    entries = []
+    for k, v in request.form.items():
+        if not k.startswith("score_"):
+            continue
+        parts = k.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            eid, iid = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        val = v.strip()
+        if val == "":
+            entries.append((eid, iid, None))
+        else:
+            try:
+                entries.append((eid, iid, float(val)))
+            except ValueError:
+                flash(f"Invalid score '{val}'.", "err")
+                return redirect(url_for("grades_page", subject=subject, section=section))
+    try:
+        save_grade_scores(subject, section, entries)
+        log_change("Grades saved", f"{subject} ({section or ''})", f"Updated scores for {subject}")
+        flash("Saved student scores.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
 
 
 
@@ -472,11 +651,12 @@ def subjects_delete_image():
 @app.route("/subjects/add", methods=["POST"])
 def subjects_add():
     name = clean_sheet_name(request.form.get("name", ""))
+    sec_name = clean_sheet_name(request.form.get("section_name", "")) or None
     if not name or name.lower() == "guide":
         flash("Please enter a different subject name.", "err")
         return redirect(url_for("students"))
     try:
-        n = add_subject(name, request.form.get("copy_from", ""))
+        n = add_subject(name, request.form.get("copy_from", ""), section_name=sec_name)
     except ValueError as err:
         flash(str(err), "err")
         return redirect(url_for("students"))
@@ -485,10 +665,92 @@ def subjects_add():
     return redirect(url_for("students", subject=name))
 
 
+@app.route("/sections/add", methods=["POST"])
+def sections_add():
+    subject = request.form.get("subject", "").strip()
+    sec_name = clean_sheet_name(request.form.get("section", ""))
+    copy_from = request.form.get("copy_from_section", "").strip() or None
+    if not subject or not sec_name:
+        flash("Enter a section name (e.g. BSCS-1B).", "err")
+        return redirect(url_for("students", subject=subject))
+    try:
+        n = add_section(subject, sec_name, copy_from_section=copy_from)
+        log_change("Section added", f"{subject} ({sec_name})",
+                   f"Copied {n} students from {copy_from}" if n else "New empty section")
+        flash(f"Added section '{sec_name}' to {subject}.", "ok")
+        return redirect(url_for("students", subject=subject, section=sec_name))
+    except ValueError as err:
+        flash(str(err), "err")
+        return redirect(url_for("students", subject=subject))
+
+
+@app.route("/sections/rename", methods=["POST"])
+def sections_rename():
+    subject = request.form.get("subject", "").strip()
+    old_name = request.form.get("old_section", "").strip()
+    new_name = clean_sheet_name(request.form.get("new_section", ""))
+    try:
+        updated = rename_section(subject, old_name, new_name)
+        log_change("Section renamed", subject, f"{old_name} → {updated}")
+        flash(f"Renamed section '{old_name}' to '{updated}'.", "ok")
+        return redirect(url_for("students", subject=subject, section=updated))
+    except ValueError as err:
+        flash(str(err), "err")
+        return redirect(url_for("students", subject=subject, section=old_name))
+
+
+@app.route("/sections/delete", methods=["POST"])
+def sections_delete():
+    subject = request.form.get("subject", "").strip()
+    sec_name = request.form.get("section", "").strip()
+    try:
+        delete_section(subject, sec_name)
+        log_change("Section deleted", f"{subject} ({sec_name})", "Section and its records removed")
+        flash(f"Deleted section '{sec_name}' from {subject}.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("students", subject=subject))
+
+
 @app.route("/log")
 def log_page():
     shown, total = read_log()
-    return render_template("log.html", page="log", shown=shown, total=total)
+    backups = list_backups()
+    has_xlsx = os.path.isfile(XLSX)
+    return render_template("log.html", page="log", shown=shown, total=total,
+                           backups=backups[:30], has_xlsx=has_xlsx)
+
+
+@app.route("/backups/restore", methods=["POST"])
+def backups_restore():
+    if not getattr(g, "is_admin", False):
+        flash("Only an admin can restore a database snapshot.", "err")
+        return redirect(url_for("log_page"))
+    fn = request.form.get("filename", "").strip()
+    try:
+        restore_backup(fn)
+        log_change("Backup restored", "", f"Restored database from {fn}")
+        flash(f"Restored data from snapshot '{fn}'.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("log_page"))
+
+
+@app.route("/backups/reimport_excel", methods=["POST"])
+def backups_reimport_excel():
+    if not getattr(g, "is_admin", False):
+        flash("Only an admin can re-import from Excel.", "err")
+        return redirect(url_for("log_page"))
+    try:
+        restored = reimport_from_excel()
+        if restored:
+            log_change("Excel re-imported", ", ".join(restored), "Restored missing subject(s) from attendance_records.xlsx")
+            flash("Restored missing subject(s) from attendance_records.xlsx: " + ", ".join(restored) + ".", "ok")
+        else:
+            flash("All subjects in attendance_records.xlsx are already present in the database.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("log_page"))
 
 
 def human_size(n):

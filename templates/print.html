@@ -6,14 +6,14 @@
 <style id="pageStyle"></style></head><body>
 <div class="bar">
   <button type="button" onclick="window.print()">&#128424; Print</button>
-  <a href="{{ url_for('records', subject=subject) }}" style="margin-left:12px">&larr; Back to records</a>
+  <a href="{{ url_for('records', subject=subject, section=section) }}" style="margin-left:12px">&larr; Back to records</a>
   <div class="subj" style="margin-top:8px">Subject:
     {% for s in subjects %}<a class="{{ 'on' if s == subject }}" href="{{ url_for('print_sheet', subject=s) }}">{{ s }}</a>{% endfor %}
   </div>
   <div style="margin-top:6px">
     <label>Paper <select id="inPaper"><option value="a4">A4 landscape</option><option value="long">Long bond 8.5 x 13 in, landscape</option><option value="letter">Letter (short) 8.5 x 11 in, landscape</option></select></label>
     <label>School <input id="inSchool" size="26"></label>
-    <label>Section <input id="inSection" size="12" placeholder="e.g. BS CS 1-A"></label>
+    <label>Section <input id="inSection" size="12" placeholder="e.g. BSCS-1A"></label>
     <label>Semester <input id="inSem" size="16" placeholder="e.g. 1st Sem 2026"></label>
   </div>
   <div style="margin-top:8px"><label><input type="checkbox" id="chkTot"> <b>Show TOTAL and REC columns</b> (use this for the final copy you hand in)</label>
@@ -49,7 +49,7 @@
 <script>
 (function () {
   var K = {school: "sheet_school", section: "sheet_section", sem: "sheet_semester"};
-  var D = {school: "ECLARO ACADEMY, INC.", section: "", sem: ""};
+  var D = {school: "ECLARO ACADEMY, INC.", section: {{ (section or 'BSCS-1A')|tojson }}, sem: ""};
   function get(k) { try { var v = localStorage.getItem(K[k]); return v === null ? D[k] : v; } catch (e) { return D[k]; } }
   function put(k, v) { try { localStorage.setItem(K[k], v); } catch (e) {} }
   function paint(k, cls) { var v = get(k); document.querySelectorAll(cls).forEach(function (n) { n.textContent = v; }); }

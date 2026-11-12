@@ -21,6 +21,7 @@
   <p class="muted" style="margin-top:0">Upload the attendance <b>CSV</b> exported from your Google Meet extension. No AI key is needed. Present = in the call for at least <b>{{ pct }}%</b> of the meeting, and your recited (R) marks for that day are kept.</p>
   <form method="post" enctype="multipart/form-data" action="{{ url_for('import_meet') }}">
     <input type="hidden" name="subject" value="{{ subject }}">
+    <input type="hidden" name="section" value="{{ section or '' }}">
     <p><input type="file" name="csv" accept=".csv,text/csv" required></p>
     <div class="toolbar">
       <input type="text" name="topic" class="grow" maxlength="120" placeholder="Topic for this day (optional)">
@@ -115,6 +116,7 @@
 <script>
 const students = {{ students|tojson }};
 const subject = {{ subject|tojson }};
+const section = {{ section|tojson }};
 const recorded = {{ recorded|tojson }};
 const today = {{ today|tojson }};
 const recordsUrl = {{ records_url|tojson }};
