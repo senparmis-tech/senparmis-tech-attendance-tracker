@@ -14,3 +14,6 @@ meet_aliases.json
 name_aliases.json
 backups/
 subject_images/
+attendance.db
+attendance.db-journal
+*.db.new

@@ -26,7 +26,7 @@
       {% endif %}
       <span class="date-title-text">{{ date_label }}</span>
       <span class="date-badge-slot">
-        {% if recorded %}<span class="badge done">✓ Saved in Excel</span>{% else %}<span class="badge todo">⚪ Not saved yet</span>{% endif %}
+        {% if recorded %}<span class="badge done">✓ Saved</span>{% else %}<span class="badge todo">⚪ Not saved yet</span>{% endif %}
       </span>
     </div>
   </div>
@@ -145,7 +145,7 @@ document.getElementById('dateIn').onchange = e => {
     <p class="muted" style="margin-bottom:12px">All students have been reviewed for this date.</p>
     <div class="done-stats-summary" id="doneStatsSummary"></div>
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
-      <button type="button" class="btn primary" id="doneSaveBtn" style="padding:12px 24px;font-size:16px">💾 Save to Excel</button>
+      <button type="button" class="btn primary" id="doneSaveBtn" style="padding:12px 24px;font-size:16px">💾 Save</button>
       <button type="button" class="btn" id="doneReviewBtn">Review List</button>
     </div>
   </div>
@@ -162,7 +162,7 @@ document.getElementById('dateIn').onchange = e => {
   </div>
   <button class="btn primary save-btn" id="save" type="button">
     <span class="save-status-dot" id="saveDot"></span>
-    <span id="saveBtnText">Save to Excel</span>
+    <span id="saveBtnText">Save</span>
   </button>
 </div>
 

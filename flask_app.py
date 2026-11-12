@@ -1,5 +1,5 @@
 """
-School attendance website that uses an Excel workbook as its database.
+School attendance website that keeps its records in a SQLite database (Excel import/export supported).
 
 Layout of every subject sheet (matches a classic attendance sheet):
   - one sheet (tab) per subject
@@ -20,8 +20,8 @@ import webbrowser
 import auth  # registers @app.before_request, /login, /logout
 import routes  # registers page and API routes
 import lookup  # registers the student lookup page
-from config import HOST, START_PORT, XLSX
-from excel_store import ensure_workbook
+from config import DB_FILE, HOST, START_PORT
+from store import ensure_db
 from web import app
 
 __all__ = ["app", "auth", "routes", "lookup"]
@@ -45,7 +45,7 @@ def get_local_ip():
 
 
 if __name__ == "__main__":
-    ensure_workbook()
+    ensure_db()
     port = free_port(START_PORT)
     lip = get_local_ip()
     local_url = f"http://localhost:{port}"
@@ -54,7 +54,7 @@ if __name__ == "__main__":
     print(" Attendance site is running")
     print(f" Open on this PC:    {local_url}")
     print(f" Open on your phone: {mobile_url}  (connected to same Wi-Fi)")
-    print(f" Excel database:     {XLSX}")
+    print(f" Database file:      {DB_FILE}")
     print(" Close this window (or press Ctrl+C) to stop the site.")
     print("=" * 60)
     if "--no-browser" not in sys.argv:

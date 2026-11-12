@@ -2,6 +2,7 @@
 Page and JSON API routes for marking, records, scanning, Meet import, students, log, and files.
 """
 import base64
+import io
 import os
 import re
 import subprocess
@@ -12,19 +13,20 @@ from flask import flash, jsonify, redirect, render_template, request, send_file,
 
 from ai_scan import AIError, call_ai, get_api_key, normalize_scan, provider_of
 from config import (API_KEY_FILE, LOG_FILE, LOW_RATE, MAX_CSV, MAX_IMAGES,
-                    MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR, XLSX)
-from excel_store import (FileLocked, add_students, add_subject, apply_marks,
-                         backup_workbook, delete_date, delete_subject,
-                         ensure_workbook, get_subject_image_file, load_data,
-                         remove_student, remove_subject_image, student_stats,
-                         subject_image_url)
+                    MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR, DB_FILE)
+from excel_io import build_workbook
+from store import (FileLocked, add_students, add_subject, apply_marks,
+                   backup_workbook, delete_date, delete_subject,
+                   ensure_db, get_subject_image_file, load_data,
+                   remove_student, remove_subject_image, student_stats,
+                   subject_image_url)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
 from web import app
 
-LOCKED_MSG = ("Excel has attendance_records.xlsx open, so it can't be changed right now. "
-              "Save and close it in Excel, then try again.")
+LOCKED_MSG = ("The database is busy right now, so the change was not saved. "
+              "Wait a few seconds and try again.")
 
 
 def make_tabs(subjects, current, endpoint, **extra):
@@ -161,7 +163,7 @@ def scan():
 
 @app.route("/api/scan", methods=["POST"])
 def api_scan():
-    """Read photos/screenshots of an attendance record. This only READS: nothing is written to Excel here."""
+    """Read photos/screenshots of an attendance record. This only READS: nothing is saved here."""
     data = load_data()
     subject = request.form.get("subject", "")
     files = [f for f in request.files.getlist("image") if f]
@@ -272,7 +274,7 @@ def dates_delete():
         flash("That date was not understood.", "err")
         return redirect(url_for("records", subject=subject))
     try:
-        ensure_workbook()
+        ensure_db()
         backup_workbook("before_delete_date")
         marks, topic = delete_date(subject, d)
     except ValueError as err:
@@ -427,7 +429,7 @@ def subjects_delete():
     name = request.form.get("subject", "").strip()
     try:
         delete_subject(name)
-        log_change("Subject deleted", name, "Subject and records removed from Excel")
+        log_change("Subject deleted", name, "Subject and records removed")
         flash(f"Deleted subject '{name}'.", "ok")
     except Exception as err:
         flash(str(err), "err")
@@ -495,13 +497,13 @@ def human_size(n):
 
 @app.route("/files")
 def files_page():
-    exists = os.path.exists(XLSX)
+    exists = os.path.exists(DB_FILE)
     size = modified = ""
     if exists:
-        st = os.stat(XLSX)
+        st = os.stat(DB_FILE)
         size = human_size(st.st_size)
         modified = datetime.fromtimestamp(st.st_mtime).strftime("%b %d, %Y %I:%M %p").replace(" 0", " ")
-    return render_template("files.html", page="files", xlsx_path=XLSX, folder=os.path.dirname(XLSX),
+    return render_template("files.html", page="files", xlsx_path=DB_FILE, folder=os.path.dirname(DB_FILE),
                            exists=exists, size=size, modified=modified, log_name=os.path.basename(LOG_FILE),
                            is_local=request.remote_addr in ("127.0.0.1", "::1"), open_url=url_for("api_open"))
 
@@ -514,8 +516,8 @@ def api_open():
     what = (request.get_json(silent=True) or {}).get("what")
     if what not in ("folder", "file"):
         return jsonify(ok=False, error="That request was not understood."), 400
-    ensure_workbook()
-    target = os.path.dirname(XLSX) if what == "folder" else XLSX
+    ensure_db()
+    target = os.path.dirname(DB_FILE) if what == "folder" else DB_FILE
     try:
         if sys.platform.startswith("win"):
             os.startfile(target)
@@ -530,5 +532,9 @@ def api_open():
 
 @app.route("/download")
 def download():
-    ensure_workbook()
-    return send_file(XLSX, as_attachment=True, download_name="attendance_records.xlsx")
+    """Download the attendance as a fresh Excel workbook built from the database."""
+    buf = io.BytesIO()
+    build_workbook(load_data()).save(buf)
+    buf.seek(0)
+    return send_file(buf, as_attachment=True, download_name="attendance_records.xlsx",
+                     mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")

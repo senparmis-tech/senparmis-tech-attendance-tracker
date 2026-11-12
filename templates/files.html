@@ -1,23 +1,22 @@
 {% extends "base.html" %}
-{% block title %}Excel file{% endblock %}
+{% block title %}Data file{% endblock %}
 {% block body %}
-<h1>Where your Excel file is saved</h1>
+<h1>Where your data is saved</h1>
 <div class="card">
-  <h2>attendance_records.xlsx</h2>
+  <h2>attendance.db</h2>
   <p class="muted" style="margin:0 0 4px">Full location on the computer that runs this site:</p>
   <p style="margin:0 0 10px"><code id="fpath" style="display:block;padding:10px 12px;background:var(--surface);border-radius:8px;word-break:break-all;font-size:14px">{{ xlsx_path }}</code></p>
   <p class="muted" style="margin:0 0 4px">Folder:</p>
   <p style="margin:0 0 12px"><code id="fdir" style="display:block;padding:10px 12px;background:var(--surface);border-radius:8px;word-break:break-all;font-size:14px">{{ folder }}</code></p>
   <p style="margin:0 0 12px">
-    {% if exists %}<span class="badge done">File exists</span> {{ size }} · last saved {{ modified }}
+    {% if exists %}<span class="badge done">Database exists</span> {{ size }} · last saved {{ modified }}
     {% else %}<span class="badge todo">Not created yet</span> It is created when you first mark attendance or open the site.{% endif %}
   </p>
   <div class="toolbar">
-    <a class="btn primary" href="{{ url_for('download') }}">⬇ Download a copy</a>
+    <a class="btn primary" href="{{ url_for('download') }}">⬇ Download Excel copy</a>
     <button class="btn" type="button" id="copyPath">Copy file path</button>
     {% if is_local %}
     <button class="btn" type="button" id="openFolder">Open folder on this PC</button>
-    <button class="btn" type="button" id="openFile">Open in Excel on this PC</button>
     {% endif %}
   </div>
   <div id="msg" class="muted"></div>
@@ -25,11 +24,11 @@
 <div class="card">
   <h2>How saving works</h2>
   <ul style="margin:0;padding-left:20px">
-    <li>Every time you press <b>Save to Excel</b> or confirm a scan, the change is written straight into the file above.</li>
-    <li>The file always stays on the computer that runs <code>start.bat</code>, even when you use the site from your phone.</li>
-    <li><b>Download a copy</b> sends a copy to the device you are using now. From a phone it goes to the phone's Downloads. The copy does not update later, so download again for the latest.</li>
-    <li>If Excel has the file open, saving from the website is blocked until you close Excel.</li>
-    <li>To move the file, stop the site, move <code>attendance_records.xlsx</code> to another folder, then edit <code>XLSX</code> near the top of <code>app.py</code>.</li>
+    <li>Every time you press <b>Save</b> or confirm a scan, the change is written straight into the database file above.</li>
+    <li>The file always stays on the computer (or PythonAnywhere account) that runs the site, even when you use the site from your phone.</li>
+    <li><b>Download Excel copy</b> builds a fresh <code>.xlsx</code> from the current data and sends it to the device you are using. The copy does not update later, so download again for the latest.</li>
+    <li>Automatic backups of the database are kept in the <code>backups</code> folder next to it.</li>
+    <li>An older <code>attendance_records.xlsx</code> is imported once, the first time the site starts without a database. It is never changed afterwards.</li>
     <li>The changes log is a separate file in the same folder: <code>{{ log_name }}</code>.</li>
   </ul>
 </div>
@@ -47,6 +46,6 @@ async function openIt(what) {
     const j = await r.json(); say(j.ok ? j.message : (j.error || 'Could not open it.'), !j.ok);
   } catch (e) { say('Could not reach the site. Is the black window still open?', true); }
 }
-if ($('openFolder')) { $('openFolder').onclick = () => openIt('folder'); $('openFile').onclick = () => openIt('file'); }
+if ($('openFolder')) { $('openFolder').onclick = () => openIt('folder'); }
 </script>
 {% endblock %}

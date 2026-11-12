@@ -16,7 +16,7 @@
 {% elif not rows %}<div class="card">No students in {{ subject }} yet.</div>
 {% else %}
 {% if role == 'teacher' %}<p><a class="btn small" href="{{ url_for('print_sheet', subject=subject) }}" target="_blank">&#128424; Print sheet</a></p>{% endif %}
-{% if role == 'teacher' %}<p class="muted">Same view as the Excel sheet. To change a day, use <a href="{{ url_for('mark', subject=subject) }}">Mark attendance</a> and pick that date.</p>
+{% if role == 'teacher' %}<p class="muted">Same view as the attendance sheet. To change a day, use <a href="{{ url_for('mark', subject=subject) }}">Mark attendance</a> and pick that date.</p>
 {% else %}<p class="muted">p = present &middot; x = absent &middot; l = late &middot; e = excused &middot; r = recited. Swipe the table sideways to see every day.</p>{% endif %}
 <div class="scroll"><table class="grid recgrid">
 <thead><tr><th class="sticky">Student</th><th class="n">P</th><th class="n">A</th><th class="n">L</th><th class="n">E</th><th class="n">R</th><th class="n">Rate</th>

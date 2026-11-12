@@ -46,7 +46,7 @@
 </div>
 {% endif %}
 <div class="card" id="step1">
-  <p class="muted" style="margin-top:0">Choose a photo of a paper list, or screenshots of an online-meeting attendance report (up to {{ max_images }}, for example when the report is long and you scroll). The AI reads the names and suggests who was present or absent for <b>{{ subject }}</b>. People who are not on this class list (other sections, teachers) are ignored. <b>Nothing is saved to Excel until you confirm.</b> The images, including the names on them, are sent to {{ 'Google' if provider == 'gemini' else 'Anthropic' if provider else 'the AI service you set up' }} to be read.{% if provider == 'gemini' %} On Google's free tier, Google may use it to improve its products; a paid Gemini account does not.{% endif %}</p>
+  <p class="muted" style="margin-top:0">Choose a photo of a paper list, or screenshots of an online-meeting attendance report (up to {{ max_images }}, for example when the report is long and you scroll). The AI reads the names and suggests who was present or absent for <b>{{ subject }}</b>. People who are not on this class list (other sections, teachers) are ignored. <b>Nothing is saved until you confirm.</b> The images, including the names on them, are sent to {{ 'Google' if provider == 'gemini' else 'Anthropic' if provider else 'the AI service you set up' }} to be read.{% if provider == 'gemini' %} On Google's free tier, Google may use it to improve its products; a paid Gemini account does not.{% endif %}</p>
   <input type="file" id="file" accept="image/*" multiple>
   <div id="previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
   <p><button class="btn primary" id="read" type="button" disabled>Read the sheet</button> <span id="busy" class="muted"></span></p>
@@ -83,11 +83,11 @@
   <div class="dock">
     <div class="counts"><span class="s-p" id="cp">P 0</span><span class="s-x" id="cx">A 0</span><span class="s-l" id="cl">L 0</span><span class="s-e" id="ce">E 0</span></div>
     <button class="btn" id="cancel" type="button">Cancel</button>
-    <button class="btn primary" id="confirm" type="button">Confirm &amp; save to Excel</button>
+    <button class="btn primary" id="confirm" type="button">Confirm &amp; save</button>
   </div>
 </div>
 <div class="card" id="done" style="display:none">
-  <h2>Saved to Excel ✓</h2>
+  <h2>Saved ✓</h2>
   <p id="doneMsg"></p>
   <a class="btn primary" id="doneLink" href="#">View records</a>
   <button class="btn" id="again" type="button">Scan another sheet</button>
