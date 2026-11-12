@@ -10,7 +10,7 @@ import unicodedata
 from datetime import datetime
 
 from config import MEET_ALIAS_FILE
-from excel_store import write_lock
+from store import write_lock
 from helpers import clean_name
 
 NAME_COLS = ("full name", "name", "participant", "participant name", "display name")

@@ -5,7 +5,7 @@ Teacher-only (the auth gate only lets students open the Records page).
 from flask import render_template, request
 
 from config import CODES, LOW_RATE
-from excel_store import load_data, student_stats
+from store import load_data, student_stats
 from helpers import clean_name
 from web import app
 

@@ -153,7 +153,7 @@ function reset() {
   $('review').style.display = 'none'; $('done').style.display = 'none'; $('step1').style.display = 'block';
   $('file').value = ''; blobs = []; showPreviews(); showErr('');
 }
-$('cancel').onclick = () => { if (confirm('Discard this scan? Nothing has been saved to Excel.')) reset(); };
+$('cancel').onclick = () => { if (confirm('Discard this scan? Nothing has been saved.')) reset(); };
 $('again').onclick = reset;
 
 $('confirm').onclick = async () => {

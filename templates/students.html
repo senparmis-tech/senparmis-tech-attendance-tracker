@@ -44,7 +44,7 @@
       </div>
     </div>
     <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
-      <form class="inline" method="post" action="{{ url_for('subjects_delete') }}" onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject and all its attendance records from Excel. Are you sure?')">
+      <form class="inline" method="post" action="{{ url_for('subjects_delete') }}" onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject and all its attendance records. Are you sure?')">
         <input type="hidden" name="subject" value="{{ subject }}">
         <button class="btn small danger" type="submit">🗑 Delete Subject</button>
       </form>

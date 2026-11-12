@@ -9,7 +9,8 @@ BASE_DIR = os.path.dirname(os.path.abspath(__file__))
 # Data and secret files live next to the code unless ATTENDANCE_DATA_DIR points somewhere else
 # (the automated tests use this so they never touch the real workbook).
 DATA_DIR = os.environ.get("ATTENDANCE_DATA_DIR", "").strip() or BASE_DIR
-XLSX = os.path.join(DATA_DIR, "attendance_records.xlsx")
+XLSX = os.path.join(DATA_DIR, "attendance_records.xlsx")   # old Excel database: imported once, then only used for exports
+DB_FILE = os.path.join(DATA_DIR, "attendance.db")           # the SQLite database the site really uses
 
 SAMPLE_SUBJECTS = ["College Algebra", "MMW"]
 SAMPLE_STUDENTS = ["Sample Student A", "Sample Student B", "Sample Student C"]

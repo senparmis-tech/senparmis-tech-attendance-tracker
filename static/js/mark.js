@@ -180,7 +180,7 @@ function paint() {
   document.getElementById('cr').textContent = 'R ' + counts.r;
 
   if (saveDot) saveDot.classList.toggle('dirty', dirty);
-  if (saveBtnText) saveBtnText.textContent = dirty ? 'Save to Excel *' : 'Save to Excel';
+  if (saveBtnText) saveBtnText.textContent = dirty ? 'Save *' : 'Save';
 
   if (rollCallArea.style.display !== 'none') {
     renderRollCall();
@@ -373,10 +373,10 @@ async function saveAttendance() {
       dirty = false;
       wasRecorded = true;
       vibrate(25);
-      toast('Saved to Excel ✓', 'ok');
+      toast('Saved ✓', 'ok');
       const badgeSlot = document.querySelector('.date-badge-slot');
       if (badgeSlot) {
-        badgeSlot.innerHTML = '<span class="badge done">✓ Saved in Excel</span>';
+        badgeSlot.innerHTML = '<span class="badge done">✓ Saved</span>';
       }
     } else {
       toast(data.error || 'Could not save.', 'err');

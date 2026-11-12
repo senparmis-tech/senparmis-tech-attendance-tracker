@@ -15,7 +15,9 @@ os.environ["ATTENDANCE_STUDENT_PASSWORD"] = "studentpass1"
 
 import flask_app  # noqa: E402
 from openpyxl import load_workbook  # noqa: E402
-from config import XLSX  # noqa: E402
+import db  # noqa: E402
+import excel_io  # noqa: E402
+import store  # noqa: E402
 
 app = flask_app.app
 
@@ -52,20 +54,61 @@ def test_every_page_and_static_asset_loads():
         assert r.status_code == 200 and len(r.data) > 50, asset
 
 
-def test_save_attendance_and_excel_roundtrip():
+def test_save_attendance_and_database_roundtrip():
     c = _teacher_client()
     r = c.post("/api/save", json={
         "subject": "MMW", "date": "2026-11-10", "topic": "=DangerTopic",
-        "marks": [{"row": 5, "name": "Sample Student A", "code": "x"},
-                  {"row": 6, "name": "Sample Student B", "code": "r"}],
+        "marks": [{"row": 0, "name": "Sample Student A", "code": "x"},
+                  {"row": 0, "name": "Sample Student B", "code": "r"}],
         "new_students": ["Added Student"],
     })
     assert r.status_code == 200 and r.get_json()["ok"] is True
-    wb = load_workbook(XLSX)
-    ws = wb["MMW"]
-    assert ws.cell(3, 8).value == "DangerTopic"     # leading '=' stripped against formula injection
-    assert ws.cell(5, 8).value == "x"
-    assert ws.cell(6, 8).value == "r"
+    sd = store.load_data()["MMW"]
+    day = next(d for d in sd["dates"] if d["date"].isoformat() == "2026-11-10")
+    assert day["topic"] == "DangerTopic"            # leading '=' stripped against formula injection
+    by_name = {s["name"]: sd["cells"].get((s["row"], day["col"]), "") for s in sd["students"]}
+    assert by_name["Sample Student A"] == "x" and by_name["Sample Student B"] == "r"
+    assert "Added Student" in by_name
+    # changing a mark updates it, and clearing removes it
+    c.post("/api/save", json={"subject": "MMW", "date": "2026-11-10", "topic": "",
+                              "marks": [{"name": "Sample Student A", "code": "p"},
+                                        {"name": "Sample Student B", "code": "", "clear": True}]})
+    sd = store.load_data()["MMW"]
+    by_name = {s["name"]: sd["cells"].get((s["row"], day["col"]), "") for s in sd["students"]}
+    assert by_name["Sample Student A"] == "p" and by_name["Sample Student B"] == ""
+    assert c.post("/api/save", json={"subject": "Nope", "date": "2026-11-10", "marks": []}).status_code == 400
+
+
+def test_excel_export_and_import_roundtrip():
+    c = _teacher_client()
+    r = c.get("/download")
+    assert r.status_code == 200 and r.data[:2] == b"PK"
+    wb = load_workbook(io.BytesIO(r.data))
+    assert "MMW" in wb.sheetnames
+    # import the exported workbook into a brand-new database and compare
+    path = os.path.join(_tmp, "roundtrip.xlsx")
+    wb.save(path)
+    original = store.load_data()
+    fresh = os.path.join(_tmp, "fresh.db")
+    conn = db.connect(fresh)
+    db.migrate(conn)
+    store.import_data(conn, excel_io.read_workbook(path))
+    conn.commit()
+    conn.close()
+    conn = db.connect(fresh)
+    n_students = conn.execute("SELECT COUNT(*) FROM students").fetchone()[0]
+    n_marks = conn.execute("SELECT COUNT(*) FROM attendance").fetchone()[0]
+    conn.close()
+    assert n_students == len({s["name"].casefold() for sd in original.values() for s in sd["students"]})
+    assert n_marks == sum(len(sd["cells"]) for sd in original.values())
+
+
+def test_backup_is_a_valid_database():
+    store.backup_latest()
+    from config import BACKUP_DIR
+    conn = db.connect(os.path.join(BACKUP_DIR, "attendance_LATEST.db"))
+    assert conn.execute("SELECT COUNT(*) FROM subjects").fetchone()[0] >= 1
+    conn.close()
 
 
 def test_students_subjects_and_meet_import():
