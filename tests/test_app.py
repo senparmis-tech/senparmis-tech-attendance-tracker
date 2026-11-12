@@ -149,3 +149,47 @@ def test_student_lookup():
     stu = app.test_client()
     stu.post("/login", data={"password": "studentpass1"})
     assert stu.get("/lookup").status_code == 302
+
+
+def test_per_teacher_accounts_and_subject_isolation():
+    admin = _teacher_client()
+    assert admin.get("/teachers").status_code == 200
+    r = admin.post("/teachers/add", data={
+        "username": "msantos", "display_name": "Prof. Santos", "password": "santospassword1",
+    })
+    assert r.status_code == 302
+    teachers = store.list_teachers()
+    santos = next(t for t in teachers if t["username"] == "msantos")
+    assert not santos["is_admin"]
+
+    # Assign MMW to Prof. Santos; College Algebra remains unassigned (admin-only when signed in as non-admin)
+    assert admin.post("/teachers/assign_subject",
+                      data={"subject": "MMW", "teacher_id": str(santos["id"])}).status_code == 302
+
+    # Sign in as Prof. Santos
+    tc = app.test_client()
+    r = tc.post("/login", data={"username": "msantos", "password": "santospassword1"})
+    assert r.status_code == 302 and r.headers["Location"].endswith("/")
+    dash = tc.get("/").get_data(as_text=True)
+    assert "MMW" in dash
+    assert "College Algebra" not in dash
+
+    # Non-admin teacher cannot modify an unassigned / other teacher's subject
+    r_forbid = tc.post("/api/save", json={
+        "subject": "College Algebra", "date": "2026-11-11", "topic": "Forbidden",
+        "marks": [{"name": "Sample Student A", "code": "p"}],
+    })
+    assert r_forbid.status_code == 400
+
+    # Non-admin teacher can create their own subject and it is automatically owned by them
+    assert tc.post("/subjects/add", data={"name": "Data Structures", "copy_from": "MMW"}).status_code == 302
+    assert "Data Structures" in tc.get("/").get_data(as_text=True)
+
+    # Non-admin cannot create another teacher account
+    tc.post("/teachers/add", data={"username": "hacker", "password": "hackerpassword1"})
+    assert not any(t["username"] == "hacker" for t in store.list_teachers())
+
+    # Clean up test subject and teacher
+    assert admin.post("/subjects/delete", data={"subject": "Data Structures"}).status_code == 302
+    assert admin.post("/teachers/delete", data={"teacher_id": str(santos["id"])}).status_code == 302
+

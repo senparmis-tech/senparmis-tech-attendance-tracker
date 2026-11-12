@@ -50,6 +50,19 @@ MIGRATIONS = [
     CREATE INDEX idx_sessions_section ON sessions(section_id);
     CREATE INDEX idx_attendance_session ON attendance(session_id);
     """,
+    # 2: per-teacher accounts and subject ownership.
+    """
+    CREATE TABLE teachers (
+        id            INTEGER PRIMARY KEY,
+        username      TEXT NOT NULL UNIQUE COLLATE NOCASE,
+        display_name  TEXT NOT NULL,
+        password_hash TEXT NOT NULL,
+        is_admin      INTEGER NOT NULL DEFAULT 0,
+        created_at    TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+    ALTER TABLE subjects ADD COLUMN teacher_id INTEGER REFERENCES teachers(id) ON DELETE SET NULL;
+    CREATE INDEX idx_subjects_teacher ON subjects(teacher_id);
+    """,
 ]
 
 

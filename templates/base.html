@@ -67,6 +67,10 @@
     <div class="header-actions">
       {% if role == 'teacher' %}
       <div class="desktop-tools">
+        <a href="{{ url_for('teachers_page') }}" class="tool-link {{ 'on' if page=='teachers' }}" title="Teachers &amp; access">
+          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5Z"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+          <span>{{ teacher_name if teacher_name and teacher_name != 'Admin' else 'Teachers' }}</span>
+        </a>
         <a href="{{ url_for('log_page') }}" class="tool-link {{ 'on' if page=='log' }}" title="Changes log">
           <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span>Log</span>
@@ -136,6 +140,7 @@
     </div>
     <div class="mnav-section-label">Tools &amp; data</div>
     <div class="mnav-tools-row">
+      <a href="{{ url_for('teachers_page') }}" class="mnav-chip {{ 'on' if page=='teachers' }}">👤 Teachers</a>
       <a href="{{ url_for('log_page') }}" class="mnav-chip {{ 'on' if page=='log' }}">📝 Changes log</a>
       <a href="{{ url_for('files_page') }}" class="mnav-chip {{ 'on' if page=='files' }}">📁 Excel file</a>
       <a href="{{ url_for('download') }}" class="mnav-chip">⬇ Download .xlsx</a>

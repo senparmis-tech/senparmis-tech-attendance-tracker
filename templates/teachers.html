@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+{% block title %}Teachers &amp; access{% endblock %}
+{% block body %}
+<h1>Teachers &amp; access</h1>
+<p class="muted">
+  Signed in as <b>{{ teacher_name or 'Admin' }}</b>
+  {% if is_admin %}<span class="badge done">Admin</span>{% else %}<span class="badge todo">Teacher</span>{% endif %}
+</p>
+
+{% if is_admin %}
+<div class="grid2">
+  <div class="card">
+    <h2>Add a teacher account</h2>
+    <p class="muted" style="margin-top:0;font-size:13px">Each teacher signs in with their username and password and sees only the subjects assigned to them (unless marked as Admin).</p>
+    <form method="post" action="{{ url_for('teachers_add') }}">
+      <p><input class="txt" type="text" name="username" placeholder="Username (e.g. m.santos)" required style="width:100%"></p>
+      <p><input class="txt" type="text" name="display_name" placeholder="Full / display name (e.g. Prof. Maria Santos)" style="width:100%"></p>
+      <p><input class="txt" type="password" name="password" placeholder="Password (at least 8 characters)" minlength="8" required style="width:100%"></p>
+      <p><label class="chk"><input type="checkbox" name="is_admin" value="1"> Admin (can see all subjects and manage teachers)</label></p>
+      <button class="btn primary" type="submit">Create teacher</button>
+    </form>
+  </div>
+
+  <div class="card">
+    <h2>Subject ownership</h2>
+    <p class="muted" style="margin-top:0;font-size:13px">Assign each subject to a specific teacher so only they (and admins) see it.</p>
+    {% if subjects %}
+    <table>
+      <tr><th>Subject</th><th>Assigned teacher</th></tr>
+      {% for s in subjects %}
+      <tr>
+        <td><b>{{ s.name }}</b></td>
+        <td>
+          <form method="post" action="{{ url_for('teachers_assign_subject') }}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+            <input type="hidden" name="subject" value="{{ s.name }}">
+            <select name="teacher_id">
+              <option value="">— Admin / unassigned —</option>
+              {% for t in teachers %}
+              <option value="{{ t.id }}" {{ 'selected' if s.teacher_id == t.id }}>{{ t.display_name }} ({{ t.username }})</option>
+              {% endfor %}
+            </select>
+            <button class="btn small" type="submit">Save</button>
+          </form>
+        </td>
+      </tr>
+      {% endfor %}
+    </table>
+    {% else %}
+    <p class="muted">No subjects yet.</p>
+    {% endif %}
+  </div>
+</div>
+
+<div class="card">
+  <h2>Teacher accounts ({{ teachers|length }})</h2>
+  {% if teachers %}
+  <table>
+    <tr><th>Name</th><th>Username</th><th>Role</th><th>Subjects</th><th>Reset password / remove</th></tr>
+    {% for t in teachers %}
+    <tr>
+      <td><b>{{ t.display_name }}</b></td>
+      <td><code>{{ t.username }}</code></td>
+      <td>{% if t.is_admin %}<span class="badge done">Admin</span>{% else %}Teacher{% endif %}</td>
+      <td>{{ t.n_subjects }}</td>
+      <td style="white-space:nowrap">
+        <form class="inline" method="post" action="{{ url_for('teachers_password') }}" style="display:inline-flex;gap:6px;align-items:center">
+          <input type="hidden" name="teacher_id" value="{{ t.id }}">
+          <input class="txt" type="password" name="password" placeholder="New password" minlength="8" required style="width:140px;padding:4px 8px;font-size:13px">
+          <button class="btn small" type="submit">Set</button>
+        </form>
+        {% if t.id != teacher_id %}
+        <form class="inline" method="post" action="{{ url_for('teachers_delete') }}" onsubmit="return confirm('Remove teacher {{ t.display_name|e }} ({{ t.username|e }})? Their subjects will remain and become unassigned.')">
+          <input type="hidden" name="teacher_id" value="{{ t.id }}">
+          <button class="btn small danger" type="submit">Remove</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+  </table>
+  {% else %}
+  <p class="muted">No database teacher accounts yet. You are currently signed in with the master password from <code>passwords.txt</code>.</p>
+  {% endif %}
+</div>
+{% else %}
+<div class="card" style="max-width:480px">
+  <h2>Change your password</h2>
+  {% if teacher_id %}
+  <form method="post" action="{{ url_for('teachers_password') }}">
+    <input type="hidden" name="teacher_id" value="{{ teacher_id }}">
+    <p><input class="txt" type="password" name="password" placeholder="New password (at least 8 characters)" minlength="8" required style="width:100%"></p>
+    <button class="btn primary" type="submit">Update password</button>
+  </form>
+  {% else %}
+  <p class="muted">You are signed in with a shared password from <code>passwords.txt</code>.</p>
+  {% endif %}
+</div>
+{% endif %}
+{% endblock %}

@@ -58,8 +58,12 @@ LETTER = {"p": "P", "x": "A", "l": "L", "e": "E", "r": "R", "": "blank"}
 
 
 def who_is_it():
-    ip = request.remote_addr or ""
-    return "This PC" if ip in ("127.0.0.1", "::1") else (ip or "unknown")
+    from flask import g, has_request_context
+    ip = (request.remote_addr or "") if has_request_context() else ""
+    base = "This PC" if ip in ("127.0.0.1", "::1") else (ip or "unknown")
+    if has_request_context() and getattr(g, "teacher_name", None):
+        return f"{g.teacher_name} ({base})"
+    return base
 
 
 def log_change(action, subject="", detail=""):

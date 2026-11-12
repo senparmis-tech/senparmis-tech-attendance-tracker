@@ -13,11 +13,13 @@ import threading
 import time
 from datetime import date, datetime
 
-from flask import url_for
+from flask import g, has_request_context, url_for
+from werkzeug.security import check_password_hash, generate_password_hash
 
 import db
-from config import (BACKUP_DIR, BACKUP_EVERY_MIN, BACKUP_KEEP, DB_FILE, SAMPLE_STUDENTS,
-                    SAMPLE_SUBJECTS, SUBJECT_IMG_DIR, XLSX)
+from config import (BACKUP_DIR, BACKUP_EVERY_MIN, BACKUP_KEEP, DB_FILE,
+                    MIN_PASSWORD, SAMPLE_STUDENTS, SAMPLE_SUBJECTS,
+                    SUBJECT_IMG_DIR, XLSX)
 from helpers import clean_name, clean_sheet_name, norm_code, safe_text
 
 write_lock = threading.RLock()
@@ -33,9 +35,19 @@ def key_of(name):
 
 
 # ------------------------------------------------------------------ set-up
-def _insert_subject(conn, name):
+def _current_teacher_filter():
+    """Return (teacher_id, is_admin) from Flask request context if a non-admin teacher is logged in."""
+    if has_request_context():
+        tid = getattr(g, "teacher_id", None)
+        is_adm = getattr(g, "is_admin", True)
+        return tid, bool(is_adm)
+    return None, True
+
+
+def _insert_subject(conn, name, teacher_id=None):
     pos = conn.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM subjects").fetchone()[0]
-    sid = conn.execute("INSERT INTO subjects (name, position) VALUES (?, ?)", (name, pos)).lastrowid
+    sid = conn.execute("INSERT INTO subjects (name, position, teacher_id) VALUES (?, ?, ?)",
+                       (name, pos, teacher_id)).lastrowid
     return conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, 'Main')", (sid,)).lastrowid
 
 
@@ -136,20 +148,30 @@ class _Tx:
 
 # ------------------------------------------------------------ reading data
 def _section_of(conn, subject):
+    tid, is_adm = _current_teacher_filter()
     row = conn.execute(
-        "SELECT sec.id FROM sections sec JOIN subjects s ON s.id = sec.subject_id "
+        "SELECT sec.id, s.teacher_id FROM sections sec JOIN subjects s ON s.id = sec.subject_id "
         "WHERE s.name = ? ORDER BY sec.id LIMIT 1", (subject,)).fetchone()
     if not row:
         raise ValueError("That subject was not found.")
+    if not is_adm and tid is not None and row["teacher_id"] != tid:
+        raise ValueError("You do not have permission to modify that subject.")
     return row["id"]
 
 
-def load_data():
+def load_data(teacher_id=None, is_admin=None):
+    if teacher_id is None and is_admin is None:
+        teacher_id, is_admin = _current_teacher_filter()
     with _Tx() as conn:
         out = {}
-        subjects = conn.execute(
-            "SELECT s.name, (SELECT MIN(id) FROM sections WHERE subject_id = s.id) AS section_id "
-            "FROM subjects s ORDER BY s.position, s.id").fetchall()
+        if not is_admin and teacher_id is not None:
+            subjects = conn.execute(
+                "SELECT s.name, (SELECT MIN(id) FROM sections WHERE subject_id = s.id) AS section_id "
+                "FROM subjects s WHERE s.teacher_id = ? ORDER BY s.position, s.id", (teacher_id,)).fetchall()
+        else:
+            subjects = conn.execute(
+                "SELECT s.name, (SELECT MIN(id) FROM sections WHERE subject_id = s.id) AS section_id "
+                "FROM subjects s ORDER BY s.position, s.id").fetchall()
         for sub in subjects:
             sec = sub["section_id"]
             students = [{"row": r["id"], "name": r["name"]} for r in conn.execute(
@@ -373,17 +395,22 @@ def remove_subject_image(subject):
 
 def delete_subject(name):
     def run(conn):
-        row = conn.execute("SELECT id FROM subjects WHERE name = ?", (name,)).fetchone()
+        tid, is_adm = _current_teacher_filter()
+        row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
         if not row:
             raise ValueError("That subject was not found.")
+        if not is_adm and tid is not None and row["teacher_id"] != tid:
+            raise ValueError("You do not have permission to delete that subject.")
         conn.execute("DELETE FROM subjects WHERE id = ?", (row["id"],))
         conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
     mutate(run)
     remove_subject_image(name)
 
 
-def add_subject(name, copy_from):
+def add_subject(name, copy_from, teacher_id=None):
     def run(conn):
+        tid, is_adm = _current_teacher_filter()
+        owner = teacher_id if is_adm else (tid or teacher_id)
         if conn.execute("SELECT 1 FROM subjects WHERE name = ?", (name,)).fetchone():
             raise ValueError("A subject with that name already exists.")
         source = []
@@ -391,8 +418,104 @@ def add_subject(name, copy_from):
             src = _section_of(conn, copy_from)
             source = [r["student_id"] for r in conn.execute(
                 "SELECT student_id FROM enrollments WHERE section_id = ? ORDER BY id", (src,))]
-        sec = _insert_subject(conn, name)
+        sec = _insert_subject(conn, name, owner)
         for sid in source:
             _enroll(conn, sid, sec)
         return len(source)
     return mutate(run)
+
+
+# -------------------------------------------------------- teacher accounts
+def list_teachers():
+    with _Tx() as conn:
+        rows = conn.execute(
+            "SELECT t.id, t.username, t.display_name, t.is_admin, t.created_at, "
+            "(SELECT COUNT(*) FROM subjects s WHERE s.teacher_id = t.id) AS n_subjects "
+            "FROM teachers t ORDER BY t.is_admin DESC, t.display_name, t.username").fetchall()
+        return [dict(r) for r in rows]
+
+
+def get_teacher(teacher_id):
+    with _Tx() as conn:
+        row = conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers WHERE id = ?",
+                           (teacher_id,)).fetchone()
+        return dict(row) if row else None
+
+
+def verify_teacher(username_or_pw, password=None):
+    """Verify a teacher by (username, password), or if username is blank, check password against all teachers."""
+    with _Tx() as conn:
+        if password is not None and username_or_pw:
+            row = conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers "
+                               "WHERE username = ?", (username_or_pw.strip(),)).fetchone()
+            if row and check_password_hash(row["password_hash"], password):
+                return dict(row)
+            return None
+        pw = password if password is not None else username_or_pw
+        for row in conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers"):
+            if check_password_hash(row["password_hash"], pw):
+                return dict(row)
+        return None
+
+
+def create_teacher(username, display_name, password, is_admin=False):
+    uname = re.sub(r"[^a-zA-Z0-9_.\-]", "", (username or "").strip()).lower()
+    dname = clean_name(display_name or uname)
+    if not uname or len(uname) < 2:
+        raise ValueError("Username must be at least 2 characters (letters, numbers, _, ., -).")
+    if not password or len(password) < MIN_PASSWORD:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
+    pw_hash = generate_password_hash(password)
+
+    def run(conn):
+        if conn.execute("SELECT 1 FROM teachers WHERE username = ?", (uname,)).fetchone():
+            raise ValueError("That username is already taken.")
+        return conn.execute(
+            "INSERT INTO teachers (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)",
+            (uname, dname, pw_hash, 1 if is_admin else 0)).lastrowid
+    return mutate(run)
+
+
+def update_teacher_password(teacher_id, new_password):
+    if not new_password or len(new_password) < MIN_PASSWORD:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
+    pw_hash = generate_password_hash(new_password)
+
+    def run(conn):
+        cur = conn.execute("UPDATE teachers SET password_hash = ? WHERE id = ?", (pw_hash, int(teacher_id)))
+        if not cur.rowcount:
+            raise ValueError("Teacher account not found.")
+    mutate(run)
+
+
+def delete_teacher(teacher_id):
+    def run(conn):
+        row = conn.execute("SELECT is_admin FROM teachers WHERE id = ?", (int(teacher_id),)).fetchone()
+        if not row:
+            raise ValueError("Teacher account not found.")
+        if row["is_admin"]:
+            admins = conn.execute("SELECT COUNT(*) FROM teachers WHERE is_admin = 1").fetchone()[0]
+            if admins <= 1:
+                raise ValueError("Cannot delete the last admin account.")
+        conn.execute("DELETE FROM teachers WHERE id = ?", (int(teacher_id),))
+    mutate(run)
+
+
+def list_subjects_with_owners():
+    with _Tx() as conn:
+        rows = conn.execute(
+            "SELECT s.id, s.name, s.teacher_id, t.username AS teacher_username, t.display_name AS teacher_name "
+            "FROM subjects s LEFT JOIN teachers t ON t.id = s.teacher_id ORDER BY s.position, s.id").fetchall()
+        return [dict(r) for r in rows]
+
+
+def assign_subject_teacher(subject_name, teacher_id):
+    def run(conn):
+        tid = int(teacher_id) if teacher_id not in (None, "", "0", 0) else None
+        if tid is not None and not conn.execute("SELECT 1 FROM teachers WHERE id = ?", (tid,)).fetchone():
+            raise ValueError("Selected teacher does not exist.")
+        cur = conn.execute("UPDATE subjects SET teacher_id = ? WHERE name = ?", (tid, subject_name))
+        if not cur.rowcount:
+            raise ValueError("Subject not found.")
+    mutate(run)
+
