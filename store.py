@@ -267,6 +267,108 @@ def _copy_db(target):
         src.close()
 
 
+def list_backups():
+    """Return all timestamped .db snapshots in the backups folder, newest first."""
+    out = []
+    if not os.path.exists(BACKUP_DIR):
+        return out
+    labels = {
+        "auto": "Automatic snapshot",
+        "before_delete_date": "Before deleting a date",
+        "before_delete_subject": "Before deleting a subject",
+        "before_delete_section": "Before deleting a section",
+        "before_restore": "Before a restore",
+    }
+    try:
+        files = [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db") and f != "attendance_LATEST.db"]
+    except OSError:
+        return out
+    for fn in files:
+        full = os.path.join(BACKUP_DIR, fn)
+        try:
+            st = os.stat(full)
+        except OSError:
+            continue
+        m = re.match(r"^attendance_(.+)_(\d{8}_\d{6})\.db$", fn)
+        tag = m.group(1) if m else "snapshot"
+        dt = datetime.fromtimestamp(st.st_mtime)
+        subjects = []
+        try:
+            conn = sqlite3.connect(full)
+            subjects = [r[0] for r in conn.execute("SELECT name FROM subjects ORDER BY position, id").fetchall()]
+            conn.close()
+        except sqlite3.Error:
+            pass
+        out.append({
+            "filename": fn,
+            "kind": labels.get(tag, tag.replace("_", " ").capitalize()),
+            "when": dt.strftime("%b %d, %Y %I:%M:%S %p").replace(" 0", " "),
+            "mtime": st.st_mtime,
+            "subjects": subjects,
+        })
+    out.sort(key=lambda x: x["mtime"], reverse=True)
+    return out
+
+
+def restore_backup(filename):
+    """Restore a snapshot from the backups folder (saves a safety backup of the current database first)."""
+    safe_fn = os.path.basename(filename or "")
+    if not safe_fn.endswith(".db") or safe_fn == "attendance_LATEST.db":
+        raise ValueError("Invalid backup file.")
+    src_path = os.path.join(BACKUP_DIR, safe_fn)
+    if not os.path.isfile(src_path):
+        raise ValueError("That backup file was not found.")
+    with write_lock:
+        backup_workbook("before_restore", min_gap_min=0)
+        src = sqlite3.connect(src_path)
+        dst = sqlite3.connect(DB_FILE)
+        try:
+            src.backup(dst)
+        finally:
+            dst.close()
+            src.close()
+        conn = db.connect()
+        try:
+            db.migrate(conn)
+        finally:
+            conn.close()
+        backup_latest()
+
+
+def reimport_from_excel():
+    """Import subjects/students/marks from attendance_records.xlsx if missing in the database."""
+    if not os.path.isfile(XLSX):
+        raise ValueError("No attendance_records.xlsx file was found on the server.")
+    from excel_io import read_workbook
+    excel_data = read_workbook(XLSX)
+
+    def run(conn):
+        restored = []
+        for subject, sd in excel_data.items():
+            if conn.execute("SELECT 1 FROM subjects WHERE name = ?", (subject,)).fetchone():
+                continue
+            section = _insert_subject(conn, subject)
+            enr = {}
+            for s in sd["students"]:
+                eid = _enroll(conn, _student_id(conn, s["name"]), section)
+                if eid:
+                    enr[s["row"]] = eid
+            for dd in sd["dates"]:
+                iso = dd["date"].isoformat()
+                sess = conn.execute("INSERT INTO sessions (section_id, date, topic) VALUES (?, ?, ?)",
+                                    (section, iso, dd["topic"] or None)).lastrowid
+                for row, eid in enr.items():
+                    code = sd["cells"].get((row, dd["col"]))
+                    if code:
+                        conn.execute("INSERT INTO attendance (enrollment_id, session_id, code) VALUES (?, ?, ?)",
+                                     (eid, sess, code))
+            restored.append(subject)
+        return restored
+    with write_lock:
+        backup_workbook("before_restore", min_gap_min=0)
+    return mutate(run)
+
+
 def mutate(fn):
     """Run ``fn(conn)`` as one all-or-nothing change, with backups around it."""
     ensure_db()
@@ -437,6 +539,9 @@ def remove_subject_image(subject):
 
 
 def delete_subject(name):
+    ensure_db()
+    backup_workbook("before_delete_subject", min_gap_min=0)
+
     def run(conn):
         tid, is_adm = _current_teacher_filter()
         row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
@@ -517,6 +622,9 @@ def rename_section(subject, old_name, new_name):
 
 
 def delete_section(subject, section_name):
+    ensure_db()
+    backup_workbook("before_delete_section", min_gap_min=0)
+
     def run(conn):
         sec_id = _section_of(conn, subject, section_name)
         srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()

@@ -32,7 +32,7 @@ OPEN_MODE = False        # On PythonAnywhere, always False to require password s
 # set the environment variable ATTENDANCE_BACKUP_DIR to a folder inside your Google Drive folder.
 BACKUP_DIR = os.environ.get("ATTENDANCE_BACKUP_DIR", "").strip() or os.path.join(DATA_DIR, "backups")
 BACKUP_EVERY_MIN = 10       # at most one timestamped copy per this many minutes of saving
-BACKUP_KEEP = {"auto": 60, "before_delete_date": 30}   # how many timestamped copies of each kind to keep
+BACKUP_KEEP = {"auto": 60, "before_delete_date": 30, "before_delete_subject": 30, "before_delete_section": 30, "before_restore": 30}   # how many timestamped copies of each kind to keep
 # Google Meet CSV import
 MEET_PRESENT_PCT = 0.75     # present if the student was in the call at least this share of the meeting
 MEET_ALIAS_FILE = os.path.join(DATA_DIR, "meet_aliases.json")   # remembers "Meet name -> class-list name"

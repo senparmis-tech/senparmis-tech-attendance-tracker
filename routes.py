@@ -9,17 +9,19 @@ import subprocess
 import sys
 from datetime import date, datetime, timedelta
 
-from flask import flash, jsonify, redirect, render_template, request, send_file, url_for
+from flask import flash, g, jsonify, redirect, render_template, request, send_file, url_for
 
 from ai_scan import AIError, call_ai, get_api_key, normalize_scan, provider_of
-from config import (API_KEY_FILE, LOG_FILE, LOW_RATE, MAX_CSV, MAX_IMAGES,
-                    MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR, DB_FILE)
+from config import (API_KEY_FILE, DB_FILE, LOG_FILE, LOW_RATE, MAX_CSV,
+                    MAX_IMAGES, MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR,
+                    XLSX)
 from excel_io import build_workbook
 from store import (FileLocked, add_section, add_students, add_subject,
                    apply_marks, backup_workbook, delete_date, delete_section,
                    delete_subject, ensure_db, get_subject_image_file,
-                   load_data, remove_student, remove_subject_image,
-                   rename_section, student_stats, subject_image_url)
+                   list_backups, load_data, reimport_from_excel,
+                   remove_student, remove_subject_image, rename_section,
+                   restore_backup, student_stats, subject_image_url)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
@@ -573,7 +575,42 @@ def sections_delete():
 @app.route("/log")
 def log_page():
     shown, total = read_log()
-    return render_template("log.html", page="log", shown=shown, total=total)
+    backups = list_backups()
+    has_xlsx = os.path.isfile(XLSX)
+    return render_template("log.html", page="log", shown=shown, total=total,
+                           backups=backups[:30], has_xlsx=has_xlsx)
+
+
+@app.route("/backups/restore", methods=["POST"])
+def backups_restore():
+    if not getattr(g, "is_admin", False):
+        flash("Only an admin can restore a database snapshot.", "err")
+        return redirect(url_for("log_page"))
+    fn = request.form.get("filename", "").strip()
+    try:
+        restore_backup(fn)
+        log_change("Backup restored", "", f"Restored database from {fn}")
+        flash(f"Restored data from snapshot '{fn}'.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("log_page"))
+
+
+@app.route("/backups/reimport_excel", methods=["POST"])
+def backups_reimport_excel():
+    if not getattr(g, "is_admin", False):
+        flash("Only an admin can re-import from Excel.", "err")
+        return redirect(url_for("log_page"))
+    try:
+        restored = reimport_from_excel()
+        if restored:
+            log_change("Excel re-imported", ", ".join(restored), "Restored missing subject(s) from attendance_records.xlsx")
+            flash("Restored missing subject(s) from attendance_records.xlsx: " + ", ".join(restored) + ".", "ok")
+        else:
+            flash("All subjects in attendance_records.xlsx are already present in the database.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("log_page"))
 
 
 def human_size(n):

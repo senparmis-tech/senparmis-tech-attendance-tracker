@@ -223,3 +223,22 @@ def test_sections_management_and_lookup_filter():
     assert "BSCS-1C" not in store.load_data()["MMW"]["section_names"]
 
 
+def test_delete_subject_and_restore_from_log():
+    c = _teacher_client()
+    assert c.post("/subjects/add", data={"name": "RestoreMe"}).status_code == 302
+    assert "RestoreMe" in store.load_data()
+
+    # Delete the subject (creates a before_delete_subject snapshot)
+    assert c.post("/subjects/delete", data={"subject": "RestoreMe"}).status_code == 302
+    assert "RestoreMe" not in store.load_data()
+
+    backups = store.list_backups()
+    snap = next(b for b in backups if "RestoreMe" in b["subjects"])
+    assert c.post("/backups/restore", data={"filename": snap["filename"]}).status_code == 302
+    assert "RestoreMe" in store.load_data()
+
+    # Clean up
+    c.post("/subjects/delete", data={"subject": "RestoreMe"})
+
+
+
