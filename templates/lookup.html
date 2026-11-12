@@ -1,0 +1,59 @@
+{% extends "base.html" %}
+{% block title %}Student lookup{% endblock %}
+{% block body %}
+<h1>Student lookup</h1>
+<div class="card no-print">
+  <form method="get" action="{{ url_for('lookup') }}" style="display:flex;gap:10px;flex-wrap:wrap">
+    <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search student name" autofocus style="flex:1;min-width:200px">
+    <select name="subject">
+      <option value="">All subjects</option>
+      {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject }}>{{ s }}</option>{% endfor %}
+    </select>
+    <button class="btn primary" type="submit">Search</button>
+  </form>
+</div>
+
+{% if q or subject %}
+<p class="no-print">{{ total_matches }} student{{ '' if total_matches==1 else 's' }} found{{ ' (showing first 100)' if total_matches>100 }}.</p>
+<div class="card no-print">
+  {% for p in results %}
+  <p style="margin:6px 0"><a href="{{ url_for('lookup', q=q, subject=subject, student=p.name) }}"><b>{{ p.name }}</b></a>
+    <small>
+      {% for s in p.subjects %}{{ s.subject }}{{ ', ' if not loop.last }}{% endfor %}
+      {% if p.avg is not none %} &middot; avg {{ (p.avg*100)|round|int }}%{% endif %}
+      {% if p.low %} &middot; <span style="color:var(--x)">low attendance</span>{% endif %}
+    </small></p>
+  {% else %}<p>No student matches that search.</p>{% endfor %}
+</div>
+{% else %}
+<p class="no-print">Type a name to find a student's attendance in every subject.</p>
+{% endif %}
+
+{% if selected %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <h2 style="margin:0">{{ selected.name }}</h2>
+    <button class="btn small no-print" type="button" onclick="window.print()">Print slip</button>
+  </div>
+  {% if selected.avg is not none %}
+  <p>Overall attendance: <b style="{{ 'color:var(--x)' if selected.low }}">{{ (selected.avg*100)|round|int }}%</b>
+    {% if selected.low %}(below {{ (low*100)|round|int }}% &ndash; needs attention){% endif %}</p>
+  {% endif %}
+  {% for s in selected.subjects %}
+  <h3>{{ s.subject }}</h3>
+  {% if s.total %}
+  <p>Rate <b style="{{ 'color:var(--x)' if s.low }}">{{ (s.rate*100)|round|int }}%</b>
+    &middot; Present {{ s.p + s.r }} &middot; Absent {{ s.x }} &middot; Late {{ s.l }} &middot; Excused {{ s.e }}
+    &middot; {{ s.total }} class{{ '' if s.total==1 else 'es' }} recorded</p>
+  <details {{ 'open' if print_view }}><summary>Date-by-date history</summary>
+    <table style="width:100%;border-collapse:collapse">
+      {% for h in s.history %}
+      <tr><td>{{ h.date.strftime('%b %d, %Y') }}</td><td>{{ h.label }}</td><td>{{ h.topic }}</td></tr>
+      {% endfor %}
+    </table>
+  </details>
+  {% else %}<p>No attendance recorded yet.</p>{% endif %}
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

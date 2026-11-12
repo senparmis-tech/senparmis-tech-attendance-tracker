@@ -94,3 +94,15 @@ def test_dark_mode_toggle_and_css_present():
     assert "data-theme" in html
     css = c.get("/static/css/app.css").get_data(as_text=True)
     assert '[data-theme="dark"]' in css
+
+
+def test_student_lookup():
+    c = _teacher_client()
+    r = c.get("/lookup?q=sample student a")
+    assert r.status_code == 200
+    assert b"Sample Student A" in r.data
+    assert b"Print slip" in r.data
+    assert b"No student matches" in c.get("/lookup?q=zzzz").data
+    stu = app.test_client()
+    stu.post("/login", data={"password": "studentpass1"})
+    assert stu.get("/lookup").status_code == 302

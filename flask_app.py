@@ -19,11 +19,12 @@ import webbrowser
 
 import auth  # registers @app.before_request, /login, /logout
 import routes  # registers page and API routes
+import lookup  # registers the student lookup page
 from config import HOST, START_PORT, XLSX
 from excel_store import ensure_workbook
 from web import app
 
-__all__ = ["app", "auth", "routes"]
+__all__ = ["app", "auth", "routes", "lookup"]
 
 # ---------------------------------------------------------------------- main
 def free_port(start):

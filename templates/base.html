@@ -48,6 +48,9 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>Students</span>
         </a>
+        <a href="{{ url_for('lookup') }}" class="nav-item {{ 'on' if page=='lookup' }}">
+          <span>Lookup</span>
+        </a>
       </div>
     </nav>
     {% elif role == 'student' %}
@@ -125,6 +128,10 @@
       <a href="{{ url_for('students') }}" class="mnav-tile mnav-wide {{ 'on' if page=='students' }}">
         <span class="mnav-icon">👥</span>
         <span><b>Students &amp; subjects</b><small>Manage class rosters and subject tabs</small></span>
+      </a>
+      <a href="{{ url_for('lookup') }}" class="mnav-tile mnav-wide {{ 'on' if page=='lookup' }}">
+        <span class="mnav-icon">&#128269;</span>
+        <span><b>Student lookup</b><small>Search a student's attendance</small></span>
       </a>
     </div>
     <div class="mnav-section-label">Tools &amp; data</div>
