@@ -26,14 +26,14 @@
   <p style="margin:6px 0"><a href="{{ url_for('lookup', q=q, subject=subject, section=section, student=p.name) }}"><b>{{ p.name }}</b></a>
     {% if p.student_no %}<span class="badge done" style="font-size:11px;margin-left:4px">{{ p.student_no }}</span>{% endif %}
     <small>
-      {% for s in p.subjects %}{{ s.subject }} ({{ s.section }}){{ ', ' if not loop.last }}{% endfor %}
-      {% if p.avg is not none %} &middot; avg {{ (p.avg*100)|round|int }}%{% endif %}
+      {% for s in p.subjects %}{{ s.subject }} ({{ s.section }}){% if s.grade and s.grade.final_pct is not none %} [{{ s.grade.final_pct|round(1) }}% / {{ s.grade.scale }}]{% endif %}{{ ', ' if not loop.last }}{% endfor %}
+      {% if p.avg is not none %} &middot; att. avg {{ (p.avg*100)|round|int }}%{% endif %}
       {% if p.low %} &middot; <span style="color:var(--x)">low attendance</span>{% endif %}
     </small></p>
   {% else %}<p>No student matches that search.</p>{% endfor %}
 </div>
 {% else %}
-<p class="no-print">Type a name, student ID, or pick a section to view a student's attendance, contact info, and printable slip.</p>
+<p class="no-print">Type a name, student ID, or pick a section to view a student's attendance, grades, contact info, and printable slip.</p>
 {% endif %}
 
 {% if selected %}
@@ -79,20 +79,57 @@
   <p>Overall attendance: <b style="{{ 'color:var(--x)' if selected.low }}">{{ (selected.avg*100)|round|int }}%</b>
     {% if selected.low %}(below {{ (low*100)|round|int }}% &ndash; needs attention){% endif %}</p>
   {% endif %}
+
   {% for s in selected.subjects %}
-  <h3>{{ s.subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ s.section }}</span></h3>
-  {% if s.total %}
-  <p>Rate <b style="{{ 'color:var(--x)' if s.low }}">{{ (s.rate*100)|round|int }}%</b>
-    &middot; Present {{ s.p + s.r }} &middot; Absent {{ s.x }} &middot; Late {{ s.l }} &middot; Excused {{ s.e }}
-    &middot; {{ s.total }} class{{ '' if s.total==1 else 'es' }} recorded</p>
-  <details {{ 'open' if print_view }}><summary>Date-by-date history</summary>
-    <table style="width:100%;border-collapse:collapse">
-      {% for h in s.history %}
-      <tr><td>{{ h.date.strftime('%b %d, %Y') }}</td><td>{{ h.label }}</td><td>{{ h.topic }}</td></tr>
-      {% endfor %}
-    </table>
-  </details>
-  {% else %}<p>No attendance recorded yet.</p>{% endif %}
+  <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+      <h3 style="margin:0">{{ s.subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ s.section }}</span></h3>
+      <a class="btn small no-print" href="{{ url_for('grades_page', subject=s.subject, section=s.section) }}">Open Gradebook</a>
+    </div>
+
+    <!-- Attendance summary -->
+    {% if s.total %}
+    <p style="margin:6px 0"><b>Attendance:</b> Rate <b style="{{ 'color:var(--x)' if s.low }}">{{ (s.rate*100)|round|int }}%</b>
+      &middot; Present {{ s.p + s.r }} &middot; Absent {{ s.x }} &middot; Late {{ s.l }} &middot; Excused {{ s.e }}
+      &middot; {{ s.total }} class{{ '' if s.total==1 else 'es' }} recorded</p>
+    <details {{ 'open' if print_view }} style="margin-bottom:8px"><summary>Attendance date-by-date history</summary>
+      <table style="width:100%;border-collapse:collapse;margin-top:4px">
+        {% for h in s.history %}
+        <tr><td>{{ h.date.strftime('%b %d, %Y') }}</td><td>{{ h.label }}</td><td>{{ h.topic }}</td></tr>
+        {% endfor %}
+      </table>
+    </details>
+    {% else %}<p style="margin:6px 0"><b>Attendance:</b> No attendance recorded yet.</p>{% endif %}
+
+    <!-- Grades summary -->
+    {% if s.grade and s.grade.final_pct is not none %}
+    <p style="margin:6px 0">
+      <b>Grades:</b> Standing <b style="{{ 'color:var(--x)' if not s.grade.passing else 'color:var(--p)' }}">{{ s.grade.final_pct|round(1) }}% ({{ s.grade.scale }})</b>
+      &middot; Exam ({{ s.grade_weights.exam|round(0)|int }}%): {{ '–' if s.grade.cat_pct.exam is none else ((s.grade.cat_pct.exam|round(1)) ~ '%') }}
+      &middot; Quiz ({{ s.grade_weights.quiz|round(0)|int }}%): {{ '–' if s.grade.cat_pct.quiz is none else ((s.grade.cat_pct.quiz|round(1)) ~ '%') }}
+      &middot; Activity ({{ s.grade_weights.activity|round(0)|int }}%): {{ '–' if s.grade.cat_pct.activity is none else ((s.grade.cat_pct.activity|round(1)) ~ '%') }}
+    </p>
+    {% if s.grade_items %}
+    <details open><summary>Exam, Quiz &amp; Activity breakdown</summary>
+      <table style="width:100%;border-collapse:collapse;margin-top:4px">
+        <thead><tr><th>Category</th><th>Title</th><th class="n">Score</th><th class="n">Max</th></tr></thead>
+        <tbody>
+          {% for gi in s.grade_items %}
+          <tr>
+            <td>{{ gi.label }}</td>
+            <td>{{ gi.title }}</td>
+            <td class="n"><b>{{ '–' if gi.score is none else ('%g' % gi.score) }}</b></td>
+            <td class="n">{{ '%g' % gi.max_score }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </details>
+    {% endif %}
+    {% else %}
+    <p style="margin:6px 0"><b>Grades:</b> No grades recorded yet.</p>
+    {% endif %}
+  </div>
   {% endfor %}
 </div>
 {% endif %}

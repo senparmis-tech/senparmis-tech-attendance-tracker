@@ -16,13 +16,14 @@ from config import (API_KEY_FILE, DB_FILE, LOG_FILE, LOW_RATE, MAX_CSV,
                     MAX_IMAGES, MAX_UPLOAD, MEET_PRESENT_PCT, SUBJECT_IMG_DIR,
                     XLSX)
 from excel_io import build_workbook
-from store import (FileLocked, add_section, add_students, add_subject,
-                   apply_marks, backup_workbook, delete_date, delete_section,
-                   delete_subject, ensure_db, get_subject_image_file,
-                   list_backups, load_data, reimport_from_excel,
-                   remove_student, remove_subject_image, rename_section,
-                   restore_backup, student_stats, subject_image_url,
-                   update_student_profile)
+from store import (FileLocked, add_grade_item, add_section, add_students,
+                   add_subject, apply_marks, backup_workbook, delete_date,
+                   delete_grade_item, delete_section, delete_subject,
+                   ensure_db, get_subject_image_file, list_backups, load_data,
+                   load_grades, reimport_from_excel, remove_student,
+                   remove_subject_image, rename_section, restore_backup,
+                   save_grade_scores, save_grade_weights, set_weights_lock,
+                   student_stats, subject_image_url, update_student_profile)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
@@ -480,6 +481,117 @@ def students_profile():
     if next_page == "lookup":
         return redirect(url_for("lookup", q=request.form.get("q", ""), subject=subject, section=section, student=saved_name))
     return redirect(url_for("students", subject=subject, section=section))
+
+
+# --------------------------------------------------------------- grades
+@app.route("/grades")
+def grades_page():
+    data = load_data()
+    subjects, subject = pick_subject(data)
+    sec_names, section, _ = pick_section(data.get(subject))
+    gb = load_grades(subject, section) if subject else None
+    return render_template(
+        "grades.html", page="grades", subjects=subjects, subject=subject,
+        section=section, section_names=sec_names, gb=gb,
+        tabs=make_tabs(subjects, subject, "grades_page"),
+        section_tabs=make_section_tabs(sec_names, section, subject, "grades_page"))
+
+
+@app.route("/grades/weights", methods=["POST"])
+def grades_weights():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    try:
+        save_grade_weights(
+            subject, section,
+            request.form.get("exam_weight"),
+            request.form.get("quiz_weight"),
+            request.form.get("activity_weight"),
+        )
+        log_change("Grade weights updated", f"{subject} ({section or ''})",
+                   f"Exam {request.form.get('exam_weight')}% · Quiz {request.form.get('quiz_weight')}% · Activity {request.form.get('activity_weight')}%")
+        flash("Saved grade category weights.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/lock", methods=["POST"])
+def grades_lock():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    lock_on = request.form.get("locked") == "1"
+    try:
+        set_weights_lock(subject, section, lock_on)
+        log_change("Grade weights " + ("locked" if lock_on else "unlocked"), f"{subject} ({section or ''})", "")
+        flash("Grade weights are now " + ("locked 🔒." if lock_on else "unlocked 🔓."), "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/items/add", methods=["POST"])
+def grades_item_add():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    category = request.form.get("category", "").strip()
+    title = request.form.get("title", "").strip()
+    max_score = request.form.get("max_score", "").strip()
+    date_str = request.form.get("date", "").strip()
+    try:
+        add_grade_item(subject, section, category, title, max_score, date_str=date_str)
+        log_change("Grade item added", f"{subject} ({section or ''})", f"{category.capitalize()}: {title} (max {max_score})")
+        flash(f"Added {category.capitalize()} '{title}'.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/items/delete", methods=["POST"])
+def grades_item_delete():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    item_id = request.form.get("item_id", "").strip()
+    try:
+        title = delete_grade_item(subject, section, item_id)
+        log_change("Grade item deleted", f"{subject} ({section or ''})", title)
+        flash(f"Deleted '{title}'.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
+
+
+@app.route("/grades/scores", methods=["POST"])
+def grades_scores():
+    subject = request.form.get("subject", "").strip()
+    section = request.form.get("section", "").strip() or None
+    entries = []
+    for k, v in request.form.items():
+        if not k.startswith("score_"):
+            continue
+        parts = k.split("_")
+        if len(parts) != 3:
+            continue
+        try:
+            eid, iid = int(parts[1]), int(parts[2])
+        except ValueError:
+            continue
+        val = v.strip()
+        if val == "":
+            entries.append((eid, iid, None))
+        else:
+            try:
+                entries.append((eid, iid, float(val)))
+            except ValueError:
+                flash(f"Invalid score '{val}'.", "err")
+                return redirect(url_for("grades_page", subject=subject, section=section))
+    try:
+        save_grade_scores(subject, section, entries)
+        log_change("Grades saved", f"{subject} ({section or ''})", f"Updated scores for {subject}")
+        flash("Saved student scores.", "ok")
+    except ValueError as err:
+        flash(str(err), "err")
+    return redirect(url_for("grades_page", subject=subject, section=section))
 
 
 

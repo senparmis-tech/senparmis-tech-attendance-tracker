@@ -1,12 +1,12 @@
 """
-Student lookup: search a student by name, ID, or section and see their attendance and contact info in every subject.
+Student lookup: search a student by name, ID, or section and see their attendance, grades, and contact info in every subject.
 Teacher-only (the auth gate only lets students open the Records page).
 """
 from flask import render_template, request
 
 from config import CODES, LOW_RATE
 from helpers import clean_name
-from store import load_data, student_stats
+from store import load_data, load_grades, student_stats
 from web import app
 
 
@@ -15,7 +15,7 @@ def _key(name):
 
 
 def build_index(data):
-    """Map each student (by lowercase name) to their profile, stats, and history in every subject and section."""
+    """Map each student (by lowercase name) to their profile, attendance, and grades in every subject and section."""
     people = {}
     all_sections = []
     for subject, sd in data.items():
@@ -23,6 +23,13 @@ def build_index(data):
         for sec_name, sec_sd in secs_map.items():
             if sec_name not in all_sections:
                 all_sections.append(sec_name)
+            try:
+                gb = load_grades(subject, sec_name)
+                grade_by_enr = {r["enrollment_id"]: r for r in gb["rows"]}
+                grade_items = gb["items"]
+                grade_weights = gb["weights"]
+            except Exception:
+                grade_by_enr, grade_items, grade_weights = {}, [], {}
             for st in student_stats(sec_sd):
                 p = people.setdefault(_key(st["name"]), {
                     "name": st["name"],
@@ -42,11 +49,30 @@ def build_index(data):
                     if code:
                         history.append({"date": dd["date"], "topic": dd["topic"],
                                         "code": code, "label": CODES.get(code, code)})
-                p["subjects"].append({"subject": subject, "section": sec_name,
-                                      "p": st["p"], "x": st["x"], "l": st["l"],
-                                      "e": st["e"], "r": st["r"], "total": st["total"],
-                                      "rate": st["rate"], "low": st["rate"] is not None and st["rate"] < LOW_RATE,
-                                      "history": sorted(history, key=lambda h: h["date"], reverse=True)})
+                gr = grade_by_enr.get(st["row"])
+                item_details = []
+                if gr and grade_items:
+                    for it in grade_items:
+                        sc = gr["scores"].get(it["id"])
+                        item_details.append({
+                            "label": it["label"],
+                            "title": it["title"],
+                            "max_score": it["max_score"],
+                            "score": sc,
+                            "date": it.get("date") or "",
+                        })
+                p["subjects"].append({
+                    "subject": subject,
+                    "section": sec_name,
+                    "p": st["p"], "x": st["x"], "l": st["l"],
+                    "e": st["e"], "r": st["r"], "total": st["total"],
+                    "rate": st["rate"],
+                    "low": st["rate"] is not None and st["rate"] < LOW_RATE,
+                    "history": sorted(history, key=lambda h: h["date"], reverse=True),
+                    "grade": gr,
+                    "grade_items": item_details,
+                    "grade_weights": grade_weights,
+                })
     for p in people.values():
         rated = [s["rate"] for s in p["subjects"] if s["rate"] is not None]
         p["avg"] = sum(rated) / len(rated) if rated else None

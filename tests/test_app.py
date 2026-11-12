@@ -262,5 +262,56 @@ def test_student_profile_and_guardian_contact():
     assert "123 Rizal St, Quezon City" in lk
 
 
+def test_grades_weights_lock_and_scale():
+    c = _teacher_client()
+    assert c.get("/grades?subject=MMW").status_code == 200
+
+    # Change weights to 40 / 40 / 20 and lock them
+    assert c.post("/grades/weights", data={
+        "subject": "MMW", "section": "BSCS-1A",
+        "exam_weight": "40", "quiz_weight": "40", "activity_weight": "20",
+    }).status_code == 302
+    assert c.post("/grades/lock", data={"subject": "MMW", "section": "BSCS-1A", "locked": "1"}).status_code == 302
+    gb = store.load_grades("MMW", "BSCS-1A")
+    assert gb["locked"] is True and gb["weights"]["exam"] == 40.0
+
+    # Attempting to change weights while locked does not alter them
+    c.post("/grades/weights", data={
+        "subject": "MMW", "section": "BSCS-1A",
+        "exam_weight": "60", "quiz_weight": "20", "activity_weight": "20",
+    })
+    assert store.load_grades("MMW", "BSCS-1A")["weights"]["exam"] == 40.0
+
+    # Add Exam, Quiz, and Activity items
+    c.post("/grades/items/add", data={"subject": "MMW", "section": "BSCS-1A", "category": "exam", "title": "Midterm", "max_score": "100"})
+    c.post("/grades/items/add", data={"subject": "MMW", "section": "BSCS-1A", "category": "quiz", "title": "Quiz 1", "max_score": "50"})
+    c.post("/grades/items/add", data={"subject": "MMW", "section": "BSCS-1A", "category": "activity", "title": "Lab 1", "max_score": "20"})
+
+    gb = store.load_grades("MMW", "BSCS-1A")
+    stu_a = next(r for r in gb["rows"] if r["name"] == "Sample Student A")
+    eid = stu_a["enrollment_id"]
+    items = {it["title"]: it["id"] for it in gb["items"]}
+
+    # Enter scores for Sample Student A: 95/100 exam (95%), 45/50 quiz (90%), 20/20 activity (100%)
+    # Weighted: 95*0.4 + 90*0.4 + 100*0.2 = 38 + 36 + 20 = 94.0% -> 1.25
+    form_data = {
+        "subject": "MMW", "section": "BSCS-1A",
+        f"score_{eid}_{items['Midterm']}": "95",
+        f"score_{eid}_{items['Quiz 1']}": "45",
+        f"score_{eid}_{items['Lab 1']}": "20",
+    }
+    assert c.post("/grades/scores", data=form_data).status_code == 302
+    gb2 = store.load_grades("MMW", "BSCS-1A")
+    stu_a2 = next(r for r in gb2["rows"] if r["name"] == "Sample Student A")
+    assert round(stu_a2["final_pct"], 1) == 94.0
+    assert stu_a2["scale"] == "1.25"
+
+    # Student Lookup displays the computed grade standing and breakdown
+    lk = c.get("/lookup?student=Sample+Student+A").get_data(as_text=True)
+    assert "94.0% (1.25)" in lk
+    assert "Midterm" in lk
+
+
+
 
 

@@ -44,6 +44,10 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span>Records</span>
         </a>
+        <a href="{{ url_for('grades_page') }}" class="nav-item {{ 'on' if page=='grades' }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+          <span>Grades</span>
+        </a>
         <a href="{{ url_for('students') }}" class="nav-item {{ 'on' if page=='students' }}">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>Students</span>
@@ -120,6 +124,10 @@
       <a href="{{ url_for('records') }}" class="mnav-tile {{ 'on' if page=='records' }}">
         <span class="mnav-icon">📊</span>
         <span><b>Records</b><small>Full sheet &amp; print</small></span>
+      </a>
+      <a href="{{ url_for('grades_page') }}" class="mnav-tile {{ 'on' if page=='grades' }}">
+        <span class="mnav-icon">🎓</span>
+        <span><b>Grades</b><small>Exam, quiz &amp; activity</small></span>
       </a>
       <a href="{{ url_for('scan') }}" class="mnav-tile {{ 'on' if page=='scan' }}">
         <span class="mnav-icon">📥</span>

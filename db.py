@@ -80,6 +80,29 @@ MIGRATIONS = [
     ALTER TABLE students ADD COLUMN email TEXT DEFAULT '';
     ALTER TABLE students ADD COLUMN address TEXT DEFAULT '';
     """,
+    # 5: grades (exam, quiz, activity), category weights, and weight lock per section.
+    """
+    ALTER TABLE sections ADD COLUMN exam_weight REAL NOT NULL DEFAULT 50.0;
+    ALTER TABLE sections ADD COLUMN quiz_weight REAL NOT NULL DEFAULT 30.0;
+    ALTER TABLE sections ADD COLUMN activity_weight REAL NOT NULL DEFAULT 20.0;
+    ALTER TABLE sections ADD COLUMN weights_locked INTEGER NOT NULL DEFAULT 0;
+    CREATE TABLE grade_items (
+        id         INTEGER PRIMARY KEY,
+        section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+        category   TEXT NOT NULL CHECK (category IN ('exam', 'quiz', 'activity')),
+        title      TEXT NOT NULL,
+        max_score  REAL NOT NULL CHECK (max_score > 0),
+        date       TEXT DEFAULT ''
+    );
+    CREATE TABLE grades (
+        grade_item_id INTEGER NOT NULL REFERENCES grade_items(id) ON DELETE CASCADE,
+        enrollment_id INTEGER NOT NULL REFERENCES enrollments(id) ON DELETE CASCADE,
+        score         REAL NOT NULL,
+        PRIMARY KEY (grade_item_id, enrollment_id)
+    );
+    CREATE INDEX idx_grade_items_section ON grade_items(section_id);
+    CREATE INDEX idx_grades_enrollment ON grades(enrollment_id);
+    """,
 ]
 
 

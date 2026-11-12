@@ -770,3 +770,195 @@ def update_student_profile(name, new_name=None, student_no="", guardian_name="",
     return mutate(run)
 
 
+# --------------------------------------------------------------- grades
+GRADE_CATEGORIES = ("exam", "quiz", "activity")
+CATEGORY_LABELS = {"exam": "Exam", "quiz": "Quiz", "activity": "Activity"}
+
+
+def pct_to_scale(pct):
+    """Convert a 0-100 percentage to standard Philippine 1.00 - 5.00 college grade scale."""
+    if pct is None:
+        return None
+    p = round(float(pct), 2)
+    if p >= 96:
+        return "1.00"
+    if p >= 93:
+        return "1.25"
+    if p >= 90:
+        return "1.50"
+    if p >= 87:
+        return "1.75"
+    if p >= 84:
+        return "2.00"
+    if p >= 81:
+        return "2.25"
+    if p >= 78:
+        return "2.50"
+    if p >= 75:
+        return "2.75"
+    if p >= 70:
+        return "3.00"
+    return "5.00"
+
+
+def load_grades(subject, section=None):
+    """Load gradebook for (subject, section): weights, lock state, items, student scores, and computed standing."""
+    with _Tx() as conn:
+        sec_id = _section_of(conn, subject, section)
+        sec_row = conn.execute(
+            "SELECT id, name, exam_weight, quiz_weight, activity_weight, weights_locked "
+            "FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        weights = {
+            "exam": float(sec_row["exam_weight"]),
+            "quiz": float(sec_row["quiz_weight"]),
+            "activity": float(sec_row["activity_weight"]),
+        }
+        locked = bool(sec_row["weights_locked"])
+        items = [dict(r) for r in conn.execute(
+            "SELECT id, category, title, max_score, date FROM grade_items "
+            "WHERE section_id = ? ORDER BY CASE category WHEN 'exam' THEN 1 WHEN 'quiz' THEN 2 ELSE 3 END, id",
+            (sec_id,)).fetchall()]
+        for it in items:
+            it["label"] = CATEGORY_LABELS.get(it["category"], it["category"].capitalize())
+        students = [dict(r) for r in conn.execute(
+            "SELECT e.id AS enrollment_id, st.name, st.student_no FROM enrollments e "
+            "JOIN students st ON st.id = e.student_id WHERE e.section_id = ? ORDER BY e.id",
+            (sec_id,)).fetchall()]
+        scores = {}
+        for r in conn.execute(
+                "SELECT g.grade_item_id, g.enrollment_id, g.score FROM grades g "
+                "JOIN grade_items gi ON gi.id = g.grade_item_id WHERE gi.section_id = ?", (sec_id,)):
+            scores[(r["enrollment_id"], r["grade_item_id"])] = float(r["score"])
+
+        items_by_cat = {cat: [it for it in items if it["category"] == cat] for cat in GRADE_CATEGORIES}
+        cat_max = {cat: sum(float(it["max_score"]) for it in items_by_cat[cat]) for cat in GRADE_CATEGORIES}
+
+        rows = []
+        for s in students:
+            eid = s["enrollment_id"]
+            cat_pct = {}
+            cat_earned = {}
+            for cat in GRADE_CATEGORIES:
+                if cat_max[cat] > 0:
+                    earned = sum(scores.get((eid, it["id"]), 0.0) for it in items_by_cat[cat])
+                    cat_earned[cat] = earned
+                    cat_pct[cat] = (earned / cat_max[cat]) * 100.0
+                else:
+                    cat_earned[cat] = None
+                    cat_pct[cat] = None
+            active_weight = sum(weights[c] for c in GRADE_CATEGORIES if cat_pct[c] is not None and weights[c] > 0)
+            if active_weight > 0:
+                final_pct = sum(cat_pct[c] * weights[c] for c in GRADE_CATEGORIES if cat_pct[c] is not None) / active_weight
+            else:
+                final_pct = None
+            rows.append({
+                "enrollment_id": eid,
+                "name": s["name"],
+                "student_no": s["student_no"] or "",
+                "scores": {it["id"]: scores.get((eid, it["id"])) for it in items},
+                "cat_earned": cat_earned,
+                "cat_max": cat_max,
+                "cat_pct": cat_pct,
+                "final_pct": final_pct,
+                "scale": pct_to_scale(final_pct),
+                "passing": (final_pct >= 70.0) if final_pct is not None else None,
+            })
+        return {
+            "section": sec_row["name"],
+            "weights": weights,
+            "locked": locked,
+            "items": items,
+            "items_by_cat": items_by_cat,
+            "cat_max": cat_max,
+            "rows": rows,
+        }
+
+
+def save_grade_weights(subject, section, exam_w, quiz_w, activity_w):
+    try:
+        ew, qw, aw = float(exam_w), float(quiz_w), float(activity_w)
+    except (TypeError, ValueError):
+        raise ValueError("Weights must be valid numbers.")
+    if ew < 0 or qw < 0 or aw < 0 or abs((ew + qw + aw) - 100.0) > 0.05:
+        raise ValueError("Exam, Quiz, and Activity weights must be non-negative and add up to 100%.")
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        locked = conn.execute("SELECT weights_locked FROM sections WHERE id = ?", (sec_id,)).fetchone()["weights_locked"]
+        if locked:
+            raise ValueError("Grade weights are locked. Unlock them first before changing percentages.")
+        conn.execute(
+            "UPDATE sections SET exam_weight = ?, quiz_weight = ?, activity_weight = ? WHERE id = ?",
+            (ew, qw, aw, sec_id))
+    mutate(run)
+
+
+def set_weights_lock(subject, section, locked):
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        conn.execute("UPDATE sections SET weights_locked = ? WHERE id = ?", (1 if locked else 0, sec_id))
+    mutate(run)
+
+
+def add_grade_item(subject, section, category, title, max_score, date_str=""):
+    cat = (category or "").strip().lower()
+    if cat not in GRADE_CATEGORIES:
+        raise ValueError("Choose Exam, Quiz, or Activity.")
+    t = safe_text(title)[:80]
+    if not t:
+        raise ValueError("Enter a title (e.g. Quiz 1 or Midterm Exam).")
+    try:
+        mx = float(max_score)
+    except (TypeError, ValueError):
+        raise ValueError("Max score must be a number greater than 0.")
+    if mx <= 0 or mx > 10000:
+        raise ValueError("Max score must be between 1 and 10,000.")
+
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        return conn.execute(
+            "INSERT INTO grade_items (section_id, category, title, max_score, date) VALUES (?, ?, ?, ?, ?)",
+            (sec_id, cat, t, mx, safe_text(date_str)[:20])).lastrowid
+    return mutate(run)
+
+
+def delete_grade_item(subject, section, item_id):
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        row = conn.execute("SELECT id, title FROM grade_items WHERE id = ? AND section_id = ?",
+                           (int(item_id), sec_id)).fetchone()
+        if not row:
+            raise ValueError("Grade item not found.")
+        conn.execute("DELETE FROM grade_items WHERE id = ?", (row["id"],))
+        return row["title"]
+    return mutate(run)
+
+
+def save_grade_scores(subject, section, entries):
+    """Save [(enrollment_id, item_id, score_or_none), ...] for a section."""
+    def run(conn):
+        sec_id = _section_of(conn, subject, section)
+        valid_items = {r["id"]: float(r["max_score"]) for r in conn.execute(
+            "SELECT id, max_score FROM grade_items WHERE section_id = ?", (sec_id,))}
+        valid_enr = {r["id"] for r in conn.execute(
+            "SELECT id FROM enrollments WHERE section_id = ?", (sec_id,))}
+        saved = 0
+        for eid, iid, val in entries:
+            if eid not in valid_enr or iid not in valid_items:
+                continue
+            if val is None or val == "":
+                conn.execute("DELETE FROM grades WHERE grade_item_id = ? AND enrollment_id = ?", (iid, eid))
+            else:
+                sc = float(val)
+                if sc < 0 or sc > valid_items[iid]:
+                    raise ValueError(f"Score {sc:g} is outside 0 to {valid_items[iid]:g}.")
+                conn.execute(
+                    "INSERT INTO grades (grade_item_id, enrollment_id, score) VALUES (?, ?, ?) "
+                    "ON CONFLICT (grade_item_id, enrollment_id) DO UPDATE SET score = excluded.score",
+                    (iid, eid, sc))
+                saved += 1
+        return saved
+    return mutate(run)
+
+
+
