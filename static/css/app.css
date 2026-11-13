@@ -69,7 +69,6 @@ header.top {
 .header-inner {
   display: flex;
   align-items: center;
-  justify-content: space-between;
   gap: 12px;
   height: 60px;
   max-width: 1120px;
@@ -84,7 +83,7 @@ header.top {
   display: inline-flex;
   align-items: center;
   gap: 10px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
 }
 .brand-badge {
   width: 34px;
@@ -96,14 +95,16 @@ header.top {
   align-items: center;
   justify-content: center;
   box-shadow: 0 2px 8px rgba(37, 99, 235, 0.32);
+  flex-shrink: 0;
 }
 
-/* Center Segmented Primary Nav */
+/* Centre segmented primary nav. It takes the space between the brand and the
+   right-hand actions and may shrink (min-width: 0), so it can never overlap them. */
 nav.desktop-nav {
   display: flex;
   align-items: center;
   justify-content: center;
-  flex: 1;
+  flex: 1 1 auto;
   min-width: 0;
 }
 .nav-pill-group {
@@ -114,18 +115,23 @@ nav.desktop-nav {
   border-radius: 12px;
   background: var(--surface);
   border: 1px solid var(--line);
+  max-width: 100%;
+  overflow-x: auto;              /* safety net: scroll instead of overlapping */
+  scrollbar-width: none;
 }
+.nav-pill-group::-webkit-scrollbar { display: none; }
 .nav-item {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  padding: 7px 13px;
+  padding: 7px 11px;
   border-radius: 9px;
   color: var(--muted);
   text-decoration: none;
   font-weight: 600;
   font-size: 13.5px;
   white-space: nowrap;
+  flex-shrink: 0;
   transition: color 0.14s ease, background 0.14s ease, box-shadow 0.14s ease;
 }
 .nav-item svg {
@@ -144,30 +150,37 @@ nav.desktop-nav {
   opacity: 1;
 }
 
-/* Right Action Cluster */
+/* Right action cluster */
 .header-actions {
   display: flex;
   align-items: center;
   gap: 6px;
-  flex-shrink: 0;
+  flex: 0 0 auto;
+  margin-left: auto;             /* keeps it on the right even when there is no nav (login page) */
 }
 .desktop-tools {
   display: flex;
   align-items: center;
   gap: 2px;
 }
+/* Tools are icon-only by default (the name shows as a tooltip) so the bar always fits. */
 .tool-link {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
-  padding: 7px 10px;
+  min-width: 34px;
+  height: 34px;
+  padding: 0 9px;
   border-radius: 8px;
   color: var(--muted);
   text-decoration: none;
   font-weight: 600;
   font-size: 13px;
+  white-space: nowrap;
   transition: all 0.14s ease;
 }
+.tool-link span { display: none; }
 .tool-link:hover {
   color: var(--ink);
   background: var(--surface);
@@ -193,6 +206,7 @@ nav.desktop-nav {
   align-items: center;
   justify-content: center;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all 0.15s ease;
 }
 .theme-toggle-btn:hover {
@@ -210,9 +224,11 @@ nav.desktop-nav {
 .signout-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 5px;
   height: 36px;
-  padding: 0 11px;
+  min-width: 36px;
+  padding: 0 10px;
   border-radius: 10px;
   border: 1px solid rgba(239, 68, 68, 0.28);
   background: var(--xbg);
@@ -220,14 +236,17 @@ nav.desktop-nav {
   text-decoration: none;
   font-weight: 600;
   font-size: 13px;
+  white-space: nowrap;
+  flex-shrink: 0;
   transition: all 0.14s ease;
 }
 .signout-btn:hover {
   border-color: var(--x);
   filter: brightness(0.97);
 }
+.desktop-signout span { display: none; }
 
-/* Mobile Hamburger Button & Sheet */
+/* Mobile hamburger button & sheet */
 .nav-toggle-btn {
   display: none;
   height: 36px;
@@ -241,6 +260,7 @@ nav.desktop-nav {
   cursor: pointer;
   align-items: center;
   gap: 6px;
+  flex-shrink: 0;
 }
 .nav-toggle-btn .icon-close { display: none; }
 .nav-toggle-btn.open {
@@ -264,9 +284,15 @@ nav.desktop-nav {
 .mobile-nav-panel {
   display: none;
   border-top: 1px solid var(--line);
-  padding: 12px 0 16px;
+  padding: 12px 0 calc(16px + env(safe-area-inset-bottom, 0px));
   max-width: 1120px;
   margin: 0 auto;
+  /* a tall menu scrolls inside the sheet instead of running off a small phone screen */
+  max-height: calc(100vh - 70px - env(safe-area-inset-top, 0px));
+  max-height: calc(100dvh - 70px - env(safe-area-inset-top, 0px));
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 .mobile-nav-panel.open {
   display: block;
@@ -281,7 +307,7 @@ nav.desktop-nav {
 }
 .mnav-grid {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   margin-bottom: 12px;
 }
@@ -289,6 +315,7 @@ nav.desktop-nav {
   display: flex;
   align-items: center;
   gap: 10px;
+  min-width: 0;
   padding: 11px 12px;
   border-radius: 12px;
   background: var(--surface);
@@ -312,6 +339,7 @@ nav.desktop-nav {
   font-size: 16px;
   flex-shrink: 0;
 }
+.mnav-tile > span:last-child { min-width: 0; }
 .mnav-tile b {
   display: block;
   font-size: 14px;
@@ -375,14 +403,24 @@ nav.desktop-nav {
   font-size: 14px;
 }
 
+/* Laptop-sized windows: nav items become icon-only; the active page keeps its label. */
+@media (max-width: 1199px) {
+  .nav-item { padding: 8px 10px; }
+  .nav-item:not(.on) span { display: none; }
+}
+/* Tablets and phones: switch to the Menu sheet. */
 @media (max-width: 960px) {
   nav.desktop-nav, .desktop-tools, .desktop-signout { display: none; }
   .nav-toggle-btn { display: inline-flex; }
   .header-inner { height: 56px; }
 }
 @media (max-width: 420px) {
+  header.top { padding-left: 12px; padding-right: 12px; }
   .mnav-grid { grid-template-columns: 1fr; }
   .mnav-tile.mnav-wide { grid-column: span 1; }
+}
+@media (max-width: 340px) {
+  .brand-text { display: none; }
 }
 
 /* -------------------------------------------------------------- Page Body */
