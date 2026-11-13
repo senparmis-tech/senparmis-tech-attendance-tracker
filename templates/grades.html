@@ -47,7 +47,7 @@
   <!-- Add Exam / Quiz / Activity -->
   <div class="card">
     <h2 style="margin:0 0 8px;font-size:17px">➕ Add Exam, Quiz, or Activity</h2>
-    <p class="muted" style="margin-top:0;font-size:13px">Create a graded item, then use <b>🎯 Roll call</b> on it to enter scores one student at a time, or type them in the table below.</p>
+    <p class="muted" style="margin-top:0;font-size:13px">Create a graded item, then type each student's score in the table below.</p>
     <form method="post" action="{{ url_for('grades_item_add') }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <input type="hidden" name="subject" value="{{ subject }}">
       <input type="hidden" name="section" value="{{ section }}">
@@ -80,17 +80,16 @@
   </div>
 
   {% if gb['items'] %}
-  <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+  <div style="margin-bottom:10px;display:flex;gap:6px;flex-wrap:wrap;align-items:center">
     <span class="muted" style="font-size:12px">Items:</span>
     {% for it in gb['items'] %}
     <form class="inline" method="post" action="{{ url_for('grades_item_delete') }}" onsubmit="return confirm('Delete {{ it.label|e }} {{ it.title|e }} and all scores recorded for it?')">
       <input type="hidden" name="subject" value="{{ subject }}">
       <input type="hidden" name="section" value="{{ section }}">
       <input type="hidden" name="item_id" value="{{ it.id }}">
-      <span style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9999px;padding:4px 8px 4px 12px;font-size:13px">
-        <span><b>{{ it.label }}:</b> {{ it.title }} <span class="muted">({{ it.max_score|round(1) }})</span></span>
-        <a class="btn small primary" href="{{ url_for('grade_rollcall', subject=subject, section=section, item=it.id) }}" title="Enter scores one student at a time" style="padding:3px 10px;border-radius:9999px">🎯 Roll call</a>
-        <button type="submit" title="Delete item" aria-label="Delete {{ it.title }}" style="border:0;background:none;color:#c0392b;cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+      <span class="chip" style="display:inline-flex;align-items:center;gap:6px">
+        <b>{{ it.label }}:</b> {{ it.title }} ({{ it.max_score|round(1) }})
+        <button type="submit" title="Delete item" style="border:0;background:none;color:#c0392b;cursor:pointer;font-size:12px;padding:0">✕</button>
       </span>
     </form>
     {% endfor %}
