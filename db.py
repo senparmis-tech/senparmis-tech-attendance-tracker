@@ -103,6 +103,33 @@ MIGRATIONS = [
     CREATE INDEX idx_grade_items_section ON grade_items(section_id);
     CREATE INDEX idx_grades_enrollment ON grades(enrollment_id);
     """,
+    # 6: terms (Prelim, Midterm, ...) inside a semester. Every section has exactly one open term that new
+    #    attendance dates and graded items go into; a locked term is read-only and keeps the category
+    #    weights it had when it was locked. Existing data goes into a first term called '1st Sem - Prelim'
+    #    (it can be renamed when that term is locked).
+    """
+    CREATE TABLE periods (
+        id         INTEGER PRIMARY KEY,
+        section_id INTEGER NOT NULL REFERENCES sections(id) ON DELETE CASCADE,
+        semester   TEXT NOT NULL,
+        term       TEXT NOT NULL,
+        position   INTEGER NOT NULL DEFAULT 1,
+        locked     INTEGER NOT NULL DEFAULT 0,
+        locked_at  TEXT,
+        locked_by  TEXT,
+        w_exam     REAL,
+        w_quiz     REAL,
+        w_activity REAL
+    );
+    CREATE INDEX idx_periods_section ON periods(section_id);
+    ALTER TABLE sessions ADD COLUMN period_id INTEGER REFERENCES periods(id) ON DELETE CASCADE;
+    ALTER TABLE grade_items ADD COLUMN period_id INTEGER REFERENCES periods(id) ON DELETE CASCADE;
+    INSERT INTO periods (section_id, semester, term, position) SELECT id, '1st Sem', 'Prelim', 1 FROM sections;
+    UPDATE sessions SET period_id = (SELECT p.id FROM periods p WHERE p.section_id = sessions.section_id);
+    UPDATE grade_items SET period_id = (SELECT p.id FROM periods p WHERE p.section_id = grade_items.section_id);
+    CREATE INDEX idx_sessions_period ON sessions(period_id);
+    CREATE INDEX idx_grade_items_period ON grade_items(period_id);
+    """,
 ]
 
 

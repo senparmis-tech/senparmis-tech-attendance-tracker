@@ -179,6 +179,7 @@
 <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
 <main>
 {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+{% if term_label %}<div class="term-chip {{ 'locked' if term_locked }}"><span>Term: <b>{{ term_label }}</b></span>{% if term_locked %}<span class="badge done">🔒 Locked</span>{% endif %}{% if term_url %}<a href="{{ term_url }}">Manage terms</a>{% endif %}</div>{% endif %}
 {% if tabs %}<div class="tabs">{% for t in tabs %}<a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
 {% if section_tabs and section_tabs|length > 1 %}
 <div class="tabs" style="margin-top:-6px;margin-bottom:12px;gap:6px">

@@ -19,11 +19,12 @@ from excel_io import build_workbook
 from store import (FileLocked, add_grade_item, add_section, add_students,
                    add_subject, apply_marks, backup_workbook, delete_date,
                    delete_grade_item, delete_section, delete_subject,
-                   ensure_db, get_subject_image_file, list_backups, load_data,
-                   load_grades, reimport_from_excel, remove_student,
-                   remove_subject_image, rename_section, restore_backup,
-                   save_grade_scores, save_grade_weights, set_weights_lock,
-                   student_stats, subject_image_url, update_student_profile)
+                   ensure_db, get_subject_image_file, list_backups, list_periods,
+                   load_data, load_grades, load_period_data, reimport_from_excel,
+                   remove_student, remove_subject_image, rename_section,
+                   restore_backup, save_grade_scores, save_grade_weights,
+                   set_weights_lock, student_stats, subject_image_url,
+                   update_student_profile)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
@@ -59,6 +60,30 @@ def pick_section(sd):
     matched = next((s for s in sec_names if s.lower() == wanted.lower()), None) if wanted else None
     cur = matched or (sec_names[0] if sec_names else None)
     return sec_names, cur, (secs_map[cur] if cur else sd)
+
+
+def term_ctx(subject, section, period):
+    """Template values for the 'Term: 1st Sem - Prelim' strip shown at the top of the page."""
+    if not subject or not period:
+        return {}
+    ctx = {"term_label": period["label"], "term_locked": period["locked"]}
+    if getattr(g, "role", None) == "teacher":
+        ctx["term_url"] = url_for("periods_page", subject=subject, section=section)
+    return ctx
+
+
+def pick_period(subject, section, sd):
+    """The term to show: the one in ?period=, otherwise the open term already inside ``sd``.
+    Returns (sd_for_that_term, period_dict, error_message)."""
+    period = sd.get("period") if subject else None
+    want = request.args.get("period", type=int)
+    if subject and want and (not period or want != period["id"]):
+        try:
+            sd = load_period_data(subject, section, want)
+        except ValueError as err:
+            return sd, period, str(err)
+        period = sd["period"]
+    return sd, period, None
 
 
 @app.errorhandler(FileLocked)
@@ -120,6 +145,7 @@ def mark():
                    prev_url=url_for("mark", subject=subject, section=section, date=(d - timedelta(days=1)).isoformat()) if d else "",
                    next_url=url_for("mark", subject=subject, section=section, date=(d + timedelta(days=1)).isoformat()) if d else "",
                    date_label=d.strftime("%A, %B %d, %Y").replace(" 0", " ") if d else "")
+        ctx.update(term_ctx(subject, section, sd.get("period")))
     return render_template("mark.html", **ctx)
 
 
@@ -239,6 +265,10 @@ def records():
     data = load_data()
     subjects, subject = pick_subject(data)
     sec_names, section, sd = pick_section(data.get(subject))
+    sd, period, err = pick_period(subject, section, sd)
+    if err:
+        flash(err, "err")
+        return redirect(url_for("records", subject=subject, section=section))
     rows, dates = [], []
     if subject:
         dates = [{"label": x["date"].strftime("%b %d").replace(" 0", " "), "iso": x["date"].isoformat(),
@@ -248,8 +278,11 @@ def records():
             rows.append(s)
     return render_template("records.html", page="records", subject=subject, section=section,
                            rows=rows, dates=dates, low=LOW_RATE,
+                           period=period, periods=list_periods(subject, section) if subject else [],
+                           editable=not (period and period["locked"]),
                            tabs=make_tabs(subjects, subject, "records"),
-                           section_tabs=make_section_tabs(sec_names, section, subject, "records"))
+                           section_tabs=make_section_tabs(sec_names, section, subject, "records"),
+                           **term_ctx(subject, section, period))
 
 
 GRID_COLS = 25               # date columns in the printed grid (blank ones are left for future days)
@@ -267,6 +300,10 @@ def print_sheet():
         flash("Add a subject first.", "err")
         return redirect(url_for("dashboard"))
     sec_names, section, sd = pick_section(data[subject])
+    sd, period, err = pick_period(subject, section, sd)
+    if err:
+        flash(err, "err")
+        return redirect(url_for("records", subject=subject, section=section))
     dates, students, cells = sd["dates"], sd["students"], sd["cells"]
     unmarked = []
     for dd in dates:
@@ -295,7 +332,10 @@ def print_sheet():
                           "cols": [{"label": f"{d['date'].month}/{d['date'].day}", "topic": d["topic"]} for d in chunk]})
     return render_template("print.html", subject=subject, section=section, subjects=subjects, pages=pages,
                            unmarked=unmarked, held=held, skipped=skipped,
-                           extra_l=codes.count("l"), extra_e=codes.count("e"))
+                           extra_l=codes.count("l"), extra_e=codes.count("e"),
+                           period_id=period["id"] if period else None,
+                           term_label=period["label"] if period else "",
+                           term_name=period["term"] if period else "")
 
 
 @app.route("/dates/delete", methods=["POST"])
@@ -449,7 +489,7 @@ def students_remove():
         removed = remove_student(subject, row, name, everywhere, section=section)
     except ValueError as err:
         flash(str(err), "err")
-        return redirect(url_for("students"))
+        return redirect(url_for("students", subject=subject, section=section))
     if removed:
         log_change("Student removed", "All subjects" if everywhere else f"{subject} ({section or ''})", name)
     flash(f"Removed {name}." if removed else f"{name} was not found.", "ok" if removed else "err")
@@ -489,12 +529,21 @@ def grades_page():
     data = load_data()
     subjects, subject = pick_subject(data)
     sec_names, section, _ = pick_section(data.get(subject))
-    gb = load_grades(subject, section) if subject else None
+    gb = None
+    if subject:
+        try:
+            gb = load_grades(subject, section, request.args.get("period", type=int))
+        except ValueError as err:
+            flash(str(err), "err")
+            return redirect(url_for("grades_page", subject=subject, section=section))
+    period = gb["period"] if gb else None
     return render_template(
         "grades.html", page="grades", subjects=subjects, subject=subject,
-        section=section, section_names=sec_names, gb=gb,
+        section=section, section_names=sec_names, gb=gb, period=period,
+        periods=list_periods(subject, section) if subject else [],
         tabs=make_tabs(subjects, subject, "grades_page"),
-        section_tabs=make_section_tabs(sec_names, section, subject, "grades_page"))
+        section_tabs=make_section_tabs(sec_names, section, subject, "grades_page"),
+        **term_ctx(subject, section, period))
 
 
 @app.route("/grades/weights", methods=["POST"])
@@ -794,7 +843,8 @@ def api_open():
 
 @app.route("/download")
 def download():
-    """Download the attendance as a fresh Excel workbook built from the database."""
+    """Download the attendance of the CURRENT terms as a fresh Excel workbook built from the database.
+    (Locked terms have their own download on the Terms page.)"""
     buf = io.BytesIO()
     build_workbook(load_data()).save(buf)
     buf.seek(0)

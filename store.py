@@ -5,6 +5,10 @@ Attendance data access on top of SQLite. Replaces the old Excel-backed excel_sto
     {subject: {"students": [{"row", "name"}], "dates": [{"col", "date", "topic"}],
                "cells": {(row, col): code}}}
 where ``row`` is an enrollment id and ``col`` is a class-session id.
+
+Terms: every section has one OPEN term (e.g. "1st Sem - Prelim") that new dates and graded items go into.
+``load_data()`` and ``load_grades()`` show that open term unless another term is asked for. Locking a term
+makes it read-only and opens the next one (see lock_period / unlock_period below).
 """
 import os
 import re
@@ -20,7 +24,7 @@ import db
 from config import (BACKUP_DIR, BACKUP_EVERY_MIN, BACKUP_KEEP, DB_FILE,
                     DEFAULT_SECTION, MIN_PASSWORD, SAMPLE_STUDENTS,
                     SAMPLE_SUBJECTS, SUBJECT_IMG_DIR, XLSX)
-from helpers import clean_name, clean_sheet_name, norm_code, safe_text
+from helpers import clean_name, clean_sheet_name, norm_code, safe_text, who_is_it
 
 write_lock = threading.RLock()
 _init_lock = threading.Lock()
@@ -49,7 +53,9 @@ def _insert_subject(conn, name, teacher_id=None, section_name=None):
     sid = conn.execute("INSERT INTO subjects (name, position, teacher_id) VALUES (?, ?, ?)",
                        (name, pos, teacher_id)).lastrowid
     sec_label = clean_name(section_name or DEFAULT_SECTION) or DEFAULT_SECTION
-    return conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)", (sid, sec_label)).lastrowid
+    sec = conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)", (sid, sec_label)).lastrowid
+    _open_period(conn, sec)
+    return sec
 
 
 def _student_id(conn, name):
@@ -81,8 +87,7 @@ def import_data(conn, data):
             iso = dd["date"].isoformat()
             if conn.execute("SELECT 1 FROM sessions WHERE section_id = ? AND date = ?", (section, iso)).fetchone():
                 continue
-            sess = conn.execute("INSERT INTO sessions (section_id, date, topic) VALUES (?, ?, ?)",
-                                (section, iso, dd["topic"] or None)).lastrowid
+            sess = _insert_session(conn, section, iso, dd["topic"] or None)
             for row, eid in enr.items():
                 code = sd["cells"].get((row, dd["col"]))
                 if code:
@@ -147,6 +152,194 @@ class _Tx:
         return False
 
 
+# ------------------------------------------------------------------ terms
+DEFAULT_SEMESTER, DEFAULT_TERM = "1st Sem", "Prelim"
+TERM_NAMES = ("Prelim", "Midterm", "Pre-final", "Final")
+SEMESTER_NAMES = ("1st Sem", "2nd Sem", "Summer")
+
+
+def _period_dict(p):
+    return {"id": p["id"], "semester": p["semester"], "term": p["term"],
+            "label": f"{p['semester']} · {p['term']}", "locked": bool(p["locked"]),
+            "locked_at": p["locked_at"] or "", "locked_by": p["locked_by"] or ""}
+
+
+def _term_name(p):
+    return f"{p['semester']} {p['term']}"
+
+
+def _open_period(conn, sec_id):
+    """The one term of a section that is still open for new dates and graded items (created if missing)."""
+    row = conn.execute("SELECT * FROM periods WHERE section_id = ? AND locked = 0 "
+                       "ORDER BY position DESC, id DESC LIMIT 1", (sec_id,)).fetchone()
+    if row:
+        return row
+    pos = conn.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM periods WHERE section_id = ?",
+                       (sec_id,)).fetchone()[0]
+    pid = conn.execute("INSERT INTO periods (section_id, semester, term, position) VALUES (?, ?, ?, ?)",
+                       (sec_id, DEFAULT_SEMESTER, DEFAULT_TERM, pos)).lastrowid
+    return conn.execute("SELECT * FROM periods WHERE id = ?", (pid,)).fetchone()
+
+
+def _get_period(conn, sec_id, period_id=None):
+    """A term of this section by id, or its open term when no id is given."""
+    if period_id in (None, ""):
+        return _open_period(conn, sec_id)
+    try:
+        pid = int(period_id)
+    except (TypeError, ValueError):
+        raise ValueError("That term was not found for this subject.")
+    row = conn.execute("SELECT * FROM periods WHERE id = ? AND section_id = ?", (pid, sec_id)).fetchone()
+    if not row:
+        raise ValueError("That term was not found for this subject.")
+    return row
+
+
+def _period_row(conn, period_id):
+    if period_id is None:
+        return None
+    return conn.execute("SELECT * FROM periods WHERE id = ?", (period_id,)).fetchone()
+
+
+def _check_open(p):
+    """Stop any change to a locked term."""
+    if p is not None and p["locked"]:
+        raise ValueError(f"{_term_name(p)} is locked, so its attendance and grades can't be changed. "
+                         "Ask an admin to reopen it.")
+
+
+def _period_counts(conn, period_id):
+    dates = conn.execute("SELECT COUNT(*) FROM sessions WHERE period_id = ?", (period_id,)).fetchone()[0]
+    items = conn.execute("SELECT COUNT(*) FROM grade_items WHERE period_id = ?", (period_id,)).fetchone()[0]
+    return dates, items
+
+
+def _insert_session(conn, sec_id, iso, topic, period_id=None):
+    pid = period_id or _open_period(conn, sec_id)["id"]
+    return conn.execute("INSERT INTO sessions (section_id, date, topic, period_id) VALUES (?, ?, ?, ?)",
+                        (sec_id, iso, topic, pid)).lastrowid
+
+
+def _clean_label(s, what):
+    v = safe_text(s)[:40]
+    if not v:
+        raise ValueError(f"Enter the {what} name.")
+    return v
+
+
+def suggest_next_period(semester, term):
+    """A sensible guess for the term after this one (Prelim, Midterm, Pre-final, Final, then the next semester)."""
+    terms = [t.casefold() for t in TERM_NAMES]
+    t = clean_name(term).casefold()
+    if t not in terms:
+        return clean_name(semester), ""
+    i = terms.index(t)
+    if i + 1 < len(TERM_NAMES):
+        return clean_name(semester), TERM_NAMES[i + 1]
+    sems = [s.casefold() for s in SEMESTER_NAMES]
+    s = clean_name(semester).casefold()
+    if s in sems and sems.index(s) + 1 < len(SEMESTER_NAMES):
+        return SEMESTER_NAMES[sems.index(s) + 1], TERM_NAMES[0]
+    return "", TERM_NAMES[0]
+
+
+def list_periods(subject, section=None):
+    """All terms of a section, oldest first, with what is recorded in each."""
+    with _Tx() as conn:
+        sec = _section_of(conn, subject, section)
+        _open_period(conn, sec)
+        rows = conn.execute("SELECT * FROM periods WHERE section_id = ? ORDER BY position, id", (sec,)).fetchall()
+        out = []
+        for r in rows:
+            d = _period_dict(r)
+            d["n_dates"], d["n_items"] = _period_counts(conn, r["id"])
+            out.append(d)
+        open_p = next((p for p in reversed(out) if not p["locked"]), None)
+        last_locked = next((p for p in reversed(out) if p["locked"]), None)
+        for p in out:
+            p["is_open"] = not p["locked"]
+            p["can_reopen"] = bool(last_locked and p["id"] == last_locked["id"] and open_p
+                                   and not open_p["n_dates"] and not open_p["n_items"])
+        return out
+
+
+def lock_period(subject, section, semester, term, next_semester, next_term):
+    """Lock the section's open term (read-only from now on) and open a fresh, empty next term."""
+    sem, trm = _clean_label(semester, "semester"), _clean_label(term, "term")
+    nsem, ntrm = _clean_label(next_semester, "next semester"), _clean_label(next_term, "next term")
+    if (sem.casefold(), trm.casefold()) == (nsem.casefold(), ntrm.casefold()):
+        raise ValueError("The next term needs a different name from the one you are locking.")
+    ensure_db()
+    backup_workbook("before_lock_term", min_gap_min=0)
+
+    def run(conn):
+        sec = _section_of(conn, subject, section)
+        cur = _open_period(conn, sec)
+        n_dates, n_items = _period_counts(conn, cur["id"])
+        if not n_dates and not n_items:
+            raise ValueError("Nothing has been recorded in this term yet, so there is nothing to lock.")
+        used = {(r["semester"].casefold(), r["term"].casefold()) for r in conn.execute(
+            "SELECT semester, term FROM periods WHERE section_id = ? AND id != ?", (sec, cur["id"]))}
+        if (sem.casefold(), trm.casefold()) in used:
+            raise ValueError(f"'{sem} · {trm}' is already used by another term of this subject.")
+        if (nsem.casefold(), ntrm.casefold()) in used:
+            raise ValueError(f"'{nsem} · {ntrm}' is already used by an earlier term. Choose a new name for the next term.")
+        w = conn.execute("SELECT exam_weight, quiz_weight, activity_weight FROM sections WHERE id = ?",
+                         (sec,)).fetchone()
+        conn.execute("UPDATE periods SET semester = ?, term = ?, locked = 1, locked_at = datetime('now', 'localtime'), "
+                     "locked_by = ?, w_exam = ?, w_quiz = ?, w_activity = ? WHERE id = ?",
+                     (sem, trm, who_is_it(), w["exam_weight"], w["quiz_weight"], w["activity_weight"], cur["id"]))
+        pos = conn.execute("SELECT COALESCE(MAX(position), 0) + 1 FROM periods WHERE section_id = ?",
+                           (sec,)).fetchone()[0]
+        conn.execute("INSERT INTO periods (section_id, semester, term, position) VALUES (?, ?, ?, ?)",
+                     (sec, nsem, ntrm, pos))
+        return {"locked": f"{sem} · {trm}", "next": f"{nsem} · {ntrm}", "locked_id": cur["id"],
+                "n_dates": n_dates, "n_items": n_items}
+    return mutate(run)
+
+
+def unlock_period(subject, section, period_id):
+    """Admin only: reopen the most recent locked term, as long as the term after it is still empty."""
+    def run(conn):
+        _tid, is_adm = _current_teacher_filter()
+        if not is_adm:
+            raise ValueError("Only an admin can reopen a locked term.")
+        sec = _section_of(conn, subject, section)
+        p = _get_period(conn, sec, period_id)
+        if not p["locked"]:
+            raise ValueError("That term is not locked.")
+        later = conn.execute("SELECT * FROM periods WHERE section_id = ? AND position > ? ORDER BY position",
+                             (sec, p["position"])).fetchall()
+        if any(l["locked"] for l in later):
+            raise ValueError("Only the most recent locked term can be reopened.")
+        for l in later:
+            if any(_period_counts(conn, l["id"])):
+                raise ValueError(f"{_term_name(l)} already has records, so {_term_name(p)} can't be reopened. "
+                                 "A locked term can be reopened only while the term after it is still empty.")
+        for l in later:
+            conn.execute("DELETE FROM periods WHERE id = ?", (l["id"],))
+        conn.execute("UPDATE periods SET locked = 0, locked_at = NULL, locked_by = NULL, "
+                     "w_exam = NULL, w_quiz = NULL, w_activity = NULL WHERE id = ?", (p["id"],))
+        return _period_dict(p)
+    return mutate(run)
+
+
+def _locked_labels(conn, enrollment_id):
+    """Names of locked terms in which this student already has attendance or scores."""
+    rows = conn.execute(
+        "SELECT p.semester, p.term FROM periods p WHERE p.locked = 1 AND ("
+        " EXISTS (SELECT 1 FROM attendance a JOIN sessions s ON s.id = a.session_id "
+        "         WHERE a.enrollment_id = ? AND s.period_id = p.id)"
+        " OR EXISTS (SELECT 1 FROM grades g JOIN grade_items gi ON gi.id = g.grade_item_id "
+        "            WHERE g.enrollment_id = ? AND gi.period_id = p.id)) ORDER BY p.position",
+        (enrollment_id, enrollment_id)).fetchall()
+    return [_term_name(r) for r in rows]
+
+
+def _has_locked_terms(conn, where, arg):
+    return conn.execute(f"SELECT 1 FROM periods p {where} AND p.locked = 1 LIMIT 1", (arg,)).fetchone() is not None
+
+
 # ------------------------------------------------------------ reading data
 def _section_of(conn, subject, section=None):
     tid, is_adm = _current_teacher_filter()
@@ -169,7 +362,37 @@ def _section_of(conn, subject, section=None):
     return row["id"]
 
 
+def _students_of(conn, sec, sec_name):
+    return [{
+        "row": r["id"],
+        "student_id": r["student_id"],
+        "name": r["name"],
+        "section": sec_name,
+        "student_no": r["student_no"] or "",
+        "guardian_name": r["guardian_name"] or "",
+        "guardian_phone": r["guardian_phone"] or "",
+        "email": r["email"] or "",
+        "address": r["address"] or "",
+    } for r in conn.execute(
+        "SELECT e.id, e.student_id, st.name, st.student_no, st.guardian_name, "
+        "st.guardian_phone, st.email, st.address "
+        "FROM enrollments e JOIN students st ON st.id = e.student_id "
+        "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
+
+
+def _dates_cells(conn, sec, period_id):
+    dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
+             for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? AND period_id = ? "
+                                   "ORDER BY date", (sec, period_id))]
+    cells = {(r["enrollment_id"], r["session_id"]): r["code"] for r in conn.execute(
+        "SELECT a.enrollment_id, a.session_id, a.code FROM attendance a "
+        "JOIN sessions se ON se.id = a.session_id WHERE se.section_id = ? AND se.period_id = ?",
+        (sec, period_id))}
+    return dates, cells
+
+
 def load_data(teacher_id=None, is_admin=None):
+    """Every subject's students and attendance for its OPEN term."""
     if teacher_id is None and is_admin is None:
         teacher_id, is_admin = _current_teacher_filter()
     with _Tx() as conn:
@@ -192,37 +415,31 @@ def load_data(teacher_id=None, is_admin=None):
                 sec = sec_row["id"]
                 sec_name = sec_row["name"]
                 section_names.append(sec_name)
-                students = [{
-                    "row": r["id"],
-                    "student_id": r["student_id"],
-                    "name": r["name"],
-                    "section": sec_name,
-                    "student_no": r["student_no"] or "",
-                    "guardian_name": r["guardian_name"] or "",
-                    "guardian_phone": r["guardian_phone"] or "",
-                    "email": r["email"] or "",
-                    "address": r["address"] or "",
-                } for r in conn.execute(
-                    "SELECT e.id, e.student_id, st.name, st.student_no, st.guardian_name, "
-                    "st.guardian_phone, st.email, st.address "
-                    "FROM enrollments e JOIN students st ON st.id = e.student_id "
-                    "WHERE e.section_id = ? ORDER BY e.id", (sec,))]
-                dates = [{"col": r["id"], "date": date.fromisoformat(r["date"]), "topic": r["topic"] or ""}
-                         for r in conn.execute("SELECT id, date, topic FROM sessions WHERE section_id = ? ORDER BY date", (sec,))]
-                cells = {(r["enrollment_id"], r["session_id"]): r["code"] for r in conn.execute(
-                    "SELECT a.enrollment_id, a.session_id, a.code FROM attendance a "
-                    "JOIN sessions se ON se.id = a.session_id WHERE se.section_id = ?", (sec,))}
+                period = _open_period(conn, sec)
+                dates, cells = _dates_cells(conn, sec, period["id"])
                 sections_map[sec_name] = {
                     "section": sec_name,
-                    "students": students,
+                    "students": _students_of(conn, sec, sec_name),
                     "dates": dates,
                     "cells": cells,
+                    "period": _period_dict(period),
                     "section_names": section_names,
                     "sections": sections_map,
                 }
             first_sec = sections_map[section_names[0]]
             out[sub["name"]] = dict(first_sec)
         return out
+
+
+def load_period_data(subject, section=None, period_id=None):
+    """One section's students and attendance for a chosen term (the open term when period_id is None)."""
+    with _Tx() as conn:
+        sec = _section_of(conn, subject, section)
+        name = conn.execute("SELECT name FROM sections WHERE id = ?", (sec,)).fetchone()["name"]
+        p = _get_period(conn, sec, period_id)
+        dates, cells = _dates_cells(conn, sec, p["id"])
+        return {"section": name, "students": _students_of(conn, sec, name), "dates": dates,
+                "cells": cells, "period": _period_dict(p)}
 
 
 def student_stats(sd):
@@ -290,6 +507,7 @@ def list_backups():
         "before_delete_subject": "Before deleting a subject",
         "before_delete_section": "Before deleting a section",
         "before_restore": "Before a restore",
+        "before_lock_term": "Before locking a term",
     }
     try:
         files = [f for f in os.listdir(BACKUP_DIR) if f.endswith(".db") and f != "attendance_LATEST.db"]
@@ -367,8 +585,7 @@ def reimport_from_excel():
                     enr[s["row"]] = eid
             for dd in sd["dates"]:
                 iso = dd["date"].isoformat()
-                sess = conn.execute("INSERT INTO sessions (section_id, date, topic) VALUES (?, ?, ?)",
-                                    (section, iso, dd["topic"] or None)).lastrowid
+                sess = _insert_session(conn, section, iso, dd["topic"] or None)
                 for row, eid in enr.items():
                     code = sd["cells"].get((row, dd["col"]))
                     if code:
@@ -397,13 +614,14 @@ def apply_marks(subject, d, topic, items, new_names=(), section=None):
     def run(conn):
         sec = _section_of(conn, subject, section)
         iso = d.isoformat()
-        row = conn.execute("SELECT id FROM sessions WHERE section_id = ? AND date = ?", (sec, iso)).fetchone()
+        row = conn.execute("SELECT id, period_id FROM sessions WHERE section_id = ? AND date = ?",
+                           (sec, iso)).fetchone()
         created = row is None
         topic_clean = safe_text(topic) or None
         if created:
-            sess = conn.execute("INSERT INTO sessions (section_id, date, topic) VALUES (?, ?, ?)",
-                                (sec, iso, topic_clean)).lastrowid
+            sess = _insert_session(conn, sec, iso, topic_clean)
         else:
+            _check_open(_period_row(conn, row["period_id"]))
             sess = row["id"]
             conn.execute("UPDATE sessions SET topic = ? WHERE id = ?", (topic_clean, sess))
         names = {}                                   # lowercase name -> enrollment id
@@ -454,10 +672,11 @@ def delete_date(subject, d, section=None):
     """Remove one class date (topic and every mark) from a subject."""
     def run(conn):
         sec = _section_of(conn, subject, section)
-        row = conn.execute("SELECT id, topic FROM sessions WHERE section_id = ? AND date = ?",
+        row = conn.execute("SELECT id, topic, period_id FROM sessions WHERE section_id = ? AND date = ?",
                            (sec, d.isoformat())).fetchone()
         if not row:
             raise ValueError("That date was not found.")
+        _check_open(_period_row(conn, row["period_id"]))
         marks = conn.execute("SELECT COUNT(*) FROM attendance WHERE session_id = ?", (row["id"],)).fetchone()[0]
         conn.execute("DELETE FROM sessions WHERE id = ?", (row["id"],))
         return marks, clean_name(row["topic"] or "")
@@ -481,6 +700,13 @@ def add_students(subjects, names, section=None):
     return mutate(run)
 
 
+def _refuse_if_locked_records(conn, enrollment_id, name):
+    labels = _locked_labels(conn, enrollment_id)
+    if labels:
+        raise ValueError(f"{name} has records in locked term(s): {', '.join(labels)}. Removing the student would "
+                         "erase them, so keep them on the list (or ask an admin to reopen the term first).")
+
+
 def remove_student(subject, row, name, everywhere, section=None):
     def run(conn):
         if everywhere:
@@ -494,6 +720,8 @@ def remove_student(subject, row, name, everywhere, section=None):
                 rows = conn.execute(
                     "SELECT e.id FROM enrollments e JOIN students st ON st.id = e.student_id "
                     "WHERE st.name_key = ?", (key_of(name),)).fetchall()
+            for r in rows:
+                _refuse_if_locked_records(conn, r["id"], name)
             for r in rows:
                 conn.execute("DELETE FROM enrollments WHERE id = ?", (r["id"],))
             conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
@@ -511,6 +739,7 @@ def remove_student(subject, row, name, everywhere, section=None):
                              "WHERE e.section_id = ? AND st.name_key = ?", (sec, key_of(name))).fetchone()
             hit = r["id"] if r else None
         if hit:
+            _refuse_if_locked_records(conn, hit, name)
             conn.execute("DELETE FROM enrollments WHERE id = ?", (hit,))
             conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
             return 1
@@ -561,6 +790,9 @@ def delete_subject(name):
             raise ValueError("That subject was not found.")
         if not is_adm and tid is not None and row["teacher_id"] != tid:
             raise ValueError("You do not have permission to delete that subject.")
+        if not is_adm and _has_locked_terms(
+                conn, "JOIN sections sec ON sec.id = p.section_id WHERE sec.subject_id = ?", row["id"]):
+            raise ValueError("This subject has locked terms, so only an admin can delete it.")
         conn.execute("DELETE FROM subjects WHERE id = ?", (row["id"],))
         conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
     mutate(run)
@@ -609,6 +841,7 @@ def add_section(subject, section_name, copy_from_section=None):
                     "SELECT student_id FROM enrollments WHERE section_id = ? ORDER BY id", (src_row["id"],))]
         new_sec = conn.execute("INSERT INTO sections (subject_id, name) VALUES (?, ?)",
                                (srow["id"], sec_label)).lastrowid
+        _open_period(conn, new_sec)
         for sid in source:
             _enroll(conn, sid, new_sec)
         return len(source)
@@ -638,11 +871,14 @@ def delete_section(subject, section_name):
     backup_workbook("before_delete_section", min_gap_min=0)
 
     def run(conn):
+        _tid, is_adm = _current_teacher_filter()
         sec_id = _section_of(conn, subject, section_name)
         srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
         count = conn.execute("SELECT COUNT(*) FROM sections WHERE subject_id = ?", (srow["subject_id"],)).fetchone()[0]
         if count <= 1:
             raise ValueError("Cannot delete the only section of a subject (rename it or delete the subject instead).")
+        if not is_adm and _has_locked_terms(conn, "WHERE p.section_id = ?", sec_id):
+            raise ValueError("This section has locked terms, so only an admin can delete it.")
         conn.execute("DELETE FROM sections WHERE id = ?", (sec_id,))
         conn.execute("DELETE FROM students WHERE id NOT IN (SELECT student_id FROM enrollments)")
     mutate(run)
@@ -801,23 +1037,29 @@ def pct_to_scale(pct):
     return "5.00"
 
 
-def load_grades(subject, section=None):
-    """Load gradebook for (subject, section): weights, lock state, items, student scores, and computed standing."""
+def load_grades(subject, section=None, period_id=None):
+    """Gradebook for (subject, section) and one term (the open term when period_id is None):
+    weights, lock state, items, student scores, and computed standing."""
     with _Tx() as conn:
         sec_id = _section_of(conn, subject, section)
         sec_row = conn.execute(
             "SELECT id, name, exam_weight, quiz_weight, activity_weight, weights_locked "
             "FROM sections WHERE id = ?", (sec_id,)).fetchone()
+        period = _get_period(conn, sec_id, period_id)
         weights = {
             "exam": float(sec_row["exam_weight"]),
             "quiz": float(sec_row["quiz_weight"]),
             "activity": float(sec_row["activity_weight"]),
         }
+        if period["locked"] and period["w_exam"] is not None:       # a locked term keeps its own weights
+            weights = {"exam": float(period["w_exam"]), "quiz": float(period["w_quiz"]),
+                       "activity": float(period["w_activity"])}
         locked = bool(sec_row["weights_locked"])
         items = [dict(r) for r in conn.execute(
             "SELECT id, category, title, max_score, date FROM grade_items "
-            "WHERE section_id = ? ORDER BY CASE category WHEN 'exam' THEN 1 WHEN 'quiz' THEN 2 ELSE 3 END, id",
-            (sec_id,)).fetchall()]
+            "WHERE section_id = ? AND period_id = ? "
+            "ORDER BY CASE category WHEN 'exam' THEN 1 WHEN 'quiz' THEN 2 ELSE 3 END, id",
+            (sec_id, period["id"])).fetchall()]
         for it in items:
             it["label"] = CATEGORY_LABELS.get(it["category"], it["category"].capitalize())
         students = [dict(r) for r in conn.execute(
@@ -827,7 +1069,8 @@ def load_grades(subject, section=None):
         scores = {}
         for r in conn.execute(
                 "SELECT g.grade_item_id, g.enrollment_id, g.score FROM grades g "
-                "JOIN grade_items gi ON gi.id = g.grade_item_id WHERE gi.section_id = ?", (sec_id,)):
+                "JOIN grade_items gi ON gi.id = g.grade_item_id WHERE gi.section_id = ? AND gi.period_id = ?",
+                (sec_id, period["id"])):
             scores[(r["enrollment_id"], r["grade_item_id"])] = float(r["score"])
 
         items_by_cat = {cat: [it for it in items if it["category"] == cat] for cat in GRADE_CATEGORIES}
@@ -867,6 +1110,8 @@ def load_grades(subject, section=None):
             "section": sec_row["name"],
             "weights": weights,
             "locked": locked,
+            "period": _period_dict(period),
+            "period_locked": bool(period["locked"]),
             "items": items,
             "items_by_cat": items_by_cat,
             "cat_max": cat_max,
@@ -917,18 +1162,19 @@ def add_grade_item(subject, section, category, title, max_score, date_str=""):
     def run(conn):
         sec_id = _section_of(conn, subject, section)
         return conn.execute(
-            "INSERT INTO grade_items (section_id, category, title, max_score, date) VALUES (?, ?, ?, ?, ?)",
-            (sec_id, cat, t, mx, safe_text(date_str)[:20])).lastrowid
+            "INSERT INTO grade_items (section_id, category, title, max_score, date, period_id) VALUES (?, ?, ?, ?, ?, ?)",
+            (sec_id, cat, t, mx, safe_text(date_str)[:20], _open_period(conn, sec_id)["id"])).lastrowid
     return mutate(run)
 
 
 def delete_grade_item(subject, section, item_id):
     def run(conn):
         sec_id = _section_of(conn, subject, section)
-        row = conn.execute("SELECT id, title FROM grade_items WHERE id = ? AND section_id = ?",
+        row = conn.execute("SELECT id, title, period_id FROM grade_items WHERE id = ? AND section_id = ?",
                            (int(item_id), sec_id)).fetchone()
         if not row:
             raise ValueError("Grade item not found.")
+        _check_open(_period_row(conn, row["period_id"]))
         conn.execute("DELETE FROM grade_items WHERE id = ?", (row["id"],))
         return row["title"]
     return mutate(run)
@@ -938,14 +1184,22 @@ def save_grade_scores(subject, section, entries):
     """Save [(enrollment_id, item_id, score_or_none), ...] for a section."""
     def run(conn):
         sec_id = _section_of(conn, subject, section)
-        valid_items = {r["id"]: float(r["max_score"]) for r in conn.execute(
-            "SELECT id, max_score FROM grade_items WHERE section_id = ?", (sec_id,))}
+        valid_items, locked_items = {}, {}
+        for r in conn.execute(
+                "SELECT gi.id, gi.max_score, p.locked, p.semester, p.term FROM grade_items gi "
+                "LEFT JOIN periods p ON p.id = gi.period_id WHERE gi.section_id = ?", (sec_id,)):
+            valid_items[r["id"]] = float(r["max_score"])
+            if r["locked"]:
+                locked_items[r["id"]] = f"{r['semester']} {r['term']}"
         valid_enr = {r["id"] for r in conn.execute(
             "SELECT id FROM enrollments WHERE section_id = ?", (sec_id,))}
         saved = 0
         for eid, iid, val in entries:
             if eid not in valid_enr or iid not in valid_items:
                 continue
+            if iid in locked_items:
+                raise ValueError(f"{locked_items[iid]} is locked, so its scores can't be changed. "
+                                 "Ask an admin to reopen it.")
             if val is None or val == "":
                 conn.execute("DELETE FROM grades WHERE grade_item_id = ? AND enrollment_id = ?", (iid, eid))
             else:
@@ -959,6 +1213,3 @@ def save_grade_scores(subject, section, entries):
                 saved += 1
         return saved
     return mutate(run)
-
-
-

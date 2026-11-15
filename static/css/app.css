@@ -539,3 +539,9 @@ form.inline { display: inline; }
 .toolbar { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 12px; }
 .toolbar input[type=date], .toolbar input[type=text], textarea, input.txt, select { font: inherit; padding: 8px 10px; border: 1px solid var(--line); border-radius: 8px; background: var(--card); color: var(--ink); }
 .toolbar .grow { flex: 1; min-width: 180px; }
+
+/* Term strip shown above the subject tabs */
+.term-chip { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin: 0 0 10px; padding: 6px 12px;
+  border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; }
+.term-chip.locked { border-color: #d9a441; }
+.term-chip a { margin-left: auto; font-weight: 600; }

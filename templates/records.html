@@ -4,6 +4,8 @@
 <h1>Records</h1>
 <style>
 .recgrid .sticky { box-shadow: 2px 0 4px rgba(15, 23, 42, .08); }
+.periodbar { display: flex; flex-wrap: wrap; gap: 8px; align-items: center; margin: 0 0 12px; }
+.periodbar select { max-width: 100%; }
 @media (max-width: 640px) {
   .scroll { max-height: 78vh; -webkit-overflow-scrolling: touch; }
   .recgrid th, .recgrid td { padding: 6px 7px; font-size: 13px; }
@@ -15,12 +17,25 @@
 {% if not subject %}<div class="card">No subjects yet.</div>
 {% elif not rows %}<div class="card">No students in {{ subject }} yet.</div>
 {% else %}
-{% if role == 'teacher' %}<p><a class="btn small" href="{{ url_for('print_sheet', subject=subject, section=section) }}" target="_blank">&#128424; Print sheet</a></p>{% endif %}
-{% if role == 'teacher' %}<p class="muted">Same view as the attendance sheet. To change a day, use <a href="{{ url_for('mark', subject=subject, section=section) }}">Mark attendance</a> and pick that date.</p>
+{% if periods and periods|length > 1 %}
+<form class="periodbar" method="get" action="{{ url_for('records') }}">
+  <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}">
+  <label>Term <select name="period" onchange="this.form.submit()">
+    {% for p in periods %}<option value="{{ p.id }}" {{ 'selected' if period and p.id == period.id }}>{{ p.label }}{{ ' 🔒' if p.locked else ' (current)' }}</option>{% endfor %}
+  </select></label>
+  <noscript><button class="btn small" type="submit">Show</button></noscript>
+</form>
+{% endif %}
+{% if role == 'teacher' %}<p>
+  <a class="btn small" href="{{ url_for('print_sheet', subject=subject, section=section, period=period.id if period else none) }}" target="_blank">&#128424; Print sheet</a>
+  {% if period %}<a class="btn small" href="{{ url_for('periods_download', subject=subject, section=section, period=period.id) }}">&#11015; Download .xlsx</a>{% endif %}
+</p>{% endif %}
+{% if not editable %}<div class="card" style="padding:10px 14px">&#128274; <b>{{ period.label }}</b> is locked, so this is a read-only copy.{% if role == 'teacher' %} Go back to the current term to keep marking attendance.{% endif %}</div>{% endif %}
+{% if role == 'teacher' %}{% if editable %}<p class="muted">Same view as the attendance sheet. To change a day, use <a href="{{ url_for('mark', subject=subject, section=section) }}">Mark attendance</a> and pick that date.</p>{% endif %}
 {% else %}<p class="muted">p = present &middot; x = absent &middot; l = late &middot; e = excused &middot; r = recited. Swipe the table sideways to see every day.</p>{% endif %}
 <div class="scroll"><table class="grid recgrid">
 <thead><tr><th class="sticky">Student</th><th class="n">P</th><th class="n">A</th><th class="n">L</th><th class="n">E</th><th class="n">R</th><th class="n">Rate</th>
-{% for d in dates %}<th class="n">{% if role == 'teacher' %}<a href="{{ url_for('mark', subject=subject, section=section, date=d.iso) }}" style="color:inherit;text-decoration:none">{{ d.label }}</a>{% else %}{{ d.label }}{% endif %}{% if role == 'teacher' %}<form method="post" action="{{ url_for('dates_delete') }}" style="display:inline" data-msg="Delete {{ d.label }} from {{ subject }} ({{ section }})? Every mark for that day will be removed (a backup copy is saved first)." onsubmit="return confirm(this.dataset.msg)"><input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="date" value="{{ d.iso }}"><button type="submit" title="Delete this date" style="border:0;background:none;color:#c0392b;cursor:pointer;font-size:12px;padding:0 0 0 4px">&#10005;</button></form>{% endif %}{% if d.topic %}<small title="{{ d.topic }}">{{ d.topic }}</small>{% endif %}</th>{% endfor %}</tr></thead>
+{% for d in dates %}<th class="n">{% if role == 'teacher' and editable %}<a href="{{ url_for('mark', subject=subject, section=section, date=d.iso) }}" style="color:inherit;text-decoration:none">{{ d.label }}</a>{% else %}{{ d.label }}{% endif %}{% if role == 'teacher' and editable %}<form method="post" action="{{ url_for('dates_delete') }}" style="display:inline" data-msg="Delete {{ d.label }} from {{ subject }} ({{ section }})? Every mark for that day will be removed (a backup copy is saved first)." onsubmit="return confirm(this.dataset.msg)"><input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="date" value="{{ d.iso }}"><button type="submit" title="Delete this date" style="border:0;background:none;color:#c0392b;cursor:pointer;font-size:12px;padding:0 0 0 4px">&#10005;</button></form>{% endif %}{% if d.topic %}<small title="{{ d.topic }}">{{ d.topic }}</small>{% endif %}</th>{% endfor %}</tr></thead>
 <tbody>
 {% for s in rows %}<tr><td class="sticky">{{ s.name }}</td><td class="n">{{ s.p }}</td><td class="n">{{ s.x }}</td><td class="n">{{ s.l }}</td><td class="n">{{ s.e }}</td><td class="n">{{ s.r }}</td>
 <td class="n">{% if s.rate is none %}<span class="pill none">–</span>{% else %}<span class="pill {{ 'low' if s.rate < low }}">{{ (s.rate*100)|round|int }}%</span>{% endif %}</td>

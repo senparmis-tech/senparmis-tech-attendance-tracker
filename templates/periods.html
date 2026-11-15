@@ -1,0 +1,105 @@
+{% extends "base.html" %}
+{% block title %}Terms{% endblock %}
+{% block body %}
+<h1>Terms &amp; locking</h1>
+
+{% if not subject %}
+<div class="card">No subjects yet. Add one under <a href="{{ url_for('students') }}">Students &amp; subjects</a>.</div>
+{% else %}
+
+<p class="muted" style="margin-top:0">
+  Lock a finished term (like Prelim) to freeze its attendance and grades. The next term then starts
+  <b>empty</b> with the same students, and every locked term stays here to look at, print or download.
+</p>
+
+{% if current %}
+<div class="card">
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px">
+    <h2 style="margin:0">Current term: {{ current.label }}</h2>
+    <span class="badge todo">Open</span>
+  </div>
+  <p class="muted" style="margin:0 0 12px;font-size:13px">
+    {{ current.n_dates }} class date{{ '' if current.n_dates == 1 else 's' }} and
+    {{ current.n_items }} graded item{{ '' if current.n_items == 1 else 's' }} recorded so far in {{ subject }} ({{ section }}).
+  </p>
+  <details {{ 'open' if current.n_dates or current.n_items }}>
+    <summary>🔒 Lock this term and start the next one</summary>
+    <form method="post" action="{{ url_for('periods_lock') }}" class="lockform"
+          onsubmit="return confirm('Lock ' + this.semester.value + ' · ' + this.term.value + '?\n\nIts attendance and grades become read-only. Only an admin can reopen it.\n' + this.next_semester.value + ' · ' + this.next_term.value + ' will start empty.')">
+      <input type="hidden" name="subject" value="{{ subject }}">
+      <input type="hidden" name="section" value="{{ section }}">
+      <div class="lockgrid">
+        <fieldset>
+          <legend>Term you are locking</legend>
+          <label>Semester<br><input class="txt" name="semester" list="semList" value="{{ current.semester }}" maxlength="40" required></label>
+          <label>Term<br><input class="txt" name="term" list="termList" value="{{ current.term }}" maxlength="40" required></label>
+        </fieldset>
+        <fieldset>
+          <legend>Next term (starts empty)</legend>
+          <label>Semester<br><input class="txt" name="next_semester" list="semList" value="{{ next_semester }}" maxlength="40" required></label>
+          <label>Term<br><input class="txt" name="next_term" list="termList" value="{{ next_term }}" maxlength="40" required></label>
+        </fieldset>
+      </div>
+      <datalist id="semList">{% for s in semesters %}<option value="{{ s }}">{% endfor %}</datalist>
+      <datalist id="termList">{% for t in terms %}<option value="{{ t }}">{% endfor %}</datalist>
+      <p class="muted" style="font-size:12px;margin:8px 0">
+        Check the names on the left: your records so far were filed under “{{ current.label }}”, and you can rename them here.
+        Grade category weights are saved with the locked term.
+      </p>
+      <button class="btn primary" type="submit" {{ 'disabled' if not (current.n_dates or current.n_items) }}>🔒 Lock {{ current.term }} &amp; start next term</button>
+      {% if not (current.n_dates or current.n_items) %}<span class="muted" style="font-size:13px;margin-left:8px">Nothing recorded yet, so there is nothing to lock.</span>{% endif %}
+    </form>
+  </details>
+</div>
+{% endif %}
+
+<div class="card">
+  <h2>All terms · {{ subject }} ({{ section }})</h2>
+  {% for grp in groups %}
+  <div class="grp-label">{{ grp.semester }}</div>
+  <div class="scroll" style="max-height:none;margin-bottom:12px"><table class="grid termtable">
+    <thead><tr><th>Term</th><th class="n">Status</th><th class="n">Dates</th><th class="n">Graded items</th><th>Open it</th></tr></thead>
+    <tbody>
+    {% for p in grp.periods %}
+    <tr>
+      <td class="termname"><b>{{ p.term }}</b>{% if p.locked and p.locked_at %}<br><small class="muted">locked {{ p.locked_at[:16] }}{% if p.locked_by %} · {{ p.locked_by }}{% endif %}</small>{% endif %}</td>
+      <td class="n">{% if p.locked %}<span class="badge done">🔒 Locked</span>{% else %}<span class="badge todo">Open</span>{% endif %}</td>
+      <td class="n">{{ p.n_dates }}</td>
+      <td class="n">{{ p.n_items }}</td>
+      <td class="actions">
+        <a class="btn small" href="{{ url_for('records', subject=subject, section=section, period=p.id) }}">Attendance</a>
+        <a class="btn small" href="{{ url_for('grades_page', subject=subject, section=section, period=p.id) }}">Grades</a>
+        <a class="btn small" href="{{ url_for('print_sheet', subject=subject, section=section, period=p.id) }}" target="_blank">🖨 Print</a>
+        <a class="btn small" href="{{ url_for('periods_download', subject=subject, section=section, period=p.id) }}">⬇ .xlsx</a>
+        {% if p.locked and is_admin %}
+        <form class="inline" method="post" action="{{ url_for('periods_unlock') }}"
+              onsubmit="return confirm('Reopen {{ p.label|e }}? It becomes the current term again and can be edited.')">
+          <input type="hidden" name="subject" value="{{ subject }}">
+          <input type="hidden" name="section" value="{{ section }}">
+          <input type="hidden" name="period" value="{{ p.id }}">
+          <button class="btn small" type="submit" {{ 'disabled' if not p.can_reopen }}
+                  title="{{ 'Reopen this term' if p.can_reopen else 'Only the newest locked term can be reopened, and only while the term after it is still empty.' }}">🔓 Reopen</button>
+        </form>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+  {% endfor %}
+</div>
+
+<style>
+.lockform { margin-top: 10px; }
+.lockgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px; }
+.lockform fieldset { border: 1px solid var(--line); border-radius: 10px; padding: 10px 14px 12px; margin: 0; }
+.lockform legend { font-weight: 700; font-size: 13px; padding: 0 6px; }
+.lockform label { display: inline-block; font-size: 13px; margin: 4px 10px 4px 0; }
+.lockform input.txt { width: 150px; max-width: 100%; }
+.grp-label { font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .06em; color: var(--muted); margin: 4px 2px 6px; }
+.termtable td.actions { white-space: normal; }
+.termtable td.actions .btn { margin: 2px 4px 2px 0; }
+.termtable td.termname { white-space: normal; min-width: 130px; }
+</style>
+{% endif %}
+{% endblock %}
