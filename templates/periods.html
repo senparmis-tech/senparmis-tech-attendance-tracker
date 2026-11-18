@@ -63,9 +63,9 @@
     {% for p in grp.periods %}
     <tr>
       <td class="termname"><b>{{ p.term }}</b>{% if p.locked and p.locked_at %}<br><small class="muted">locked {{ p.locked_at[:16] }}{% if p.locked_by %} · {{ p.locked_by }}{% endif %}</small>{% endif %}</td>
-      <td class="n">{% if p.locked %}<span class="badge done">🔒 Locked</span>{% else %}<span class="badge todo">Open</span>{% endif %}</td>
-      <td class="n">{{ p.n_dates }}</td>
-      <td class="n">{{ p.n_items }}</td>
+      <td class="n" data-label="Status">{% if p.locked %}<span class="badge done">🔒 Locked</span>{% else %}<span class="badge todo">Open</span>{% endif %}</td>
+      <td class="n" data-label="Dates">{{ p.n_dates }}</td>
+      <td class="n" data-label="Graded items">{{ p.n_items }}</td>
       <td class="actions">
         <a class="btn small" href="{{ url_for('records', subject=subject, section=section, period=p.id) }}">Attendance</a>
         <a class="btn small" href="{{ url_for('grades_page', subject=subject, section=section, period=p.id) }}">Grades</a>
@@ -100,6 +100,18 @@
 .termtable td.actions { white-space: normal; }
 .termtable td.actions .btn { margin: 2px 4px 2px 0; }
 .termtable td.termname { white-space: normal; min-width: 130px; }
+@media (max-width: 600px) {
+  /* Phone: each term becomes its own small card instead of a squeezed table */
+  .termtable, .termtable tbody, .termtable tr, .termtable td { display: block; width: 100%; }
+  .termtable thead { display: none; }
+  .termtable tr { padding: 10px 12px; border-bottom: 1px solid var(--line); }
+  table.grid.termtable td { border: 0; padding: 3px 0; text-align: left; white-space: normal; }
+  table.grid.termtable tr:last-child { border-bottom: 0; }
+  .termtable td.n { display: flex; justify-content: space-between; align-items: center; }
+  .termtable td.n::before { content: attr(data-label); color: var(--muted); font-size: 13px; }
+  .termtable td.actions { padding-top: 8px; }
+  .termtable td.actions .btn { flex: 1 1 40%; }
+}
 </style>
 {% endif %}
 {% endblock %}

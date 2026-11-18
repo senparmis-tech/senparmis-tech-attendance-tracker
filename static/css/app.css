@@ -545,3 +545,166 @@ form.inline { display: inline; }
   border: 1px solid var(--line); border-radius: 10px; background: var(--surface); font-size: 13px; }
 .term-chip.locked { border-color: #d9a441; }
 .term-chip a { margin-left: auto; font-weight: 600; }
+
+/* =====================================================================
+   DESIGN SYSTEM LAYER (v2)
+   Loaded last on purpose: it refines the tokens and components above so
+   every page (mark, records, grades, terms, students...) shares one look.
+   UX decisions are explained in the comments.
+   ===================================================================== */
+:root {
+  /* Spacing scale (4px base) and type scale */
+  --s1: 4px; --s2: 8px; --s3: 12px; --s4: 16px; --s5: 24px; --s6: 32px;
+  --fs-sm: 13px; --fs-base: 15px; --fs-lg: 17px; --fs-xl: 22px; --fs-2xl: 28px;
+  --radius: 14px;
+  --shadow-1: 0 1px 2px rgba(15, 23, 42, .05), 0 1px 3px rgba(15, 23, 42, .06);
+  --shadow-2: 0 4px 14px rgba(15, 23, 42, .10);
+  --tabbar-h: 62px;
+  --touch: 44px;                 /* minimum size of a tappable control */
+  --muted: #566376;              /* darker than before: 5.9:1 on the page background (WCAG AA) */
+  --focus: #1d4ed8;
+  /* Status colours. The "-ink" versions are for TEXT on the tinted backgrounds:
+     the old bright greens/ambers had only about 2.3:1 contrast, which fails AA. */
+  --p-ink: #047857; --x-ink: #b91c1c; --l-ink: #92400e; --e-ink: #1d4ed8; --r-ink: #6d28d9;
+}
+[data-theme="dark"] {
+  --muted: #a3b0c2;
+  --focus: #93c5fd;
+  --shadow-1: 0 1px 2px rgba(0, 0, 0, .35);
+  --shadow-2: 0 6px 18px rgba(0, 0, 0, .45);
+  --p-ink: #6ee7b7; --x-ink: #fca5a5; --l-ink: #fcd34d; --e-ink: #93c5fd; --r-ink: #c4b5fd;
+}
+
+/* Accessibility: obvious keyboard focus, a skip link, and no motion for people who ask for none. */
+:focus-visible { outline: 3px solid var(--focus); outline-offset: 2px; border-radius: 6px; }
+.skip-link {
+  position: absolute; left: 12px; top: -60px; z-index: 100; padding: 10px 16px; border-radius: 10px;
+  background: var(--brand); color: #fff; font-weight: 700; text-decoration: none; transition: top .15s;
+}
+.skip-link:focus { top: 8px; }
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation: none !important; transition: none !important; scroll-behavior: auto !important; }
+}
+
+/* Text sizes respect the user's browser/OS text-size setting (no fixed px on body in small views). */
+body { font-size: var(--fs-base); line-height: 1.5; }
+h1 { font-size: clamp(22px, 2.2vw + 14px, var(--fs-2xl)); line-height: 1.2; margin: 6px 0 var(--s4); }
+h2 { font-size: var(--fs-lg); line-height: 1.3; }
+a { color: var(--brand); text-underline-offset: 2px; }
+.muted, small.muted { color: var(--muted); }
+
+/* Cards: calmer, with a soft shadow instead of heavy borders. */
+.card { border-radius: var(--radius); padding: var(--s4) calc(var(--s4) + 2px); box-shadow: var(--shadow-1); }
+.card > h2:first-child { margin-top: 0; }
+
+/* Buttons: one clear primary per area, 40px high on desktop, 44px for fingers. */
+.btn { min-height: 40px; border-radius: 10px; padding: 8px 16px; }
+.btn.small { min-height: 34px; padding: 5px 12px; font-size: var(--fs-sm); }
+.btn.primary { box-shadow: 0 1px 2px rgba(37, 99, 235, .35); }
+.btn.danger { border-color: var(--x); color: var(--x-ink); }
+.btn.danger:hover { background: var(--xbg); }
+
+/* Forms: a visible border and focus ring on every field; 16px text on phones stops iOS from zooming. */
+.toolbar input[type=date], .toolbar input[type=text], textarea, input.txt, select, input[type=number], input[type=password], input[type=email], input[type=search] {
+  min-height: 40px; border-radius: 10px; border-color: #c3ccd9;
+}
+[data-theme="dark"] .toolbar input[type=date], [data-theme="dark"] .toolbar input[type=text], [data-theme="dark"] textarea,
+[data-theme="dark"] input.txt, [data-theme="dark"] select, [data-theme="dark"] input[type=number],
+[data-theme="dark"] input[type=password], [data-theme="dark"] input[type=email], [data-theme="dark"] input[type=search] { border-color: #3b4658; }
+input:focus-visible, select:focus-visible, textarea:focus-visible { outline: 3px solid var(--focus); outline-offset: 1px; border-color: var(--focus); }
+label { font-weight: 600; }
+
+/* Status colours: the letter or word always shows too, so colour is never the only signal. */
+.s-p, td.c.p, .pill, .badge.done { color: var(--p-ink); }
+.s-x, td.c.x, .pill.low, .chip { color: var(--x-ink); }
+.s-l, td.c.l, .badge.todo { color: var(--l-ink); }
+.s-e, td.c.e { color: var(--e-ink); }
+.s-r, td.c.r { color: var(--r-ink); }
+.pill.none { color: var(--muted); }
+.flash.ok { color: var(--p-ink); border-color: var(--p-ink); }
+.flash.err { color: var(--x-ink); border-color: var(--x-ink); }
+.flash { display: flex; gap: 10px; align-items: flex-start; box-shadow: var(--shadow-1); }
+.flash.ok::before { content: "✓"; font-weight: 800; }
+.flash.err::before { content: "!"; font-weight: 800; border: 2px solid currentColor; border-radius: 50%; width: 20px; height: 20px; flex: 0 0 20px; display: inline-flex; align-items: center; justify-content: center; font-size: 13px; line-height: 1; }
+.badge.todo::before { content: "● "; }
+.badge.done::before { content: ""; }
+
+/* Tabs: bigger, easier to hit. */
+.tab { min-height: 40px; display: inline-flex; align-items: center; }
+.tab.on { box-shadow: var(--shadow-1); }
+
+/* Tables: header row stays visible and the first column stays put while you scroll sideways. */
+.scroll { border-radius: 12px; box-shadow: var(--shadow-1); scroll-padding-left: 120px; }
+table.grid tbody tr:hover td:not(.c) { background: var(--hover); }
+table.grid tbody tr:hover td.sticky { background: var(--hover); }
+
+/* Empty and loading states, available to any page: <div class="empty"><b>Title</b><p>Hint</p></div> */
+.empty { text-align: center; padding: var(--s6) var(--s4); color: var(--muted); border: 1px dashed var(--line); border-radius: var(--radius); background: var(--card); }
+.empty b { display: block; color: var(--ink); font-size: var(--fs-lg); margin-bottom: 4px; }
+.skeleton { background: linear-gradient(90deg, var(--surface) 25%, var(--line) 37%, var(--surface) 63%); background-size: 400% 100%; animation: sk 1.4s ease infinite; border-radius: 8px; min-height: 16px; }
+@keyframes sk { 0% { background-position: 100% 50%; } 100% { background-position: 0 50%; } }
+.btn[aria-busy="true"] { opacity: .7; pointer-events: none; }
+
+/* Desktop and wide screens use the room: a wider page and more cards per row. */
+@media (min-width: 1280px) {
+  .header-inner, .mobile-nav-panel { max-width: 1240px; }
+  main { max-width: 1240px; padding-left: 24px; padding-right: 24px; }
+  .grid2 { grid-template-columns: repeat(auto-fill, minmax(340px, 1fr)); }
+}
+/* Landscape phones and notches: keep content out of the unsafe side areas. */
+header.top { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+main { padding-left: max(16px, env(safe-area-inset-left)); padding-right: max(16px, env(safe-area-inset-right)); }
+@media (max-width: 600px) { main { padding-left: max(12px, env(safe-area-inset-left)); padding-right: max(12px, env(safe-area-inset-right)); } }
+
+/* Phones: 16px fields, 44px touch targets, full-width stacked forms, tighter tables. */
+@media (max-width: 960px), (pointer: coarse) {
+  .btn, .tab { min-height: var(--touch); }
+  .btn.small { min-height: 40px; padding: 6px 14px; }
+  .toolbar input[type=date], .toolbar input[type=text], textarea, input.txt, select, input[type=number], input[type=password], input[type=email], input[type=search] {
+    min-height: var(--touch); font-size: 16px;
+  }
+  .nav-toggle-btn, .theme-toggle-btn, .signout-btn { min-height: var(--touch); min-width: var(--touch); }
+  .mnav-tile, .mnav-chip, .mnav-signout { min-height: var(--touch); }
+  details summary { min-height: var(--touch); display: flex; align-items: center; }
+}
+@media (max-width: 600px) {
+  .toolbar { flex-direction: column; align-items: stretch; }
+  .toolbar .grow { min-width: 0; }
+  .card form[style*="flex"] { align-items: stretch !important; }
+  .card form[style*="flex"] > label, .card form[style*="flex"] > .btn { flex: 1 1 100%; }
+  .card form[style*="flex"] input, .card form[style*="flex"] select { width: 100% !important; }
+  table.grid th, table.grid td { padding: 8px 8px; }
+  .stats { gap: 6px; }
+}
+
+/* ---- Bottom tab bar (phones and tablets, teachers only) -------------------
+   The 4 jobs teachers do all day sit under the thumb; everything else is in "More".
+   It hides on desktop, where the top navigation already shows everything. */
+.tabbar { display: none; }
+@media (max-width: 960px) {
+  .tabbar {
+    display: grid; grid-template-columns: repeat(5, 1fr);
+    position: fixed; left: 0; right: 0; bottom: 0; z-index: 48;
+    background: var(--header-bg); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    border-top: 1px solid var(--line);
+    padding: 4px max(4px, env(safe-area-inset-right)) env(safe-area-inset-bottom, 0px) max(4px, env(safe-area-inset-left));
+  }
+  .tabbar a, .tabbar button {
+    display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px;
+    min-height: var(--tabbar-h); padding: 6px 2px; border: 0; background: none; border-radius: 12px;
+    color: var(--muted); text-decoration: none; font: inherit; font-size: 11.5px; font-weight: 700; cursor: pointer;
+  }
+  .tabbar .ti { font-size: 20px; line-height: 1; }
+  .tabbar .on, .tabbar [aria-expanded="true"] { color: var(--brand); background: var(--ebg); }
+  body.has-tabbar main { padding-bottom: calc(var(--tabbar-h) + 96px + env(safe-area-inset-bottom, 0px)); }
+  /* the Mark page's Save bar and its toast float just above the tab bar instead of behind it */
+  body.has-tabbar .mobile-dock { bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px)); padding-bottom: 10px; }
+  body.has-tabbar .toast { bottom: calc(var(--tabbar-h) + 84px + env(safe-area-inset-bottom, 0px)); }
+  .nav-toggle-btn { display: none; }      /* the tab bar's "More" replaces the Menu button */
+}
+
+@media print { header.top, .tabbar, .term-chip, .mobile-nav-backdrop, .skip-link { display: none !important; } }
+
+/* Inline status colours in tables (grade numbers) also get the darker, readable text colours */
+b[style*="var(--p)"] { color: var(--p-ink) !important; }
+b[style*="var(--x)"] { color: var(--x-ink) !important; }

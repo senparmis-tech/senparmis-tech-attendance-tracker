@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="en"><head>
 <meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, maximum-scale=1">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#2563eb">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="default">
@@ -15,7 +15,8 @@
   }
 })();
 </script>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"></head><body>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"></head><body class="{{ 'has-tabbar' if role == 'teacher' }}">
+<a class="skip-link" href="#main">Skip to content</a>
 <header class="top">
   <div class="header-inner">
     <a href="{{ url_for('dashboard') if role == 'teacher' else (url_for('records') if role == 'student' else url_for('login')) }}" class="brand">
@@ -177,8 +178,8 @@
   {% endif %}
 </header>
 <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
-<main>
-{% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}">{{ m }}</div>{% endfor %}{% endwith %}
+<main id="main" tabindex="-1">
+{% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}" role="{{ 'alert' if cat == 'err' else 'status' }}"><span>{{ m }}</span></div>{% endfor %}{% endwith %}
 {% if term_label %}<div class="term-chip {{ 'locked' if term_locked }}"><span>Term: <b>{{ term_label }}</b></span>{% if term_locked %}<span class="badge done">🔒 Locked</span>{% endif %}{% if term_url %}<a href="{{ term_url }}">Manage terms</a>{% endif %}</div>{% endif %}
 {% if tabs %}<div class="tabs">{% for t in tabs %}<a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
 {% if section_tabs and section_tabs|length > 1 %}
@@ -189,6 +190,15 @@
 {% endif %}
 {% block body %}{% endblock %}
 </main>
+{% if role == 'teacher' %}
+<nav class="tabbar" aria-label="Quick navigation">
+  <a href="{{ url_for('dashboard') }}" class="{{ 'on' if page=='dashboard' }}"><span class="ti" aria-hidden="true">🏠</span>Home</a>
+  <a href="{{ url_for('mark') }}" class="{{ 'on' if page=='mark' }}"><span class="ti" aria-hidden="true">✓</span>Attendance</a>
+  <a href="{{ url_for('grades_page') }}" class="{{ 'on' if page=='grades' }}"><span class="ti" aria-hidden="true">🎓</span>Grades</a>
+  <a href="{{ url_for('records') }}" class="{{ 'on' if page in ('records',) }}"><span class="ti" aria-hidden="true">📊</span>Records</a>
+  <button type="button" id="tabMoreBtn" aria-expanded="false" aria-controls="mobileNavPanel"><span class="ti" aria-hidden="true">☰</span>More</button>
+</nav>
+{% endif %}
 <script>
 const nBtn = document.getElementById('navToggleBtn');
 const nPan = document.getElementById('mobileNavPanel');
@@ -198,14 +208,18 @@ function setMenuOpen(open) {
   nPan.classList.toggle('open', open);
   nBtn.classList.toggle('open', open);
   nBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+  const mb = document.getElementById('tabMoreBtn'); if (mb) mb.setAttribute('aria-expanded', open ? 'true' : 'false');
   if (nBack) nBack.classList.toggle('open', open);
 }
 if (nBtn && nPan) {
   nBtn.onclick = () => setMenuOpen(!nPan.classList.contains('open'));
   if (nBack) nBack.onclick = () => setMenuOpen(false);
+  const moreBtn = document.getElementById('tabMoreBtn');
+  if (moreBtn) moreBtn.onclick = () => setMenuOpen(!nPan.classList.contains('open'));
   document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenuOpen(false); });
   window.addEventListener('resize', () => { if (window.innerWidth > 960) setMenuOpen(false); });
 }
+document.querySelectorAll('.nav-item.on,.mnav-tile.on,.mnav-chip.on,.tool-link.on,.tabbar a.on').forEach(a => a.setAttribute('aria-current', 'page'));
 const tBtn = document.getElementById('themeToggleBtn');
 function syncThemeBtn() {
   if (!tBtn) return;
