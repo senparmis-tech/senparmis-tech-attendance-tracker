@@ -1,52 +1,113 @@
 {% extends "base.html" %}
+{% block title %}Dashboard · Eclaro Academy Attendance{% endblock %}
 {% block body %}
-<h1>Dashboard <span class="muted" style="font-size:15px;font-weight:400">· {{ today_label }}</span></h1>
-{% if not cards %}<div class="card">No subject sheets found. Go to <a href="{{ url_for('students') }}">Students &amp; subjects</a> to add one.</div>{% endif %}
+<div style="margin-bottom:16px">
+  <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">Faculty &amp; Class Monitoring</div>
+  <h1 style="margin:2px 0 6px">Class Rosters <span class="muted" style="font-size:15px;font-weight:400">· {{ today_label }}</span></h1>
+</div>
+
+{% if not cards %}
+<div class="card" style="padding:28px 20px;text-align:center">
+  <h3 style="margin:0 0 8px">No Subject Sections Found</h3>
+  <p class="muted" style="margin:0 0 16px;font-size:14px">There are currently no active class sheets assigned to your account.</p>
+  {% if not is_monitor %}
+  <a class="btn primary" href="{{ url_for('students') }}">Set Up Subject &amp; Students</a>
+  {% endif %}
+</div>
+{% endif %}
+
 <div class="grid2">
 {% for c in cards %}
-<div class="card" style="padding:{% if c.image_url %}0 0 16px{% else %}16px{% endif %};overflow:hidden">
+<div class="card" style="padding:{% if c.image_url %}0 0 16px{% else %}16px{% endif %};overflow:hidden;border:1px solid var(--line);border-radius:12px">
   {% if c.image_url %}
-  <div style="height:115px;width:100%;overflow:hidden;position:relative;background:#e2e8f0">
+  <div style="height:115px;width:100%;overflow:hidden;position:relative;background:#0a2d52">
     <img src="{{ c.image_url }}" alt="{{ c.name }}" style="width:100%;height:100%;object-fit:cover">
-    <div style="position:absolute;inset:0;background:linear-gradient(to top, rgba(15,23,42,0.72) 0%, rgba(15,23,42,0.1) 60%, transparent 100%)"></div>
+    <div style="position:absolute;inset:0;background:linear-gradient(to top, rgba(10,45,82,0.88) 0%, rgba(10,45,82,0.2) 60%, transparent 100%)"></div>
     <div style="position:absolute;bottom:10px;left:14px;right:14px;display:flex;justify-content:space-between;align-items:flex-end">
-      <h2 style="margin:0;color:#fff;font-size:19px;text-shadow:0 1px 4px rgba(0,0,0,0.8)">{{ c.name }}{% if c.section %} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ c.section }}</span>{% endif %}</h2>
-      {% if c.today %}<span class="badge done" style="box-shadow:0 2px 6px rgba(0,0,0,0.4)">Today marked</span>{% else %}<span class="badge todo" style="box-shadow:0 2px 6px rgba(0,0,0,0.4)">Today not marked</span>{% endif %}
+      <h2 style="margin:0;color:#fff;font-size:18px;text-shadow:0 1px 4px rgba(0,0,0,0.8)">
+        {{ c.name }}
+        {% if c.section %}
+        <span class="badge" style="background:#fff;color:#0a2d52;font-size:12px;font-weight:800;vertical-align:middle;margin-left:4px">{{ c.section }}</span>
+        {% endif %}
+      </h2>
+      {% if c.today %}
+      <span class="badge done" style="box-shadow:0 2px 6px rgba(0,0,0,0.4)">Recorded</span>
+      {% else %}
+      <span class="badge todo" style="box-shadow:0 2px 6px rgba(0,0,0,0.4)">Roll Call Pending</span>
+      {% endif %}
     </div>
   </div>
   {% else %}
-  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px">
-    <h2 style="margin:0">{{ c.name }}{% if c.section %} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ c.section }}</span>{% endif %}</h2>
-    {% if c.today %}<span class="badge done">Today marked</span>{% else %}<span class="badge todo">Today not marked</span>{% endif %}
+  <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;padding-bottom:10px;border-bottom:1px solid var(--line)">
+    <h2 style="margin:0;font-size:17px">
+      {{ c.name }}
+      {% if c.section %}
+      <span class="badge" style="background:var(--ebg);color:var(--brand);border:1px solid var(--line);font-size:12px;font-weight:800;vertical-align:middle;margin-left:4px">{{ c.section }}</span>
+      {% endif %}
+    </h2>
+    {% if c.today %}
+    <span class="badge done">Recorded</span>
+    {% else %}
+    <span class="badge todo">Roll Call Pending</span>
+    {% endif %}
   </div>
   {% endif %}
-  <div style="{% if c.image_url %}padding:12px 16px 0{% endif %}">
+
+  <div style="{% if c.image_url %}padding:14px 16px 0{% else %}padding-top:10px{% endif %}">
     <!-- Term badge -->
     {% if c.term_label %}
-    <div style="margin-top:{% if c.image_url %}4px{% else %}4px{% endif %};margin-bottom:6px">
-      <span style="font-size:12px;background:var(--ebg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-weight:600;display:inline-flex;align-items:center;gap:4px">
-        📌 {{ c.term_label }}{% if c.term_locked %} 🔒{% endif %}
+    <div style="margin-bottom:8px">
+      <span style="font-size:11.5px;background:var(--ebg);border:1px solid var(--line);border-radius:6px;padding:3px 8px;font-weight:700;display:inline-flex;align-items:center;gap:5px;color:var(--ink)">
+        Term: {{ c.term_label }}{% if c.term_locked %} <span style="color:var(--muted);font-weight:500">[Locked]</span>{% endif %}
       </span>
     </div>
     {% endif %}
-    <div class="muted" style="margin-top:2px">{{ c.n_students }} students · {{ c.held }} class days recorded{% if c.avg is not none %} · average {{ (c.avg*100)|round|int }}%{% endif %}</div>
+
+    <div class="muted" style="font-size:13px;line-height:1.4">
+      <strong>{{ c.n_students }}</strong> students enrolled · <strong>{{ c.held }}</strong> class days held
+      {% if c.avg is not none %} · average <strong style="color:var(--ink)">{{ (c.avg*100)|round|int }}%</strong>{% endif %}
+    </div>
+
     {% if c.today %}
-    <div class="stats">
+    <div class="stats" style="margin:12px 0">
       <div class="stat s-p"><b>{{ c.today.p }}</b><span>Present</span></div>
       <div class="stat s-x"><b>{{ c.today.x }}</b><span>Absent</span></div>
       <div class="stat s-l"><b>{{ c.today.l }}</b><span>Late</span></div>
       <div class="stat s-e"><b>{{ c.today.e }}</b><span>Excused</span></div>
       <div class="stat s-r"><b>{{ c.today.r }}</b><span>Recited</span></div>
     </div>
-    {% if c.absent_today %}<div>Absent today: {% for n in c.absent_today %}<span class="chip">{{ n }}</span>{% endfor %}</div>{% endif %}
-    <p style="margin:10px 0 0"><a class="btn small" href="{{ url_for('mark', subject=c.name, date=today_iso) }}">Edit today</a></p>
-    {% else %}
-    <p style="margin:14px 0 4px"><a class="btn primary" href="{{ url_for('mark', subject=c.name) }}">Mark attendance now</a></p>
+    {% if c.absent_today %}
+    <div style="font-size:12.5px;margin-bottom:10px">
+      <span class="muted">Absent today:</span>
+      {% for n in c.absent_today %}
+      <span class="chip" style="font-size:12px">{{ n }}</span>
+      {% endfor %}
+    </div>
     {% endif %}
+    <div style="margin-top:12px">
+      <a class="btn small" style="width:100%;justify-content:center" href="{{ url_for('mark', subject=c.name, date=today_iso) }}">Update Today's Record</a>
+    </div>
+    {% else %}
+    <div style="margin-top:14px">
+      <a class="btn primary" style="width:100%;justify-content:center;padding:11px 14px;font-size:15px;font-weight:700" href="{{ url_for('mark', subject=c.name) }}">Take Roll Call</a>
+    </div>
+    {% endif %}
+
     {% if c.watch %}
-    <details><summary>Students below {{ (low*100)|int }}% ({{ c.watch|length }})</summary>
-      <table style="margin-top:6px">{% for s in c.watch %}<tr><td>{{ s.name }}</td><td class="n">{{ s.x }} absent</td><td class="n"><span class="pill low">{{ (s.rate*100)|round|int }}%</span></td></tr>{% endfor %}</table>
-    </details>
+    <div style="margin-top:12px">
+      <details style="background:var(--surface);border-radius:8px;padding:8px 10px">
+        <summary style="font-size:12.5px;font-weight:600;cursor:pointer;color:var(--x-ink)">Students below {{ (low*100)|int }}% attendance ({{ c.watch|length }})</summary>
+        <table style="margin-top:8px;width:100%;font-size:12.5px">
+          {% for s in c.watch %}
+          <tr>
+            <td style="padding:4px 0">{{ s.name }}</td>
+            <td class="n" style="padding:4px 0;color:var(--muted)">{{ s.x }} absent</td>
+            <td class="n" style="padding:4px 0"><span class="pill low">{{ (s.rate*100)|round|int }}%</span></td>
+          </tr>
+          {% endfor %}
+        </table>
+      </details>
+    </div>
     {% endif %}
   </div>
 </div>

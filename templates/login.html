@@ -1,21 +1,78 @@
 {% extends "base.html" %}
-{% block title %}Sign In{% endblock %}
+{% block title %}Sign In · Eclaro Academy Attendance Portal{% endblock %}
 {% block body %}
-<div class="card" style="max-width:410px;margin:30px auto;padding:24px 20px;text-align:center">
-  <div style="font-size:38px;margin-bottom:8px">🔒</div>
-  <h1 style="font-size:22px;margin:0 0 6px">Attendance Sign In</h1>
-  <p class="muted" style="margin:0 0 16px;font-size:14px">
-    {% if has_teachers %}
-    Sign in with your teacher username and password, or leave username blank for shared / student access.
-    {% else %}
-    Enter teacher password to manage attendance, or student password to view records.
-    {% endif %}
-  </p>
-  {% if error %}<div class="flash err" style="text-align:left">{{ error }}</div>{% endif %}
-  <form method="post" action="{{ url_for('login') }}">
-    <input type="text" name="username" value="{{ username or '' }}" autocomplete="username" placeholder="Username (optional for shared/student)" style="width:100%;margin-bottom:10px;padding:12px;font-size:15px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);outline:none">
-    <input type="password" name="password" autofocus autocomplete="current-password" placeholder="Enter password..." required style="width:100%;margin-bottom:14px;padding:12px;font-size:15px;border:1.5px solid var(--line);border-radius:10px;background:var(--card);color:var(--ink);outline:none">
-    <button class="btn primary" type="submit" style="width:100%;padding:12px;font-size:16px;border-radius:10px">Sign In</button>
-  </form>
+<div class="portal-wrap">
+  <div class="portal-grid">
+    <!-- Left Column: School Context & Role Guide -->
+    <div class="portal-banner">
+      <div class="portal-logo-wrap">
+        <img class="portal-logo-img" src="{{ url_for('static', filename='img/eclaro_logo.jpg') }}" alt="Eclaro Academy Logo">
+      </div>
+      <div class="portal-motto-tag">Learn Today. Lead Tomorrow.</div>
+      <h1 class="portal-title">College Attendance &amp; Grading System</h1>
+      <p class="portal-desc">
+        Official roll call monitoring, Philippine grading scale records (1.00–5.00), and term attendance sheets for Eclaro Academy college sections.
+      </p>
+
+      <div class="portal-guide-list">
+        <div class="portal-guide-item">
+          <div class="portal-guide-text">
+            <div class="portal-guide-title">Instructors &amp; Faculty</div>
+            <div class="portal-guide-body">Sign in with your faculty username to record daily roll call, manage students, and compute term grades.</div>
+          </div>
+        </div>
+        <div class="portal-guide-item monitor">
+          <div class="portal-guide-text">
+            <div class="portal-guide-title">Section Attendance Monitors</div>
+            <div class="portal-guide-body">Sign in with your designated monitor account to mark attendance and manage rosters for your assigned section.</div>
+          </div>
+        </div>
+        <div class="portal-guide-item student">
+          <div class="portal-guide-text">
+            <div class="portal-guide-title">Students (Read-Only)</div>
+            <div class="portal-guide-body">Leave the username blank and enter the student access key to check your personal attendance history.</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="portal-meta">
+        <div><strong>Eclaro Academy</strong> · College Department</div>
+        <div>Computer Science &amp; Information Technology Class Records</div>
+      </div>
+    </div>
+
+    <!-- Right Column: Clean, Touch-Friendly Sign-In Card -->
+    <div class="portal-card">
+      <div class="portal-card-header">
+        <h2 class="portal-card-title">Sign In</h2>
+        <p class="portal-card-subtitle">
+          {% if has_teachers %}
+          Enter your faculty / monitor account, or leave username blank for student access.
+          {% else %}
+          Enter your teacher password to manage attendance, or student password to view records.
+          {% endif %}
+        </p>
+      </div>
+
+      {% if error %}
+      <div class="flash err" style="margin-bottom: 14px;">{{ error }}</div>
+      {% endif %}
+
+      <form method="post" action="{{ url_for('login') }}">
+        <div class="portal-field">
+          <label for="username">Username</label>
+          <input type="text" id="username" name="username" value="{{ username or '' }}" autocomplete="username" placeholder="e.g. prof_name (or blank for student)">
+          <div class="portal-hint">Students: Leave blank to view class records.</div>
+        </div>
+
+        <div class="portal-field">
+          <label for="password">Password or Student Key</label>
+          <input type="password" id="password" name="password" autofocus autocomplete="current-password" placeholder="Enter password or access key" required>
+        </div>
+
+        <button class="btn primary" type="submit" style="width:100%;margin-top:8px;font-size:16px;padding:12px">Sign In to Workspace</button>
+      </form>
+    </div>
+  </div>
 </div>
 {% endblock %}
