@@ -47,21 +47,27 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
 <!-- ===== TOP ACTION BAR ===== -->
 <div class="stu-action-bar">
   {% if subjects %}
-  <details class="stu-drawer" style="flex:1 1 320px">
+  <details class="stu-drawer" style="flex:1 1 320px" {% if is_monitor %}open{% endif %}>
     <summary>➕ Add Students</summary>
     <div class="stu-drawer-body">
       <form method="post" action="{{ url_for('students_add') }}">
         <input type="hidden" name="section" value="{{ section or '' }}">
         <textarea name="names" rows="4" style="width:100%;box-sizing:border-box" placeholder="One name per line" required></textarea>
+        {% if is_monitor %}
+        <input type="hidden" name="subjects" value="{{ subject }}">
+        <p class="muted" style="font-size:12px;margin:8px 0">Adding to <b>{{ subject }}</b> (Section: <b>{{ section }}</b>).</p>
+        {% else %}
         <p style="margin:8px 0 4px;font-size:13px;font-weight:600">Add to subjects:</p>
         <p style="margin:0 0 8px">{% for s in subjects %}<label class="chk"><input type="checkbox" name="subjects" value="{{ s }}" {{ 'checked' if s==subject or not subject }}> {{ s }}</label>{% endfor %}</p>
         {% if section %}<p class="muted" style="font-size:12px;margin:0 0 8px">Adding to section <b>{{ section }}</b>.</p>{% endif %}
+        {% endif %}
         <button class="btn primary" type="submit">Add students</button>
       </form>
     </div>
   </details>
   {% endif %}
 
+  {% if not is_monitor %}
   <details class="stu-drawer" style="flex:1 1 280px">
     <summary>➕ New Subject</summary>
     <div class="stu-drawer-body">
@@ -81,6 +87,7 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
       {% endif %}
     </div>
   </details>
+  {% endif %}
 </div>
 
 {% if not subjects %}
@@ -109,7 +116,7 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
           </span>
           {% endif %}
         </div>
-        {% if period and not period.locked %}
+        {% if period and not period.locked and not is_monitor %}
         <!-- Inline term rename -->
         <details style="margin-top:6px">
           <summary style="font-size:12px;color:var(--brand);cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="font-size:10px">▸</span> ✏️ Edit term name</summary>
@@ -134,6 +141,7 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
     </div>
 
     <!-- danger actions -->
+    {% if not is_monitor %}
     <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
       <form class="inline" method="post" action="{{ url_for('subjects_delete') }}"
             onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject, all its sections, and all its attendance records. Are you sure?')">
@@ -141,6 +149,7 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
         <button class="btn small danger" type="submit">🗑 Delete Subject</button>
       </form>
     </div>
+    {% endif %}
   </div>
 
   <!-- ===== SECTION PILLS ===== -->
@@ -154,6 +163,7 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
   {% endif %}
 
   <!-- ===== SECTION & PICTURE MANAGEMENT ===== -->
+  {% if not is_monitor %}
   <details class="stu-drawer" style="margin-bottom:14px">
     <summary>🏷️ Manage Sections &amp; Picture</summary>
     <div class="stu-drawer-body" style="display:flex;flex-direction:column;gap:14px">
@@ -212,6 +222,7 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
       </div>
     </div>
   </details>
+  {% endif %}
 
   <!-- ===== STUDENT ROSTER ===== -->
   {% if rows %}
@@ -266,11 +277,13 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
         <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="row" value="{{ s.row }}"><input type="hidden" name="name" value="{{ s.name }}">
         <button class="btn small danger" type="submit">Remove</button>
       </form>
+      {% if not is_monitor %}
       <form class="inline" method="post" action="{{ url_for('students_remove') }}"
             onsubmit="return confirm('Remove {{ s.name|e }} from ALL subjects? Their marks are deleted everywhere.')">
         <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="name" value="{{ s.name }}"><input type="hidden" name="everywhere" value="1">
         <button class="btn small danger" type="submit" style="margin-top:4px">Remove from all</button>
       </form>
+      {% endif %}
     </td>
   </tr>
   {% endfor %}

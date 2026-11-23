@@ -740,6 +740,15 @@ def delete_date(subject, d, section=None):
 
 def add_students(subjects, names, section=None):
     def run(conn):
+        tid, is_adm, mon_sec = _current_teacher_filter()
+        if mon_sec is not None:
+            added, skipped = 0, []
+            for n in names:
+                if _enroll(conn, _student_id(conn, n), mon_sec):
+                    added += 1
+                else:
+                    skipped.append(f"{n}")
+            return added, skipped
         added, skipped = 0, []
         for sub in subjects:
             try:
@@ -764,8 +773,10 @@ def _refuse_if_locked_records(conn, enrollment_id, name):
 
 def remove_student(subject, row, name, everywhere, section=None):
     def run(conn):
+        tid, is_adm, mon_sec = _current_teacher_filter()
         if everywhere:
-            tid, is_adm, _mon = _current_teacher_filter()
+            if mon_sec is not None:
+                raise ValueError("Section monitors cannot remove students across all subjects.")
             if not is_adm and tid is not None:
                 rows = conn.execute(
                     "SELECT e.id FROM enrollments e JOIN sections sec ON sec.id = e.section_id "
@@ -840,6 +851,8 @@ def delete_subject(name):
 
     def run(conn):
         tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot delete subjects.")
         row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
         if not row:
             raise ValueError("That subject was not found.")
@@ -857,6 +870,8 @@ def delete_subject(name):
 def add_subject(name, copy_from, teacher_id=None, section_name=None):
     def run(conn):
         tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot create subjects.")
         owner = teacher_id if is_adm else (tid or teacher_id)
         if conn.execute("SELECT 1 FROM subjects WHERE name = ?", (name,)).fetchone():
             raise ValueError("A subject with that name already exists.")
@@ -879,6 +894,8 @@ def add_section(subject, section_name, copy_from_section=None):
 
     def run(conn):
         tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot create sections.")
         srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
         if not srow:
             raise ValueError("That subject was not found.")
@@ -909,6 +926,9 @@ def rename_section(subject, old_name, new_name):
         raise ValueError("Please enter a valid section name.")
 
     def run(conn):
+        tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot rename sections.")
         sec_id = _section_of(conn, subject, old_name)
         srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
         conflict = conn.execute(
@@ -927,6 +947,8 @@ def delete_section(subject, section_name):
 
     def run(conn):
         _tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot delete sections.")
         sec_id = _section_of(conn, subject, section_name)
         srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
         count = conn.execute("SELECT COUNT(*) FROM sections WHERE subject_id = ?", (srow["subject_id"],)).fetchone()[0]

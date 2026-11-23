@@ -45,10 +45,12 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
           <span>Records</span>
         </a>
+        {% if not is_monitor %}
         <a href="{{ url_for('grades_page') }}" title="Grades" class="nav-item {{ 'on' if page=='grades' }}">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
           <span>Grades</span>
         </a>
+        {% endif %}
         <a href="{{ url_for('students') }}" title="Students" class="nav-item {{ 'on' if page=='students' }}">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
           <span>Students</span>
@@ -88,6 +90,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span>Log</span>
         </a>
+        {% if not is_monitor %}
         <a href="{{ url_for('files_page') }}" class="tool-link {{ 'on' if page=='files' }}" title="Excel file info" aria-label="Excel file info">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
           <span>File</span>
@@ -96,6 +99,7 @@
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
           <span>Excel</span>
         </a>
+        {% endif %}
         <span class="nav-divider" aria-hidden="true"></span>
       </div>
       {% endif %}
@@ -134,10 +138,12 @@
         <span class="mnav-icon">📊</span>
         <span><b>Records</b><small>Full sheet &amp; print</small></span>
       </a>
+      {% if not is_monitor %}
       <a href="{{ url_for('grades_page') }}" class="mnav-tile {{ 'on' if page=='grades' }}">
         <span class="mnav-icon">🎓</span>
         <span><b>Grades</b><small>Exam, quiz &amp; activity</small></span>
       </a>
+      {% endif %}
       <a href="{{ url_for('scan') }}" class="mnav-tile {{ 'on' if page=='scan' }}">
         <span class="mnav-icon">📥</span>
         <span><b>Import</b><small>Meet CSV or photo</small></span>
@@ -157,10 +163,14 @@
     </div>
     <div class="mnav-section-label">Tools &amp; data</div>
     <div class="mnav-tools-row">
+      {% if not is_monitor %}
       <a href="{{ url_for('teachers_page') }}" class="mnav-chip {{ 'on' if page=='teachers' }}">👤 Teachers</a>
+      {% endif %}
       <a href="{{ url_for('log_page') }}" class="mnav-chip {{ 'on' if page=='log' }}">📝 Changes log</a>
+      {% if not is_monitor %}
       <a href="{{ url_for('files_page') }}" class="mnav-chip {{ 'on' if page=='files' }}">📁 Excel file</a>
       <a href="{{ url_for('download') }}" class="mnav-chip">⬇ Download .xlsx</a>
+      {% endif %}
     </div>
     {% if auth_on %}
     <div class="mnav-footer">
@@ -210,8 +220,13 @@
 <nav class="tabbar" aria-label="Quick navigation">
   <a href="{{ url_for('dashboard') }}" class="{{ 'on' if page=='dashboard' }}"><span class="ti" aria-hidden="true">🏠</span>Home</a>
   <a href="{{ url_for('mark') }}" class="{{ 'on' if page=='mark' }}"><span class="ti" aria-hidden="true">✓</span>Attendance</a>
+  {% if not is_monitor %}
   <a href="{{ url_for('grades_page') }}" class="{{ 'on' if page=='grades' }}"><span class="ti" aria-hidden="true">🎓</span>Grades</a>
+  {% endif %}
   <a href="{{ url_for('records') }}" class="{{ 'on' if page in ('records',) }}"><span class="ti" aria-hidden="true">📊</span>Records</a>
+  {% if is_monitor %}
+  <a href="{{ url_for('students') }}" class="{{ 'on' if page=='students' }}"><span class="ti" aria-hidden="true">👥</span>Students</a>
+  {% endif %}
   <button type="button" id="tabMoreBtn" aria-expanded="false" aria-controls="mobileNavPanel"><span class="ti" aria-hidden="true">☰</span>More</button>
 </nav>
 {% endif %}

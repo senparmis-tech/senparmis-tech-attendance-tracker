@@ -116,6 +116,26 @@ def fail_key():
 
 PUBLIC_ENDPOINTS = {"login", "logout", "static", "subject_image"}
 STUDENT_ENDPOINTS = {"records"}
+MONITOR_ALLOWED_ENDPOINTS = {
+    "dashboard",
+    "mark",
+    "api_save",
+    "scan",
+    "api_scan",
+    "api_set_key",
+    "records",
+    "print_sheet",
+    "dates_delete",
+    "import_meet",
+    "api_meet_alias",
+    "students",
+    "students_add",
+    "students_remove",
+    "students_profile",
+    "lookup",
+    "log_page",
+    "preview_monitor",
+}
 
 
 @app.context_processor
@@ -125,9 +145,11 @@ def inject_auth():
         "role": getattr(g, "role", None),
         "teacher_id": getattr(g, "teacher_id", None),
         "teacher_name": getattr(g, "teacher_name", None),
-        "is_admin": getattr(g, "is_admin", False),
+        "is_admin": False if getattr(g, "preview_section_id", None) else getattr(g, "is_admin", False),
         "is_monitor": getattr(g, "is_monitor", False),
         "monitor_section_name": getattr(g, "monitor_section_name", None),
+        "monitor_sec_name": getattr(g, "monitor_sec_name", None),
+        "monitor_sub_name": getattr(g, "monitor_sub_name", None),
         "preview_section_id": getattr(g, "preview_section_id", None),
         "auth_on": bool(cfg["teacher"] or list_teachers()),
     }
@@ -142,6 +164,8 @@ def gate():
     g.is_monitor = False
     g.monitor_section_id = None
     g.monitor_section_name = None
+    g.monitor_sec_name = None
+    g.monitor_sub_name = None
     g.preview_section_id = None
     if request.method == "POST":
         origin = request.headers.get("Origin")
@@ -162,9 +186,9 @@ def gate():
         return locked_page(problem)
     role, tid, tname, is_adm, mon_sec, preview_sec = _resolve_session()
     g.role, g.teacher_id, g.teacher_name, g.is_admin = role, tid, tname, is_adm
-    g.monitor_section_id = mon_sec
+    g.monitor_section_id = mon_sec or preview_sec
     g.preview_section_id = preview_sec
-    g.is_monitor = bool(mon_sec and not preview_sec)  # True only for real monitors, not admin-previewing
+    g.is_monitor = bool(mon_sec or preview_sec)
     # Load section name for monitor label in UI
     if mon_sec or preview_sec:
         sec_id = preview_sec or mon_sec
@@ -172,14 +196,23 @@ def gate():
             import db as _db
             conn = _db.connect()
             row = conn.execute(
-                "SELECT sec.name, sub.name AS sub_name FROM sections sec "
+                "SELECT sec.name AS sec_name, sub.name AS sub_name FROM sections sec "
                 "JOIN subjects sub ON sub.id = sec.subject_id WHERE sec.id = ?", (sec_id,)).fetchone()
             conn.close()
             if row:
-                g.monitor_section_name = f"{row['sub_name']} · {row['name']}"
+                g.monitor_section_name = f"{row['sub_name']} · {row['sec_name']}"
+                g.monitor_sec_name = row['sec_name']
+                g.monitor_sub_name = row['sub_name']
         except Exception:
             pass
     if request.endpoint in PUBLIC_ENDPOINTS:
+        return None
+    if g.is_monitor:
+        if request.endpoint not in MONITOR_ALLOWED_ENDPOINTS:
+            if request.path.startswith("/api/"):
+                return jsonify(ok=False, error="Section monitors do not have access to that feature."), 403
+            flash("You don't have access to that page.", "err")
+            return redirect(url_for("dashboard"))
         return None
     if role == "teacher" or (role == "student" and request.endpoint in STUDENT_ENDPOINTS):
         return None

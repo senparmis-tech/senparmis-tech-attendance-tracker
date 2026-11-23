@@ -68,7 +68,7 @@ def term_ctx(subject, section, period):
     if not subject or not period:
         return {}
     ctx = {"term_label": period["label"], "term_locked": period["locked"]}
-    if getattr(g, "role", None) == "teacher":
+    if getattr(g, "role", None) == "teacher" and not getattr(g, "is_monitor", False):
         ctx["term_url"] = url_for("periods_page", subject=subject, section=section)
     return ctx
 
@@ -115,7 +115,7 @@ def dashboard():
                 if code == "x":
                     absent.append(s["name"])
         watch = sorted([s for s in rated if s["rate"] < LOW_RATE], key=lambda s: s["rate"])
-        cards.append({"name": name, "n_students": len(stats), "held": len(sd["dates"]), "avg": avg,
+        cards.append({"name": name, "section": sd.get("section", ""), "n_students": len(stats), "held": len(sd["dates"]), "avg": avg,
                       "today": today_counts, "absent_today": absent, "watch": watch,
                       "image_url": subject_image_url(name),
                       "term_label": sd["period"]["label"] if sd.get("period") else "",
@@ -770,6 +770,20 @@ def sections_delete():
 @app.route("/log")
 def log_page():
     shown, total = read_log()
+    if getattr(g, "is_monitor", False):
+        sec_name = (getattr(g, "monitor_sec_name", "") or "").lower()
+        sub_name = (getattr(g, "monitor_sub_name", "") or "").lower()
+        tname = (getattr(g, "teacher_name", "") or "").lower()
+        filtered = []
+        for e in shown:
+            s_subj = (e.get("subject") or "").lower()
+            s_who = (e.get("who") or "").lower()
+            if (sec_name and f"({sec_name})" in s_subj) or \
+               (sub_name and sec_name and sub_name in s_subj and sec_name in s_subj) or \
+               (tname and tname in s_who):
+                filtered.append(e)
+        shown = filtered
+        total = len(shown)
     backups = list_backups()
     has_xlsx = os.path.isfile(XLSX)
     return render_template("log.html", page="log", shown=shown, total=total,
