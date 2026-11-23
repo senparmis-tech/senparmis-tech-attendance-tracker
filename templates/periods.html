@@ -22,6 +22,29 @@
     {{ current.n_dates }} class date{{ '' if current.n_dates == 1 else 's' }} and
     {{ current.n_items }} graded item{{ '' if current.n_items == 1 else 's' }} recorded so far in {{ subject }} ({{ section }}).
   </p>
+
+  <!-- ✏️ Rename current term (without locking) -->
+  <details style="margin-bottom:12px;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:12px 14px">
+    <summary style="font-weight:700;cursor:pointer;color:var(--brand);font-size:14px;list-style:none;display:flex;align-items:center;gap:6px">
+      <span style="font-size:11px">▸</span> ✏️ Rename / edit current term
+    </summary>
+    <form method="post" action="{{ url_for('periods_edit') }}" style="margin-top:12px;display:flex;flex-wrap:wrap;gap:12px;align-items:flex-end">
+      <input type="hidden" name="subject" value="{{ subject }}">
+      <input type="hidden" name="section" value="{{ section }}">
+      <input type="hidden" name="period_id" value="{{ current.id }}">
+      <label style="font-size:13px">Semester<br>
+        <input class="txt" name="semester" list="editSemList" value="{{ current.semester }}" maxlength="40" required style="width:150px">
+      </label>
+      <label style="font-size:13px">Term<br>
+        <input class="txt" name="term" list="editTermList" value="{{ current.term }}" maxlength="40" required style="width:150px">
+      </label>
+      <datalist id="editSemList">{% for s in semesters %}<option value="{{ s }}">{% endfor %}</datalist>
+      <datalist id="editTermList">{% for t in terms %}<option value="{{ t }}">{% endfor %}</datalist>
+      <button class="btn primary" type="submit">✏️ Save term name</button>
+    </form>
+    <p class="muted" style="font-size:12px;margin:8px 0 0">This only renames the term — attendance and grades are not affected.</p>
+  </details>
+
   <details {{ 'open' if current.n_dates or current.n_items }}>
     <summary>🔒 Lock this term and start the next one</summary>
     <form method="post" action="{{ url_for('periods_lock') }}" class="lockform"

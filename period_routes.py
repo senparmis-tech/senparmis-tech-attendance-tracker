@@ -13,7 +13,8 @@ from excel_period import build_period_workbook
 from helpers import clean_name, log_change
 from routes import make_section_tabs, make_tabs, pick_section, pick_subject
 from store import (SEMESTER_NAMES, TERM_NAMES, list_periods, load_data, load_grades,
-                   load_period_data, lock_period, suggest_next_period, unlock_period)
+                   load_period_data, lock_period, suggest_next_period, unlock_period,
+                   update_period)
 from web import app
 
 
@@ -42,6 +43,27 @@ def periods_page():
         is_admin=bool(getattr(g, "is_admin", False)),
         tabs=make_tabs(subjects, subject, "periods_page"),
         section_tabs=make_section_tabs(sec_names, section, subject, "periods_page"))
+
+
+@app.route("/periods/edit", methods=["POST"])
+def periods_edit():
+    """Rename the current open term (semester and term label) without locking it."""
+    subject, section = _args()
+    period_id = request.form.get("period_id", type=int)
+    semester = request.form.get("semester", "").strip()
+    term = request.form.get("term", "").strip()
+    try:
+        p = update_period(subject, section, semester, term, period_id)
+    except ValueError as err:
+        flash(str(err), "err")
+        return redirect(request.referrer or url_for("periods_page", subject=subject, section=section))
+    log_change("Term renamed", f"{subject} ({section or ''})",
+               f"Term updated to: {p['label']}")
+    flash(f"Term updated to '{p['label']}'.", "ok")
+    back = request.form.get("next", "")
+    if back == "students":
+        return redirect(url_for("students", subject=subject, section=section))
+    return redirect(url_for("periods_page", subject=subject, section=section))
 
 
 @app.route("/periods/lock", methods=["POST"])

@@ -21,6 +21,14 @@
   </div>
   {% endif %}
   <div style="{% if c.image_url %}padding:12px 16px 0{% endif %}">
+    <!-- Term badge -->
+    {% if c.term_label %}
+    <div style="margin-top:{% if c.image_url %}4px{% else %}4px{% endif %};margin-bottom:6px">
+      <span style="font-size:12px;background:var(--ebg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-weight:600;display:inline-flex;align-items:center;gap:4px">
+        📌 {{ c.term_label }}{% if c.term_locked %} 🔒{% endif %}
+      </span>
+    </div>
+    {% endif %}
     <div class="muted" style="margin-top:2px">{{ c.n_students }} students · {{ c.held }} class days recorded{% if c.avg is not none %} · average {{ (c.avg*100)|round|int }}%{% endif %}</div>
     {% if c.today %}
     <div class="stats">

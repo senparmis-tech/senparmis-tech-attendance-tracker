@@ -263,6 +263,27 @@ def list_periods(subject, section=None):
         return out
 
 
+def update_period(subject, section, semester, term, period_id=None):
+    """Rename the current (or specified) term's semester and term label without locking it."""
+    sem, trm = _clean_label(semester, "semester"), _clean_label(term, "term")
+    ensure_db()
+
+    def run(conn):
+        sec = _section_of(conn, subject, section)
+        p = _get_period(conn, sec, period_id)
+        # collision check: same (sem, trm) already used by a *different* term
+        used = {(r["semester"].casefold(), r["term"].casefold())
+                for r in conn.execute(
+                    "SELECT semester, term FROM periods WHERE section_id = ? AND id != ?",
+                    (sec, p["id"]))}
+        if (sem.casefold(), trm.casefold()) in used:
+            raise ValueError(f"'{sem} · {trm}' is already used by another term of this subject.")
+        conn.execute("UPDATE periods SET semester = ?, term = ? WHERE id = ?",
+                     (sem, trm, p["id"]))
+        return _period_dict(conn.execute("SELECT * FROM periods WHERE id = ?", (p["id"],)).fetchone())
+    return mutate(run)
+
+
 def lock_period(subject, section, semester, term, next_semester, next_term):
     """Lock the section's open term (read-only from now on) and open a fresh, empty next term."""
     sem, trm = _clean_label(semester, "semester"), _clean_label(term, "term")

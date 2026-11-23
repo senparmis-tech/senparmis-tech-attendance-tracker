@@ -23,6 +23,7 @@ from store import (FileLocked, add_grade_item, add_section, add_students,
                    load_data, load_grades, load_period_data, reimport_from_excel,
                    remove_student, remove_subject_image, rename_section,
                    restore_backup, save_grade_scores, save_grade_weights,
+                   SEMESTER_NAMES, TERM_NAMES,
                    set_weights_lock, student_stats, subject_image_url,
                    update_student_profile)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
@@ -116,7 +117,9 @@ def dashboard():
         watch = sorted([s for s in rated if s["rate"] < LOW_RATE], key=lambda s: s["rate"])
         cards.append({"name": name, "n_students": len(stats), "held": len(sd["dates"]), "avg": avg,
                       "today": today_counts, "absent_today": absent, "watch": watch,
-                      "image_url": subject_image_url(name)})
+                      "image_url": subject_image_url(name),
+                      "term_label": sd["period"]["label"] if sd.get("period") else "",
+                      "term_locked": bool(sd["period"]["locked"]) if sd.get("period") else False})
     return render_template("dashboard.html", page="dashboard", cards=cards, low=LOW_RATE, today_iso=today.isoformat(),
                            today_label=today.strftime("%A, %B %d, %Y").replace(" 0", " "))
 
@@ -441,11 +444,14 @@ def students():
     sec_names, section, sd = pick_section(data.get(subject))
     rows = student_stats(sd) if subject else []
     subj_img = subject_image_url(subject) if subject else None
+    period = sd.get("period") if sd else None
     return render_template("students.html", page="students", subjects=subjects, subject=subject,
                            section=section, section_names=sec_names,
                            rows=rows, low=LOW_RATE, tabs=make_tabs(subjects, subject, "students"),
                            section_tabs=make_section_tabs(sec_names, section, subject, "students"),
-                           subject_img_url=subj_img)
+                           subject_img_url=subj_img, period=period,
+                           semesters=SEMESTER_NAMES, terms=TERM_NAMES,
+                           **term_ctx(subject, section, period))
 
 
 @app.route("/students/add", methods=["POST"])
