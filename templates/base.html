@@ -73,10 +73,17 @@
     <div class="header-actions">
       {% if role == 'teacher' %}
       <div class="desktop-tools">
+        {% if is_monitor %}
+        <span class="tool-link" style="cursor:default;opacity:0.8" title="Section Monitor — {{ monitor_section_name }}">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5Z"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
+          <span style="color:#7c3aed">{{ teacher_name }}</span>
+        </span>
+        {% else %}
         <a href="{{ url_for('teachers_page') }}" class="tool-link {{ 'on' if page=='teachers' }}" title="{{ teacher_name if teacher_name and teacher_name != 'Admin' else 'Teachers' }} &amp; access" aria-label="Teachers &amp; access">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5Z"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
           <span>{{ teacher_name if teacher_name and teacher_name != 'Admin' else 'Teachers' }}</span>
         </a>
+        {% endif %}
         <a href="{{ url_for('log_page') }}" class="tool-link {{ 'on' if page=='log' }}" title="Changes log" aria-label="Changes log">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
           <span>Log</span>
@@ -180,6 +187,15 @@
 <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
 <main id="main" tabindex="-1">
 {% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}" role="{{ 'alert' if cat == 'err' else 'status' }}"><span>{{ m }}</span></div>{% endfor %}{% endwith %}
+{% if preview_section_id %}
+<div class="flash ok" role="status" style="background:#7c3aed;border-color:#6d28d9;display:flex;justify-content:space-between;align-items:center">
+  <span>👁 <b>Preview mode:</b> viewing as Section Monitor for <b>{{ monitor_section_name or 'a section' }}</b></span>
+  <form method="post" action="{{ url_for('preview_monitor') }}" style="margin:0">
+    <input type="hidden" name="section_id" value="">
+    <button type="submit" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;padding:3px 10px;border-radius:6px;cursor:pointer;font-size:13px">Exit Preview</button>
+  </form>
+</div>
+{% endif %}
 {% if term_label %}<div class="term-chip {{ 'locked' if term_locked }}"><span>Term: <b>{{ term_label }}</b></span>{% if term_locked %}<span class="badge done">🔒 Locked</span>{% endif %}{% if term_url %}<a href="{{ term_url }}">Manage terms</a>{% endif %}</div>{% endif %}
 {% if tabs %}<div class="tabs">{% for t in tabs %}<a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
 {% if section_tabs and section_tabs|length > 1 %}

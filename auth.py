@@ -13,7 +13,7 @@ from markupsafe import escape
 from config import MIN_PASSWORD, OPEN_MODE, PASSWORD_FILE
 from helpers import log_change
 from store import (assign_subject_teacher, create_teacher, delete_teacher,
-                   get_teacher, list_subjects_with_owners, list_teachers,
+                   get_teacher, list_all_sections, list_subjects_with_owners, list_teachers,
                    update_teacher_password, verify_teacher)
 from web import app
 
@@ -67,19 +67,22 @@ def pw_version(role, cfg, extra=""):
 
 
 def _resolve_session():
-    """Return (role, teacher_id, teacher_name, is_admin) for the current session."""
+    """Return (role, teacher_id, teacher_name, is_admin, monitor_section_id) for the current session."""
     cfg = read_passwords()
     role = session.get("role")
     tid = session.get("teacher_id")
     if role == "teacher" and tid:
         t = get_teacher(tid)
         if t and hmac.compare_digest(str(session.get("pv", "")), pw_version("teacher_db", cfg, t["password_hash"])):
-            return "teacher", t["id"], t["display_name"], bool(t["is_admin"])
-        return None, None, None, False
+            mon_sec = t.get("monitor_section_id")
+            # Preview-as-monitor: admin toggles session["preview_section_id"]
+            preview_sec = session.get("preview_section_id")
+            return "teacher", t["id"], t["display_name"], bool(t["is_admin"]), mon_sec, preview_sec
+        return None, None, None, False, None, None
     if role in ("teacher", "student") and cfg.get(role) and hmac.compare_digest(
             str(session.get("pv", "")), pw_version(role, cfg)):
-        return role, None, ("Admin" if role == "teacher" else None), (role == "teacher")
-    return None, None, None, False
+        return role, None, ("Admin" if role == "teacher" else None), (role == "teacher"), None, None
+    return None, None, None, False, None, None
 
 
 def current_role():
@@ -123,6 +126,9 @@ def inject_auth():
         "teacher_id": getattr(g, "teacher_id", None),
         "teacher_name": getattr(g, "teacher_name", None),
         "is_admin": getattr(g, "is_admin", False),
+        "is_monitor": getattr(g, "is_monitor", False),
+        "monitor_section_name": getattr(g, "monitor_section_name", None),
+        "preview_section_id": getattr(g, "preview_section_id", None),
         "auth_on": bool(cfg["teacher"] or list_teachers()),
     }
 
@@ -133,6 +139,10 @@ def gate():
     g.teacher_id = None
     g.teacher_name = None
     g.is_admin = False
+    g.is_monitor = False
+    g.monitor_section_id = None
+    g.monitor_section_name = None
+    g.preview_section_id = None
     if request.method == "POST":
         origin = request.headers.get("Origin")
         allowed_hosts = {request.host, request.headers.get("X-Forwarded-Host", "").split(",")[0].strip()}
@@ -150,8 +160,25 @@ def gate():
     problem = password_problem(cfg)
     if problem:
         return locked_page(problem)
-    role, tid, tname, is_adm = _resolve_session()
+    role, tid, tname, is_adm, mon_sec, preview_sec = _resolve_session()
     g.role, g.teacher_id, g.teacher_name, g.is_admin = role, tid, tname, is_adm
+    g.monitor_section_id = mon_sec
+    g.preview_section_id = preview_sec
+    g.is_monitor = bool(mon_sec and not preview_sec)  # True only for real monitors, not admin-previewing
+    # Load section name for monitor label in UI
+    if mon_sec or preview_sec:
+        sec_id = preview_sec or mon_sec
+        try:
+            import db as _db
+            conn = _db.connect()
+            row = conn.execute(
+                "SELECT sec.name, sub.name AS sub_name FROM sections sec "
+                "JOIN subjects sub ON sub.id = sec.subject_id WHERE sec.id = ?", (sec_id,)).fetchone()
+            conn.close()
+            if row:
+                g.monitor_section_name = f"{row['sub_name']} · {row['name']}"
+        except Exception:
+            pass
     if request.endpoint in PUBLIC_ENDPOINTS:
         return None
     if role == "teacher" or (role == "student" and request.endpoint in STUDENT_ENDPOINTS):
@@ -228,10 +255,12 @@ def logout():
 # -------------------------------------------------------- teacher management
 @app.route("/teachers")
 def teachers_page():
+    from store import list_all_sections
     return render_template(
         "teachers.html", page="teachers",
         teachers=list_teachers(),
         subjects=list_subjects_with_owners() if g.is_admin else [],
+        all_sections=list_all_sections() if g.is_admin else [],
     )
 
 
@@ -244,10 +273,17 @@ def teachers_add():
     display_name = request.form.get("display_name", "").strip()
     password = request.form.get("password", "").strip()
     is_adm = request.form.get("is_admin") == "1"
+    is_mon = request.form.get("is_monitor") == "1"
+    monitor_section_id = request.form.get("monitor_section_id", "").strip() or None
+    if is_mon and not monitor_section_id:
+        flash("Pick the section this monitor will manage.", "err")
+        return redirect(url_for("teachers_page"))
     try:
-        create_teacher(username, display_name, password, is_admin=is_adm)
-        log_change("Teacher added", "", f"Created teacher '{display_name or username}' ({username})")
-        flash(f"Created teacher account '{username}'.", "ok")
+        create_teacher(username, display_name, password, is_admin=is_adm,
+                       monitor_section_id=monitor_section_id if is_mon else None)
+        role_label = "admin" if is_adm else ("section monitor" if is_mon else "teacher")
+        log_change("Teacher added", "", f"Created {role_label} '{display_name or username}' ({username})")
+        flash(f"Created {role_label} account '{username}'.", "ok")
     except ValueError as err:
         flash(str(err), "err")
     return redirect(url_for("teachers_page"))
@@ -314,3 +350,23 @@ def teachers_assign_subject():
     except ValueError as err:
         flash(str(err), "err")
     return redirect(url_for("teachers_page"))
+
+
+# -------------------------------------------------------- preview-as-monitor toggle
+@app.route("/preview_monitor", methods=["POST"])
+def preview_monitor():
+    """Admin only: toggle a 'preview as monitor' mode to see what a section monitor would see."""
+    if not g.is_admin:
+        flash("Only an admin can use preview mode.", "err")
+        return redirect(url_for("dashboard"))
+    sec_id_raw = request.form.get("section_id", "").strip()
+    if sec_id_raw:
+        try:
+            session["preview_section_id"] = int(sec_id_raw)
+            flash("👁 Previewing as Section Monitor. Click 'Exit Preview' to return to your admin view.", "ok")
+        except ValueError:
+            flash("Invalid section.", "err")
+    else:
+        session.pop("preview_section_id", None)
+        flash("Exited monitor preview — back to your admin view.", "ok")
+    return redirect(url_for("dashboard"))

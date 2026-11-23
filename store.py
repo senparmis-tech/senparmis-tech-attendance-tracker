@@ -40,12 +40,22 @@ def key_of(name):
 
 # ------------------------------------------------------------------ set-up
 def _current_teacher_filter():
-    """Return (teacher_id, is_admin) from Flask request context if a non-admin teacher is logged in."""
+    """Return (teacher_id, is_admin, monitor_section_id) from Flask request context.
+
+    - Admin:   teacher_id=X, is_admin=True,  monitor_section_id=None  → sees everything
+    - Teacher: teacher_id=X, is_admin=False, monitor_section_id=None  → sees assigned subjects
+    - Monitor: teacher_id=X, is_admin=False, monitor_section_id=Y     → sees only that section
+    """
     if has_request_context():
         tid = getattr(g, "teacher_id", None)
         is_adm = getattr(g, "is_admin", True)
-        return tid, bool(is_adm)
-    return None, True
+        mon_sec = getattr(g, "monitor_section_id", None)
+        # Preview-as-monitor: admin can toggle a session flag to preview a monitor's view
+        preview_sec = getattr(g, "preview_section_id", None)
+        if preview_sec is not None:
+            return tid, False, preview_sec
+        return tid, bool(is_adm), mon_sec
+    return None, True, None
 
 
 def _insert_subject(conn, name, teacher_id=None, section_name=None):
@@ -322,7 +332,7 @@ def lock_period(subject, section, semester, term, next_semester, next_term):
 def unlock_period(subject, section, period_id):
     """Admin only: reopen the most recent locked term, as long as the term after it is still empty."""
     def run(conn):
-        _tid, is_adm = _current_teacher_filter()
+        _tid, is_adm, _mon = _current_teacher_filter()
         if not is_adm:
             raise ValueError("Only an admin can reopen a locked term.")
         sec = _section_of(conn, subject, section)
@@ -363,11 +373,11 @@ def _has_locked_terms(conn, where, arg):
 
 # ------------------------------------------------------------ reading data
 def _section_of(conn, subject, section=None):
-    tid, is_adm = _current_teacher_filter()
+    tid, is_adm, mon_sec = _current_teacher_filter()
     srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
     if not srow:
         raise ValueError("That subject was not found.")
-    if not is_adm and tid is not None and srow["teacher_id"] != tid:
+    if not is_adm and tid is not None and mon_sec is None and srow["teacher_id"] != tid:
         raise ValueError("You do not have permission to modify that subject.")
     sec_name = clean_name(section or "")
     if sec_name:
@@ -375,6 +385,17 @@ def _section_of(conn, subject, section=None):
                            (srow["id"], sec_name)).fetchone()
         if not row:
             raise ValueError("That section was not found in this subject.")
+        # Monitor: enforce their section only
+        if mon_sec is not None and row["id"] != mon_sec:
+            raise ValueError("You do not have permission to access that section.")
+        return row["id"]
+    # No explicit section — monitors get routed to their section automatically
+    if mon_sec is not None:
+        # Verify this monitor's section belongs to this subject
+        row = conn.execute("SELECT id FROM sections WHERE id = ? AND subject_id = ?",
+                           (mon_sec, srow["id"])).fetchone()
+        if not row:
+            raise ValueError("You do not have permission to access that subject.")
         return row["id"]
     row = conn.execute("SELECT id FROM sections WHERE subject_id = ? ORDER BY id LIMIT 1",
                        (srow["id"],)).fetchone()
@@ -415,19 +436,32 @@ def _dates_cells(conn, sec, period_id):
 def load_data(teacher_id=None, is_admin=None):
     """Every subject's students and attendance for its OPEN term."""
     if teacher_id is None and is_admin is None:
-        teacher_id, is_admin = _current_teacher_filter()
+        teacher_id, is_admin, monitor_section_id = _current_teacher_filter()
+    else:
+        _, _, monitor_section_id = _current_teacher_filter()
     with _Tx() as conn:
         out = {}
-        if not is_admin and teacher_id is not None:
+        if not is_admin and teacher_id is not None and monitor_section_id is None:
             subjects = conn.execute(
                 "SELECT s.id, s.name FROM subjects s WHERE s.teacher_id = ? ORDER BY s.position, s.id",
                 (teacher_id,)).fetchall()
+        elif monitor_section_id is not None:
+            # Monitor: show only the subject that contains their section
+            subjects = conn.execute(
+                "SELECT s.id, s.name FROM subjects s "
+                "JOIN sections sec ON sec.subject_id = s.id "
+                "WHERE sec.id = ? ORDER BY s.position, s.id",
+                (monitor_section_id,)).fetchall()
         else:
             subjects = conn.execute(
                 "SELECT s.id, s.name FROM subjects s ORDER BY s.position, s.id").fetchall()
         for sub in subjects:
-            secs = conn.execute(
-                "SELECT id, name FROM sections WHERE subject_id = ? ORDER BY id", (sub["id"],)).fetchall()
+            if monitor_section_id is not None:
+                secs = conn.execute(
+                    "SELECT id, name FROM sections WHERE id = ?", (monitor_section_id,)).fetchall()
+            else:
+                secs = conn.execute(
+                    "SELECT id, name FROM sections WHERE subject_id = ? ORDER BY id", (sub["id"],)).fetchall()
             if not secs:
                 continue
             sections_map = {}
@@ -731,7 +765,7 @@ def _refuse_if_locked_records(conn, enrollment_id, name):
 def remove_student(subject, row, name, everywhere, section=None):
     def run(conn):
         if everywhere:
-            tid, is_adm = _current_teacher_filter()
+            tid, is_adm, _mon = _current_teacher_filter()
             if not is_adm and tid is not None:
                 rows = conn.execute(
                     "SELECT e.id FROM enrollments e JOIN sections sec ON sec.id = e.section_id "
@@ -805,7 +839,7 @@ def delete_subject(name):
     backup_workbook("before_delete_subject", min_gap_min=0)
 
     def run(conn):
-        tid, is_adm = _current_teacher_filter()
+        tid, is_adm, _mon = _current_teacher_filter()
         row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
         if not row:
             raise ValueError("That subject was not found.")
@@ -822,7 +856,7 @@ def delete_subject(name):
 
 def add_subject(name, copy_from, teacher_id=None, section_name=None):
     def run(conn):
-        tid, is_adm = _current_teacher_filter()
+        tid, is_adm, _mon = _current_teacher_filter()
         owner = teacher_id if is_adm else (tid or teacher_id)
         if conn.execute("SELECT 1 FROM subjects WHERE name = ?", (name,)).fetchone():
             raise ValueError("A subject with that name already exists.")
@@ -844,7 +878,7 @@ def add_section(subject, section_name, copy_from_section=None):
         raise ValueError("Please enter a valid section name (e.g. BSCS-1A).")
 
     def run(conn):
-        tid, is_adm = _current_teacher_filter()
+        tid, is_adm, _mon = _current_teacher_filter()
         srow = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (subject,)).fetchone()
         if not srow:
             raise ValueError("That subject was not found.")
@@ -892,7 +926,7 @@ def delete_section(subject, section_name):
     backup_workbook("before_delete_section", min_gap_min=0)
 
     def run(conn):
-        _tid, is_adm = _current_teacher_filter()
+        _tid, is_adm, _mon = _current_teacher_filter()
         sec_id = _section_of(conn, subject, section_name)
         srow = conn.execute("SELECT subject_id FROM sections WHERE id = ?", (sec_id,)).fetchone()
         count = conn.execute("SELECT COUNT(*) FROM sections WHERE subject_id = ?", (srow["subject_id"],)).fetchone()[0]
@@ -909,36 +943,53 @@ def delete_section(subject, section_name):
 def list_teachers():
     with _Tx() as conn:
         rows = conn.execute(
-            "SELECT t.id, t.username, t.display_name, t.is_admin, t.created_at, "
-            "(SELECT COUNT(*) FROM subjects s WHERE s.teacher_id = t.id) AS n_subjects "
-            "FROM teachers t ORDER BY t.is_admin DESC, t.display_name, t.username").fetchall()
+            "SELECT t.id, t.username, t.display_name, t.is_admin, t.is_monitor, t.monitor_section_id, t.created_at, "
+            "(SELECT COUNT(*) FROM subjects s WHERE s.teacher_id = t.id) AS n_subjects, "
+            "sec.name AS monitor_section_name, sub.name AS monitor_subject_name "
+            "FROM teachers t "
+            "LEFT JOIN sections sec ON sec.id = t.monitor_section_id "
+            "LEFT JOIN subjects sub ON sub.id = sec.subject_id "
+            "ORDER BY t.is_admin DESC, t.display_name, t.username").fetchall()
         return [dict(r) for r in rows]
 
 
 def get_teacher(teacher_id):
     with _Tx() as conn:
-        row = conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers WHERE id = ?",
-                           (teacher_id,)).fetchone()
+        row = conn.execute(
+            "SELECT id, username, display_name, password_hash, is_admin, is_monitor, monitor_section_id "
+            "FROM teachers WHERE id = ?",
+            (teacher_id,)).fetchone()
         return dict(row) if row else None
 
 
 def verify_teacher(username_or_pw, password=None):
     """Verify a teacher by (username, password), or if username is blank, check password against all teachers."""
     with _Tx() as conn:
+        cols = "id, username, display_name, password_hash, is_admin, is_monitor, monitor_section_id"
         if password is not None and username_or_pw:
-            row = conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers "
-                               "WHERE username = ?", (username_or_pw.strip(),)).fetchone()
+            row = conn.execute(f"SELECT {cols} FROM teachers WHERE username = ?",
+                               (username_or_pw.strip(),)).fetchone()
             if row and check_password_hash(row["password_hash"], password):
                 return dict(row)
             return None
         pw = password if password is not None else username_or_pw
-        for row in conn.execute("SELECT id, username, display_name, password_hash, is_admin FROM teachers"):
+        for row in conn.execute(f"SELECT {cols} FROM teachers"):
             if check_password_hash(row["password_hash"], pw):
                 return dict(row)
         return None
 
 
-def create_teacher(username, display_name, password, is_admin=False):
+def list_all_sections():
+    """Return all sections with their subject name, for the section-monitor dropdown."""
+    with _Tx() as conn:
+        rows = conn.execute(
+            "SELECT sec.id, sec.name AS section_name, sub.name AS subject_name "
+            "FROM sections sec JOIN subjects sub ON sub.id = sec.subject_id "
+            "ORDER BY sub.position, sub.id, sec.id").fetchall()
+        return [dict(r) for r in rows]
+
+
+def create_teacher(username, display_name, password, is_admin=False, monitor_section_id=None):
     uname = re.sub(r"[^a-zA-Z0-9_.\-]", "", (username or "").strip()).lower()
     dname = clean_name(display_name or uname)
     if not uname or len(uname) < 2:
@@ -946,13 +997,18 @@ def create_teacher(username, display_name, password, is_admin=False):
     if not password or len(password) < MIN_PASSWORD:
         raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
     pw_hash = generate_password_hash(password)
+    mon_sec = int(monitor_section_id) if monitor_section_id else None
+    is_mon = 1 if mon_sec else 0
 
     def run(conn):
         if conn.execute("SELECT 1 FROM teachers WHERE username = ?", (uname,)).fetchone():
             raise ValueError("That username is already taken.")
+        if mon_sec and not conn.execute("SELECT 1 FROM sections WHERE id = ?", (mon_sec,)).fetchone():
+            raise ValueError("That section was not found.")
         return conn.execute(
-            "INSERT INTO teachers (username, display_name, password_hash, is_admin) VALUES (?, ?, ?, ?)",
-            (uname, dname, pw_hash, 1 if is_admin else 0)).lastrowid
+            "INSERT INTO teachers (username, display_name, password_hash, is_admin, is_monitor, monitor_section_id) "
+            "VALUES (?, ?, ?, ?, ?, ?)",
+            (uname, dname, pw_hash, 1 if is_admin else 0, is_mon, mon_sec)).lastrowid
     return mutate(run)
 
 

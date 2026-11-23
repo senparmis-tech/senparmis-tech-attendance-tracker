@@ -4,20 +4,30 @@
 <h1>Teachers &amp; access</h1>
 <p class="muted">
   Signed in as <b>{{ teacher_name or 'Admin' }}</b>
-  {% if is_admin %}<span class="badge done">Admin</span>{% else %}<span class="badge todo">Teacher</span>{% endif %}
+  {% if is_admin %}<span class="badge done">Admin</span>{% elif is_monitor %}<span class="badge" style="background:#7c3aed;color:#fff">Monitor</span>{% else %}<span class="badge todo">Teacher</span>{% endif %}
 </p>
 
 {% if is_admin %}
 <div class="grid2">
   <div class="card">
-    <h2>Add a teacher account</h2>
-    <p class="muted" style="margin-top:0;font-size:13px">Each teacher signs in with their username and password and sees only the subjects assigned to them (unless marked as Admin).</p>
+    <h2>Add an account</h2>
+    <p class="muted" style="margin-top:0;font-size:13px">Teachers see only their assigned subjects. Section Monitors see only one section of a subject — great for sharing access with another section's monitor.</p>
     <form method="post" action="{{ url_for('teachers_add') }}">
       <p><input class="txt" type="text" name="username" placeholder="Username (e.g. m.santos)" required style="width:100%"></p>
       <p><input class="txt" type="text" name="display_name" placeholder="Full / display name (e.g. Prof. Maria Santos)" style="width:100%"></p>
       <p><input class="txt" type="password" name="password" placeholder="Password (at least 8 characters)" minlength="8" required style="width:100%"></p>
       <p><label class="chk"><input type="checkbox" name="is_admin" value="1"> Admin (can see all subjects and manage teachers)</label></p>
-      <button class="btn primary" type="submit">Create teacher</button>
+      <p><label class="chk"><input type="checkbox" name="is_monitor" value="1" id="chk-monitor" onchange="document.getElementById('monitor-sec-row').style.display=this.checked?'':'none'"> Section Monitor (access to one section only)</label></p>
+      <p id="monitor-sec-row" style="display:none">
+        <label style="font-size:13px;font-weight:600">Assign to section:</label><br>
+        <select name="monitor_section_id" class="txt" style="width:100%;margin-top:4px">
+          <option value="">— pick a section —</option>
+          {% for sec in all_sections %}
+          <option value="{{ sec.id }}">{{ sec.subject_name }} · {{ sec.section_name }}</option>
+          {% endfor %}
+        </select>
+      </p>
+      <button class="btn primary" type="submit">Create account</button>
     </form>
   </div>
 
@@ -52,16 +62,22 @@
 </div>
 
 <div class="card">
-  <h2>Teacher accounts ({{ teachers|length }})</h2>
+  <h2>Accounts ({{ teachers|length }})</h2>
   {% if teachers %}
   <table>
-    <tr><th>Name</th><th>Username</th><th>Role</th><th>Subjects</th><th>Reset password / remove</th></tr>
+    <tr><th>Name</th><th>Username</th><th>Role</th><th>Scope</th><th>Reset password / remove</th></tr>
     {% for t in teachers %}
     <tr>
       <td><b>{{ t.display_name }}</b></td>
       <td><code>{{ t.username }}</code></td>
-      <td>{% if t.is_admin %}<span class="badge done">Admin</span>{% else %}Teacher{% endif %}</td>
-      <td>{{ t.n_subjects }}</td>
+      <td>{% if t.is_admin %}<span class="badge done">Admin</span>{% elif t.is_monitor %}<span class="badge" style="background:#7c3aed;color:#fff">Monitor</span>{% else %}Teacher{% endif %}</td>
+      <td style="font-size:13px;color:#555">
+        {% if t.is_monitor and t.monitor_section_name %}
+          {{ t.monitor_subject_name }} · <b>{{ t.monitor_section_name }}</b>
+        {% elif not t.is_monitor %}
+          {{ t.n_subjects }} subject(s)
+        {% endif %}
+      </td>
       <td style="white-space:nowrap">
         <form class="inline" method="post" action="{{ url_for('teachers_password') }}" style="display:inline-flex;gap:6px;align-items:center">
           <input type="hidden" name="teacher_id" value="{{ t.id }}">
@@ -69,9 +85,15 @@
           <button class="btn small" type="submit">Set</button>
         </form>
         {% if t.id != teacher_id %}
-        <form class="inline" method="post" action="{{ url_for('teachers_delete') }}" onsubmit="return confirm('Remove teacher {{ t.display_name|e }} ({{ t.username|e }})? Their subjects will remain and become unassigned.')">
+        <form class="inline" method="post" action="{{ url_for('teachers_delete') }}" onsubmit="return confirm('Remove account {{ t.display_name|e }} ({{ t.username|e }})?')">
           <input type="hidden" name="teacher_id" value="{{ t.id }}">
           <button class="btn small danger" type="submit">Remove</button>
+        </form>
+        {% endif %}
+        {% if is_admin and t.is_monitor and t.monitor_section_id %}
+        <form class="inline" method="post" action="{{ url_for('preview_monitor') }}" style="display:inline">
+          <input type="hidden" name="section_id" value="{{ t.monitor_section_id }}">
+          <button class="btn small" type="submit" style="background:#7c3aed;color:#fff" title="Preview what this monitor sees">👁 Preview</button>
         </form>
         {% endif %}
       </td>
@@ -97,3 +119,4 @@
 </div>
 {% endif %}
 {% endblock %}
+

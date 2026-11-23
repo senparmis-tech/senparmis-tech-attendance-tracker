@@ -130,6 +130,14 @@ MIGRATIONS = [
     CREATE INDEX idx_sessions_period ON sessions(period_id);
     CREATE INDEX idx_grade_items_period ON grade_items(period_id);
     """,
+    # 7: Section Monitor role. A teacher account can be scoped to one specific section (monitor_section_id).
+    #    Monitors have the same write access as teachers but only for their assigned section.
+    #    is_monitor = 1 means the account is a Section Monitor (not a full subject-owner teacher).
+    """
+    ALTER TABLE teachers ADD COLUMN is_monitor INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE teachers ADD COLUMN monitor_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL;
+    CREATE INDEX idx_teachers_monitor_section ON teachers(monitor_section_id);
+    """,
 ]
 
 
