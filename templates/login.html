@@ -1,100 +1,45 @@
 {% extends "base.html" %}
-{% block title %}Sign In · Eclaro Academy · Senparmis Tech Attendance Tracker{% endblock %}
+{% block title %}Sign in · Eclaro Academy{% endblock %}
 {% block body %}
-<div class="portal-wrap">
-  <div class="portal-grid">
-    <!-- Left Column: Academic Institution Context & Role Guide -->
-    <div class="portal-banner">
-      <div class="portal-logo-wrap">
-        <img class="portal-logo-img" src="{{ url_for('static', filename='img/eclaro_logo.jpg') }}" alt="Eclaro Academy Crest">
-        <div class="portal-brand-block">
-          <h2>Eclaro Academy</h2>
-          <span>College Department · Academic Portal</span>
-        </div>
-      </div>
+<div class="login">
+  <div class="login-card">
+    <img class="login-logo" src="{{ url_for('static', filename='img/eclaro_logo.jpg') }}" alt="Eclaro Academy">
+    <h1>Sign in</h1>
 
-      <div class="portal-motto-tag">
-        <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M12 2v20"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
-        <span>Academic Records. Organized and Accessible.</span>
-      </div>
-
-      <h1 class="portal-title">Senparmis Tech Attendance Tracker</h1>
-      <p class="portal-desc">
-        Centralized academic management software for attendance roll call, Philippine grading scale records (1.00–5.00), and institutional section monitoring for Eclaro Academy.
-      </p>
-
-      <div class="portal-guide-list">
-        <div class="portal-guide-item">
-          <div class="portal-guide-title">
-            <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none" style="margin-right:4px"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
-            Faculty &amp; Instructors
-          </div>
-          <div class="portal-guide-body">Sign in with your faculty username to record daily attendance, enter student grades, and manage terms.</div>
-        </div>
-        <div class="portal-guide-item monitor">
-          <div class="portal-guide-title">
-            <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none" style="margin-right:4px"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
-            Section Attendance Monitors
-          </div>
-          <div class="portal-guide-body">Sign in with your assigned monitor account for touch-friendly roll call and roster tracking for your class section.</div>
-        </div>
-        <div class="portal-guide-item student">
-          <div class="portal-guide-title">
-            <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none" style="margin-right:4px"><path d="M2 3h6a4 4 0 0 1 4 4v14a3 3 0 0 0-3-3H2z"/><path d="M22 3h-6a4 4 0 0 0-4 4v14a3 3 0 0 1 3-3h7z"/></svg>
-            Students (Read-Only Access)
-          </div>
-          <div class="portal-guide-body">Leave the username field empty and enter the student access key to inspect your individual attendance rate and history.</div>
-        </div>
-      </div>
-
-      <div class="portal-meta">
-        <div><strong>Institution:</strong> Eclaro Academy · Computer Science &amp; IT Programs</div>
-        <div><strong>Software Developer:</strong> Senparmis Tech</div>
-      </div>
+    {% if error %}
+    <div class="flash err" role="alert">
+      <span>{{ error }}</span>
     </div>
+    {% endif %}
 
-    <!-- Right Column: Institutional Sign-In Form -->
-    <div class="portal-card">
-      <div class="portal-card-header">
-        <h2 class="portal-card-title">Academic Sign In</h2>
-        <p class="portal-card-subtitle">
-          {% if has_teachers %}
-          Enter your faculty or monitor credentials, or enter student key below.
-          {% else %}
-          Enter your instructor or student password to access the workspace.
-          {% endif %}
-        </p>
+    <form method="post" action="{{ url_for('login') }}">
+      <div class="field">
+        <label for="username">Username</label>
+        <input type="text" id="username" name="username" value="{{ username or '' }}" autocomplete="username" autocapitalize="none" spellcheck="false">
       </div>
-
-      {% if error %}
-      <div class="flash err" role="alert" style="margin-bottom: 16px;">
-        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-        <span>{{ error }}</span>
-      </div>
-      {% endif %}
-
-      <form method="post" action="{{ url_for('login') }}">
-        <div class="portal-field">
-          <label for="username">Username / Account ID</label>
-          <input type="text" id="username" name="username" value="{{ username or '' }}" autocomplete="username" placeholder="e.g. prof_name (or blank for student)">
-          <div class="portal-hint">Students: Leave blank to view class records.</div>
+      <div class="field">
+        <label for="password">Password</label>
+        <div class="pw-wrap">
+          <input type="password" id="password" name="password" autocomplete="current-password" required autofocus>
+          <button type="button" class="pw-toggle" id="pwToggle" aria-controls="password" aria-pressed="false">Show</button>
         </div>
-
-        <div class="portal-field">
-          <label for="password">Password or Student Key</label>
-          <input type="password" id="password" name="password" autofocus autocomplete="current-password" placeholder="Enter your password or access key" required>
-        </div>
-
-        <button class="btn primary" type="submit" style="width:100%;margin-top:8px;min-height:44px;font-size:14.5px;font-weight:700">
-          <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
-          <span>Sign In to Portal</span>
-        </button>
-      </form>
-
-      <div style="margin-top:20px;padding-top:16px;border-top:1px solid var(--line);text-align:center">
-        <span class="muted" style="font-size:11.5px">Protected by Role-Based Access Control (RBAC) &amp; Session Encryption.</span>
       </div>
-    </div>
+      <button class="btn primary" type="submit">Sign in</button>
+    </form>
+
+    <p class="login-help">Students: leave the username empty and enter the student key.</p>
   </div>
 </div>
+
+<script>
+  (function () {
+    var btn = document.getElementById('pwToggle'), input = document.getElementById('password');
+    btn.addEventListener('click', function () {
+      var show = input.type === 'password';
+      input.type = show ? 'text' : 'password';
+      btn.textContent = show ? 'Hide' : 'Show';
+      btn.setAttribute('aria-pressed', show ? 'true' : 'false');
+    });
+  })();
+</script>
 {% endblock %}

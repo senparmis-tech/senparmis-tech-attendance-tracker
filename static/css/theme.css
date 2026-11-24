@@ -1,0 +1,215 @@
+/* =====================================================================
+   Eclaro Academy theme. Loaded after app.css; overrides its tokens.
+   Palette comes from the school logo: crest navy and eagle lime.
+   ===================================================================== */
+@import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700;12..96,800&family=Figtree:wght@400;500;600;700&display=swap');
+
+:root {
+  --navy-950: #020d2e;
+  --navy-900: #041544;
+  --navy-850: #071b55;
+  --navy-800: #0a2266;
+  --navy-700: #12307f;
+  --navy-600: #1c3f96;
+
+  --lime: #9dc92f;
+  --lime-deep: #4d7c0f;
+  --lime-soft: #eef6d6;
+
+  --blue-600: #0c2a80;
+  --blue-500: #143a9a;
+  --blue-400: #3a62c4;
+  --blue-50: #eef2fb;
+
+  --bg: #f4f6fa;
+  --card: #ffffff;
+  --surface: #edf0f6;
+  --surface-alt: #dfe4ee;
+  --header-bg: #041544;
+  --header-border: #0a2266;
+  --ink: #0b1630;
+  --ink-secondary: #33415e;
+  --muted: #5d6a85;
+  --line: #dde2ec;
+  --line-strong: #c3cbdb;
+
+  --brand: #041544;
+  --brand-accent: #0c2a80;
+  --brand-accent-hover: #071f66;
+  --brand-tint: #eef2fb;
+  --hover: #eef1f7;
+  --focus: #4d7c0f;
+
+  --font-sans: 'Figtree', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --font-display: 'Bricolage Grotesque', 'Figtree', -apple-system, "Segoe UI", sans-serif;
+  --ease: cubic-bezier(.2, .7, .2, 1);
+}
+
+[data-theme="dark"] {
+  --bg: #050b22;
+  --card: #0a1538;
+  --surface: #101c47;
+  --surface-alt: #182759;
+  --header-bg: #020d2e;
+  --header-border: #0a2266;
+  --line: #17275a;
+  --line-strong: #263a78;
+  --brand: #9dc92f;
+  --brand-accent: #b4dc4f;
+  --brand-accent-hover: #cdea7c;
+  --brand-tint: rgba(157, 201, 47, 0.12);
+  --hover: #101c47;
+  --focus: #b4dc4f;
+}
+
+body { font-family: var(--font-sans); }
+
+/* ---- type: display face for headings and big numbers, sentence case labels */
+h1, h2, h3, .page-title-group h1, .brand-title, .rc-flashcard-name,
+.stat-metric-value, .portal-title { font-family: var(--font-display); }
+h1, .page-title-group h1 { letter-spacing: -0.025em; }
+th, .stat-metric-label, .mnav-section-label, .gb-score-label,
+.student-status-chip, .rc-flashcard-index, .portal-motto-tag {
+  text-transform: none;
+  letter-spacing: 0;
+}
+th { font-size: 12.5px; }
+.stat-metric-label { font-size: 13px; }
+[style*="text-transform:uppercase"] { text-transform: none !important; letter-spacing: normal !important; }
+
+/* ---- header */
+header.top { border-bottom: 2px solid var(--lime); }
+.brand-badge { width: 40px; height: 40px; border-radius: 8px; padding: 2px; }
+.brand-title { font-weight: 800; font-size: 16px; }
+.brand-sub { color: #9fb0d8; }
+.nav-item, .tool-link, .signout-btn, .theme-toggle-btn { transition: background-color .16s var(--ease), color .16s var(--ease), transform .16s var(--ease); }
+.nav-item.on { background: var(--lime); color: var(--navy-900); box-shadow: none; }
+.tool-link.on { border-color: rgba(157, 201, 47, 0.5); }
+.mnav-tile:hover, .mnav-tile.on { background: var(--lime); border-color: var(--lime); color: var(--navy-900); }
+.mnav-tile.on small, .mnav-tile:hover small { opacity: 1; }
+.mnav-chip.on, .mnav-chip:hover { background: var(--lime); color: var(--navy-900); }
+.tabbar .on, .tabbar [aria-expanded="true"] { color: var(--lime); background: rgba(157, 201, 47, 0.12); }
+
+/* ---- buttons, tabs, pills */
+.btn.primary { background: var(--blue-600); border-color: var(--blue-600); box-shadow: none; }
+.btn.primary:hover { background: var(--brand-accent-hover); border-color: var(--brand-accent-hover); transform: translateY(-1px); box-shadow: 0 4px 10px rgba(4, 21, 68, 0.22); }
+.btn.primary:active { transform: translateY(0); box-shadow: none; }
+[data-theme="dark"] .btn.primary { background: var(--lime); border-color: var(--lime); color: var(--navy-900); }
+[data-theme="dark"] .btn.primary:hover { background: #b4dc4f; border-color: #b4dc4f; box-shadow: none; }
+.tab.on, .fpill.on, .sec-pill.on, .import-segbtn.on { background: var(--navy-900); border-color: var(--navy-900); color: #fff; }
+[data-theme="dark"] .tab.on, [data-theme="dark"] .fpill.on, [data-theme="dark"] .sec-pill.on,
+[data-theme="dark"] .import-segbtn.on { background: var(--lime); border-color: var(--lime); color: var(--navy-900); }
+body .rc-progress-bar { background: var(--lime); }
+.save-status-dot.dirty { background: var(--lime); box-shadow: 0 0 6px var(--lime); }
+input:focus, select:focus, textarea:focus { box-shadow: 0 0 0 3px rgba(157, 201, 47, 0.3); }
+
+/* ---- footer */
+.app-footer { margin-top: 40px; padding: 18px 16px; font-size: 12.5px; }
+.app-footer-brand { font-weight: 600; margin: 0; }
+
+/* =====================================================================
+   Motion. One orchestrated entrance on load, plus feedback for taps.
+   ===================================================================== */
+@keyframes rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes bar-draw { to { width: 36px; } }
+@keyframes pop { 0% { transform: scale(.88); } 60% { transform: scale(1.07); } 100% { transform: scale(1); } }
+@keyframes swap-in { from { opacity: 0; transform: translateX(22px); } to { opacity: 1; transform: none; } }
+@keyframes spin-once { to { transform: rotate(360deg); } }
+@keyframes shake { 20% { transform: translateX(-6px); } 40% { transform: translateX(6px); } 60% { transform: translateX(-4px); } 80% { transform: translateX(4px); } }
+@keyframes logo-in { from { opacity: 0; transform: translateY(8px) scale(.94); } to { opacity: 1; transform: none; } }
+
+/* Title underline draws in on every page */
+.page-title-group h1::after {
+  content: "";
+  display: block;
+  width: 0;
+  height: 3px;
+  margin-top: 7px;
+  border-radius: 2px;
+  background: var(--lime);
+  animation: bar-draw .6s .12s var(--ease) forwards;
+}
+
+/* Dashboard numbers: cards rise in one after another (motion.js also counts them up) */
+.stats-overview-grid > .stat-metric-card {
+  animation: rise .55s var(--ease) both;
+  animation-delay: calc(var(--i, 0) * 70ms + 80ms);
+}
+.stat-metric-value { font-weight: 800; font-variant-numeric: tabular-nums; }
+
+/* Attendance buttons: confirm the tap */
+.cb.on { animation: pop .22s var(--ease); }
+.rc-flashcard.swap { animation: swap-in .22s var(--ease); }
+.rc-big-btn { transition: transform .12s var(--ease), background-color .12s, color .12s; }
+
+/* Theme toggle spins once when used */
+.theme-toggle-btn.spin svg { animation: spin-once .5s var(--ease); }
+
+/* Toast eases in */
+.toast { animation: rise .25s var(--ease); }
+
+/* =====================================================================
+   Login: a plain centered form
+   ===================================================================== */
+.page-login header.top, .page-login .app-footer, .page-login .tabbar { display: none; }
+.page-login main {
+  max-width: none;
+  min-height: 100vh;
+  padding: 24px 16px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+}
+.page-login main > .flash { width: 100%; max-width: 360px; }
+.login { width: 100%; max-width: 360px; }
+.login-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  padding: 28px 24px 24px;
+  box-shadow: var(--shadow-sm);
+}
+.login-logo {
+  display: block;
+  width: 210px;
+  max-width: 75%;
+  height: auto;
+  margin: 0 auto 18px;
+  border-radius: 6px;
+  background: #fff;
+  animation: logo-in .7s var(--ease) both;
+}
+.login h1 { font-size: 20px; margin: 0 0 18px; text-align: center; }
+.login h1::after { display: none; }
+.login form { animation: rise .5s .12s var(--ease) both; }
+.login .field { margin-bottom: 14px; }
+.login input[type=text], .login input[type=password] { width: 100%; font-size: 15px; min-height: 42px; }
+.login .btn.primary { width: 100%; min-height: 44px; font-size: 15px; margin-top: 4px; }
+.login .flash { animation: shake .35s; }
+.login-help { margin: 16px 0 0; font-size: 12.5px; color: var(--muted); text-align: center; }
+.pw-wrap { position: relative; }
+.pw-wrap input { padding-right: 62px; }
+.pw-toggle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  border: 0;
+  background: none;
+  color: var(--brand-accent);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 600;
+  padding: 6px 8px;
+  cursor: pointer;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .01ms !important;
+    animation-delay: 0s !important;
+    transition-duration: .01ms !important;
+    scroll-behavior: auto !important;
+  }
+}
