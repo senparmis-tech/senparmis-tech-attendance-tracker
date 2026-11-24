@@ -114,27 +114,34 @@ def fail_key():
     return (request.remote_addr or "") + "|" + request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
 
 
-PUBLIC_ENDPOINTS = {"login", "logout", "static", "subject_image"}
-STUDENT_ENDPOINTS = {"records"}
+PUBLIC_ENDPOINTS = {"login", "logout", "static", "subject_image", "api_login"}
+STUDENT_ENDPOINTS = {"records", "api_records", "api_me", "api_logout"}
 MONITOR_ALLOWED_ENDPOINTS = {
     "dashboard",
+    "api_dashboard",
     "mark",
+    "api_mark",
     "api_save",
     "scan",
     "api_scan",
     "api_set_key",
     "records",
+    "api_records",
     "print_sheet",
     "dates_delete",
     "import_meet",
     "api_meet_alias",
     "students",
+    "api_subjects",
     "students_add",
     "students_remove",
     "students_profile",
     "lookup",
+    "api_lookup",
     "log_page",
     "preview_monitor",
+    "api_me",
+    "api_logout",
 }
 
 
@@ -283,6 +290,104 @@ def login():
 def logout():
     session.clear()
     return redirect(url_for("login"))
+
+
+@app.route("/api/login", methods=["POST"])
+def api_login():
+    """Mobile app & API login endpoint returning JSON session status."""
+    data = request.get_json(silent=True) or request.form.to_dict() or {}
+    username = str(data.get("username", "")).strip()
+    pw = str(data.get("password", "")).strip()
+    if not pw:
+        return jsonify(ok=False, error="Password is required."), 400
+    cfg = read_passwords()
+    teachers = list_teachers()
+    key, now = fail_key(), time.time()
+    count, until = _fails.get(key, (0, 0))
+    if until > now:
+        mins = int((until - now) // 60) + 1
+        return jsonify(ok=False, error=f"Too many wrong attempts. Wait {mins} minute(s)."), 429
+
+    matched_teacher = verify_teacher(username, pw) if username else verify_teacher(pw)
+    role = None
+    user_info = {}
+    if matched_teacher:
+        session.clear()
+        session.update(role="teacher", teacher_id=matched_teacher["id"],
+                       pv=pw_version("teacher_db", cfg, matched_teacher["password_hash"]))
+        session.permanent = True
+        _fails.pop(key, None)
+        log_change("API Sign-in", "", f"Teacher '{matched_teacher['display_name']}' signed in via Mobile App")
+        return jsonify(
+            ok=True,
+            role="teacher",
+            teacher_id=matched_teacher["id"],
+            username=matched_teacher["username"],
+            display_name=matched_teacher["display_name"],
+            is_admin=bool(matched_teacher["is_admin"]),
+            is_monitor=bool(matched_teacher["is_monitor"]),
+            monitor_section_id=matched_teacher.get("monitor_section_id"),
+        )
+    if (not username or username.lower() == "admin") and any(
+            hmac.compare_digest(pw.encode(), t_pw.encode()) for t_pw in cfg["teacher"]):
+        role = "teacher"
+        user_info = {
+            "role": "teacher",
+            "teacher_id": None,
+            "username": "admin",
+            "display_name": "Administrator",
+            "is_admin": True,
+            "is_monitor": False,
+            "monitor_section_id": None,
+        }
+    elif (not username or username.lower() == "student") and any(
+            hmac.compare_digest(pw.encode(), s_pw.encode()) for s_pw in cfg["student"]):
+        role = "student"
+        user_info = {
+            "role": "student",
+            "teacher_id": None,
+            "username": "student",
+            "display_name": "Student",
+            "is_admin": False,
+            "is_monitor": False,
+            "monitor_section_id": None,
+        }
+    if role:
+        session.clear()
+        session.update(role=role, pv=pw_version(role, cfg))
+        session.permanent = True
+        _fails.pop(key, None)
+        log_change("API Sign-in", "", f"{role.capitalize()} signed in via Mobile App")
+        return jsonify(ok=True, **user_info)
+
+    count += 1
+    _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
+    return jsonify(ok=False, error="Wrong username or password." if teachers else "Wrong password."), 401
+
+
+@app.route("/api/me", methods=["GET"])
+def api_me():
+    """Return the authenticated user profile and roles."""
+    if not getattr(g, "role", None):
+        return jsonify(ok=False, authenticated=False), 401
+    return jsonify(
+        ok=True,
+        authenticated=True,
+        role=g.role,
+        teacher_id=g.teacher_id,
+        display_name=g.teacher_name,
+        is_admin=g.is_admin,
+        is_monitor=g.is_monitor,
+        monitor_section_id=g.monitor_section_id,
+        monitor_section_name=g.monitor_section_name,
+    )
+
+
+@app.route("/api/logout", methods=["POST", "GET"])
+def api_logout():
+    """End the current API session."""
+    session.clear()
+    return jsonify(ok=True, message="Signed out.")
 
 
 # -------------------------------------------------------- teacher management
