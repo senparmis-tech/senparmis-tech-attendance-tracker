@@ -11,7 +11,7 @@ import androidx.compose.material.icons.filled.Archive
 import androidx.compose.material.icons.filled.Book
 import androidx.compose.material.icons.filled.ExpandLess
 import androidx.compose.material.icons.filled.ExpandMore
-import androidx.compose.material.icons.filled.GradeOutlined
+import androidx.compose.material.icons.filled.Grade
 import androidx.compose.material.icons.filled.ListAlt
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -365,7 +365,7 @@ private fun SectionRow(
                 contentPadding = PaddingValues(horizontal = 10.dp, vertical = 6.dp),
                 modifier = Modifier.weight(1f)
             ) {
-                Icon(Icons.Default.GradeOutlined, contentDescription = null, modifier = Modifier.size(14.dp), tint = Slate400)
+                Icon(Icons.Default.Grade, contentDescription = null, modifier = Modifier.size(14.dp), tint = Slate400)
                 Spacer(modifier = Modifier.width(4.dp))
                 Text("Grades", fontSize = 12.sp, color = Slate200)
             }
@@ -448,5 +448,3 @@ private fun ArchivedSubjectCard(
     }
 }
 
-// Missing colour alias used in this file
-private val Slate300 = androidx.compose.ui.graphics.Color(0xFFCBD5E1)

@@ -3,15 +3,15 @@ package com.senparmitech.attendancetracker.ui
 import androidx.compose.foundation.layout.padding
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Dashboard
-import androidx.compose.material.icons.filled.LibraryBooks
+import androidx.compose.material.icons.filled.MenuBook
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.Search
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavDestination.Companion.hierarchy
 import androidx.navigation.NavGraph.Companion.findStartDestination
@@ -71,7 +71,7 @@ data class BottomNavItem(
 
 val bottomNavItems = listOf(
     BottomNavItem("Dashboard", Icons.Default.Dashboard, Screen.Dashboard),
-    BottomNavItem("Subjects",  Icons.Default.LibraryBooks, Screen.Subjects),
+    BottomNavItem("Subjects",  Icons.Default.MenuBook, Screen.Subjects),
     BottomNavItem("Lookup",    Icons.Default.Search, Screen.Lookup),
     BottomNavItem("Settings",  Icons.Default.Person, Screen.Settings)
 )
@@ -156,7 +156,9 @@ fun AppNavigation() {
 
             // ── Lookup ────────────────────────────────────────────────────────
             composable(Screen.Lookup.route) {
-                LookupScreen()
+                LookupScreen(
+                    onNavigateBack = { navController.popBackStack() }
+                )
             }
 
             // ── Settings ──────────────────────────────────────────────────────
@@ -184,9 +186,9 @@ fun AppNavigation() {
                 val section = URLDecoder.decode(backStackEntry.arguments?.getString("section") ?: "", "UTF-8")
                 val date    = URLDecoder.decode(backStackEntry.arguments?.getString("date") ?: "", "UTF-8")
                 MarkAttendanceScreen(
-                    subject = subject,
-                    section = section,
-                    dateIso = date,
+                    initialSubject = subject,
+                    initialSection = section,
+                    initialDate = date,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -202,8 +204,8 @@ fun AppNavigation() {
                 val subject = URLDecoder.decode(backStackEntry.arguments?.getString("subject") ?: "", "UTF-8")
                 val section = URLDecoder.decode(backStackEntry.arguments?.getString("section") ?: "", "UTF-8")
                 RecordsScreen(
-                    subject = subject,
-                    section = section,
+                    initialSubject = subject,
+                    initialSection = section,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }
@@ -219,8 +221,8 @@ fun AppNavigation() {
                 val subject = URLDecoder.decode(backStackEntry.arguments?.getString("subject") ?: "", "UTF-8")
                 val section = URLDecoder.decode(backStackEntry.arguments?.getString("section") ?: "", "UTF-8")
                 GradebookScreen(
-                    subject = subject,
-                    section = section,
+                    initialSubject = subject,
+                    initialSection = section,
                     onNavigateBack = { navController.popBackStack() }
                 )
             }

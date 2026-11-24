@@ -17,3 +17,21 @@ subject_images/
 attendance.db
 attendance.db-journal
 *.db.new
+
+# Nested extracted zip duplicate folder
+senparmis-tech-attendance-tracker/
+
+# Android Studio & Gradle
+.gradle/
+**/.gradle/
+build/
+**/build/
+.idea/
+**/.idea/
+*.iml
+local.properties
+**/local.properties
+.cxx/
+Captures/
+*.apk
+*.aab

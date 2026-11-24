@@ -17,15 +17,16 @@ from config import (API_KEY_FILE, DB_FILE, LOG_FILE, LOW_RATE, MAX_CSV,
                     XLSX)
 from excel_io import build_workbook
 from store import (FileLocked, add_grade_item, add_section, add_students,
-                   add_subject, apply_marks, backup_workbook, delete_date,
+                   add_subject, apply_marks, archive_subject, backup_workbook, delete_date,
                    delete_grade_item, delete_section, delete_subject,
-                   ensure_db, get_subject_image_file, list_backups, list_periods,
+                   ensure_db, get_subject_image_file, is_subject_archived, list_archived_subjects,
+                   list_backups, list_periods,
                    load_data, load_grades, load_period_data, reimport_from_excel,
                    remove_student, remove_subject_image, rename_section,
                    restore_backup, save_grade_scores, save_grade_weights,
                    SEMESTER_NAMES, TERM_NAMES,
                    set_weights_lock, student_stats, subject_image_url,
-                   update_student_profile)
+                   unarchive_subject, update_student_profile)
 from helpers import (LETTER, clean_name, clean_sheet_name, log_change,
                      parse_iso, read_log, safe_text, short_list)
 from meet_import import match_roster, name_tokens, parse_meet_csv, read_aliases, write_aliases
@@ -182,6 +183,10 @@ def dashboard():
 
 @app.route("/mark")
 def mark():
+    req_sub = request.args.get("subject", "").strip()
+    if req_sub and is_subject_archived(req_sub):
+        flash(f"'{req_sub}' is archived and read-only. Unarchive it first under Students & Subjects to record attendance.", "err")
+        return redirect(url_for("records", subject=req_sub))
     data = load_data()
     subjects, subject = pick_subject(data)
     sec_names, section, sd = pick_section(data.get(subject))
@@ -321,7 +326,9 @@ def api_set_key():
 
 @app.route("/records")
 def records():
-    data = load_data()
+    req_sub = request.args.get("subject", "").strip()
+    is_arch = is_subject_archived(req_sub) if req_sub else False
+    data = load_data(include_archived=is_arch)
     subjects, subject = pick_subject(data)
     sec_names, section, sd = pick_section(data.get(subject))
     sd, period, err = pick_period(subject, section, sd)
@@ -335,10 +342,12 @@ def records():
         for s in student_stats(sd):
             s["codes"] = [sd["cells"].get((s["row"], x["col"]), "") for x in sd["dates"]]
             rows.append(s)
+    subject_is_archived = is_subject_archived(subject) if subject else False
     return render_template("records.html", page="records", subject=subject, section=section,
                            rows=rows, dates=dates, low=LOW_RATE,
                            period=period, periods=list_periods(subject, section) if subject else [],
-                           editable=not (period and period["locked"]),
+                           editable=not (period and period["locked"]) and not subject_is_archived,
+                           is_archived=subject_is_archived,
                            tabs=make_tabs(subjects, subject, "records"),
                            section_tabs=make_section_tabs(sec_names, section, subject, "records"),
                            **term_ctx(subject, section, period))
@@ -495,17 +504,22 @@ def api_meet_alias():
 
 @app.route("/students")
 def students():
-    data = load_data()
+    req_sub = request.args.get("subject", "").strip()
+    is_arch = is_subject_archived(req_sub) if req_sub else False
+    data = load_data(include_archived=is_arch)
     subjects, subject = pick_subject(data)
     sec_names, section, sd = pick_section(data.get(subject))
     rows = student_stats(sd) if subject else []
     subj_img = subject_image_url(subject) if subject else None
     period = sd.get("period") if sd else None
+    subject_is_archived = is_subject_archived(subject) if subject else False
     return render_template("students.html", page="students", subjects=subjects, subject=subject,
                            section=section, section_names=sec_names,
                            rows=rows, low=LOW_RATE, tabs=make_tabs(subjects, subject, "students"),
                            section_tabs=make_section_tabs(sec_names, section, subject, "students"),
                            subject_img_url=subj_img, period=period,
+                           is_archived=subject_is_archived,
+                           archived_subjects=list_archived_subjects(),
                            semesters=SEMESTER_NAMES, terms=TERM_NAMES,
                            **term_ctx(subject, section, period))
 
@@ -588,7 +602,9 @@ def students_profile():
 # --------------------------------------------------------------- grades
 @app.route("/grades")
 def grades_page():
-    data = load_data()
+    req_sub = request.args.get("subject", "").strip()
+    is_arch = is_subject_archived(req_sub) if req_sub else False
+    data = load_data(include_archived=is_arch)
     subjects, subject = pick_subject(data)
     sec_names, section, _ = pick_section(data.get(subject))
     gb = None
@@ -599,10 +615,12 @@ def grades_page():
             flash(str(err), "err")
             return redirect(url_for("grades_page", subject=subject, section=section))
     period = gb["period"] if gb else None
+    subject_is_archived = is_subject_archived(subject) if subject else False
     return render_template(
         "grades.html", page="grades", subjects=subjects, subject=subject,
         section=section, section_names=sec_names, gb=gb, period=period,
         periods=list_periods(subject, section) if subject else [],
+        is_archived=subject_is_archived,
         tabs=make_tabs(subjects, subject, "grades_page"),
         section_tabs=make_section_tabs(sec_names, section, subject, "grades_page"),
         **term_ctx(subject, section, period))
@@ -712,6 +730,31 @@ def subject_image(subject):
     if fn:
         return send_file(os.path.join(SUBJECT_IMG_DIR, fn))
     return "Not found", 404
+
+
+@app.route("/subjects/archive", methods=["POST"])
+def subjects_archive():
+    name = request.form.get("subject", "").strip()
+    note = request.form.get("note", "").strip()
+    try:
+        archive_subject(name, note)
+        log_change("Subject archived", name, f"Subject marked as completed/archived. {note}" if note else "Subject marked as completed/archived")
+        flash(f"Archived subject '{name}'. It is now read-only and preserved in historical records.", "ok")
+    except Exception as err:
+        flash(str(err), "err")
+    return redirect(url_for("students"))
+
+
+@app.route("/subjects/unarchive", methods=["POST"])
+def subjects_unarchive():
+    name = request.form.get("subject", "").strip()
+    try:
+        unarchive_subject(name)
+        log_change("Subject restored", name, "Subject restored to active")
+        flash(f"Restored subject '{name}' to active status.", "ok")
+    except Exception as err:
+        flash(str(err), "err")
+    return redirect(url_for("students", subject=name))
 
 
 @app.route("/subjects/delete", methods=["POST"])
@@ -926,3 +969,269 @@ def download():
     buf.seek(0)
     return send_file(buf, as_attachment=True, download_name="attendance_records.xlsx",
                      mimetype="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")
+
+
+# =====================================================================
+# REST API ENDPOINTS FOR ANDROID APP & EXTERNAL INTEGRATIONS
+# =====================================================================
+
+@app.route("/api/dashboard", methods=["GET"])
+def api_dashboard():
+    """Academic overview metrics and active subjects for mobile dashboard."""
+    data = load_data()
+    today = date.today()
+    cards = []
+    pending_rollcalls = 0
+    total_sections_count = 0
+    for subject, sd in data.items():
+        secs_map = sd.get("sections") or {sd.get("section", "BSCS-1A"): sd}
+        for sec_name, sec_sd in secs_map.items():
+            total_sections_count += 1
+            today_col = next((x["col"] for x in sec_sd["dates"] if x["date"] == today), None)
+            today_counts = None
+            if today_col is not None:
+                counts = {"p": 0, "x": 0, "l": 0, "e": 0, "r": 0}
+                for s in sec_sd["students"]:
+                    c = sec_sd["cells"].get((s["row"], today_col), "")
+                    if c in counts:
+                        counts[c] += 1
+                today_counts = counts
+            else:
+                pending_rollcalls += 1
+            held = len([dd for dd in sec_sd["dates"] if any(sec_sd["cells"].get((s["row"], dd["col"])) for s in sec_sd["students"])])
+            st = student_stats(sec_sd)
+            rates = [s["rate"] for s in st if s["rate"] is not None]
+            avg = sum(rates) / len(rates) if rates else None
+            watch = [s for s in st if s["rate"] is not None and s["rate"] < LOW_RATE]
+            cards.append({
+                "subject": subject,
+                "section": sec_name,
+                "n_students": len(sec_sd["students"]),
+                "held": held,
+                "avg": round(avg, 2) if avg is not None else None,
+                "today_recorded": today_col is not None,
+                "today_counts": today_counts,
+                "watch_count": len(watch),
+                "image_url": subject_image_url(subject),
+            })
+
+    # Global overview metrics
+    total_students = 0
+    total_subjects = len(data)
+    completed_sessions = 0
+    low_attendance_count = 0
+    try:
+        import db as _db
+        conn = _db.connect()
+        total_students = conn.execute("SELECT COUNT(DISTINCT id) FROM students").fetchone()[0]
+        completed_sessions = conn.execute("SELECT COUNT(*) FROM sessions").fetchone()[0]
+        conn.close()
+    except Exception:
+        pass
+
+    for sd in data.values():
+        secs_map = sd.get("sections") or {sd.get("section", "BSCS-1A"): sd}
+        for sec_sd in secs_map.values():
+            for s in student_stats(sec_sd):
+                if s["rate"] is not None and s["rate"] < LOW_RATE:
+                    low_attendance_count += 1
+
+    return jsonify(
+        ok=True,
+        today_iso=today.isoformat(),
+        today_label=today.strftime("%A, %B %d, %Y"),
+        overview={
+            "total_students": total_students,
+            "total_subjects": total_subjects,
+            "total_sections": total_sections_count,
+            "completed_sessions": completed_sessions,
+            "pending_rollcalls": pending_rollcalls,
+            "low_attendance_count": low_attendance_count,
+        },
+        cards=cards,
+    )
+
+
+@app.route("/api/subjects", methods=["GET"])
+def api_subjects():
+    """List all active and archived subjects with class sections."""
+    data = load_data(include_archived=False)
+    active = []
+    for subject, sd in data.items():
+        secs_map = sd.get("sections") or {sd.get("section", "BSCS-1A"): sd}
+        active.append({
+            "name": subject,
+            "sections": list(secs_map.keys()),
+            "n_students": len(sd["students"]),
+            "image_url": subject_image_url(subject),
+            "archived": False,
+        })
+    archived = list_archived_subjects()
+    return jsonify(
+        ok=True,
+        subjects=active,
+        archived_subjects=archived,
+    )
+
+
+@app.route("/api/mark", methods=["GET"])
+def api_mark():
+    """Get student roster and attendance status for a given subject, section, and date."""
+    req_sub = request.args.get("subject", "").strip()
+    if not req_sub:
+        data = load_data()
+        subjects, req_sub = pick_subject(data)
+    if not req_sub:
+        return jsonify(ok=False, error="No subjects configured."), 404
+    if is_subject_archived(req_sub):
+        return jsonify(ok=False, error=f"'{req_sub}' is archived and read-only.", archived=True), 400
+
+    data = load_data()
+    sd = data.get(req_sub)
+    if not sd:
+        return jsonify(ok=False, error="Subject not found."), 404
+    sec_names, section, sec_sd = pick_section(sd)
+    req_date = parse_iso(request.args.get("date")) or date.today()
+
+    col = next((x["col"] for x in sec_sd["dates"] if x["date"] == req_date), None)
+    topic = next((x["topic"] for x in sec_sd["dates"] if x["date"] == req_date), "")
+    students = [
+        {
+            "row": s["row"],
+            "name": s["name"],
+            "code": (sec_sd["cells"].get((s["row"], col), "") if col else "") or "p",
+        }
+        for s in sec_sd["students"]
+    ]
+    return jsonify(
+        ok=True,
+        subject=req_sub,
+        section=section,
+        date_iso=req_date.isoformat(),
+        date_label=req_date.strftime("%A, %B %d, %Y"),
+        recorded=col is not None,
+        topic=topic,
+        students=students,
+    )
+
+
+@app.route("/api/records", methods=["GET"])
+def api_records():
+    """Attendance matrix sheet data for a subject and section."""
+    req_sub = request.args.get("subject", "").strip()
+    is_arch = is_subject_archived(req_sub) if req_sub else False
+    data = load_data(include_archived=is_arch)
+    subjects, subject = pick_subject(data)
+    if not subject:
+        return jsonify(ok=False, error="No subjects found."), 404
+    sec_names, section, sd = pick_section(data.get(subject))
+    sd, period, err = pick_period(subject, section, sd)
+    if err:
+        return jsonify(ok=False, error=err), 400
+
+    dates = [
+        {"id": x["col"], "label": x["date"].strftime("%b %d"), "iso": x["date"].isoformat(), "topic": x["topic"]}
+        for x in sd["dates"]
+    ]
+    rows = []
+    for s in student_stats(sd):
+        codes = [sd["cells"].get((s["row"], x["col"]), "") for x in sd["dates"]]
+        rows.append({
+            "row": s["row"],
+            "name": s["name"],
+            "student_no": s.get("student_no", ""),
+            "p": s["p"],
+            "x": s["x"],
+            "l": s["l"],
+            "e": s["e"],
+            "r": s["r"],
+            "rate": s["rate"],
+            "codes": codes,
+        })
+    return jsonify(
+        ok=True,
+        subject=subject,
+        section=section,
+        is_archived=is_arch,
+        dates=dates,
+        rows=rows,
+    )
+
+
+@app.route("/api/grades", methods=["GET"])
+def api_grades():
+    """Gradebook scores and Philippine equivalent calculations for a subject and section."""
+    req_sub = request.args.get("subject", "").strip()
+    is_arch = is_subject_archived(req_sub) if req_sub else False
+    data = load_data(include_archived=is_arch)
+    subjects, subject = pick_subject(data)
+    if not subject:
+        return jsonify(ok=False, error="No subjects found."), 404
+    sec_names, section, _ = pick_section(data.get(subject))
+    try:
+        gb = load_grades(subject, section, request.args.get("period", type=int))
+    except ValueError as err:
+        return jsonify(ok=False, error=str(err)), 400
+
+    return jsonify(
+        ok=True,
+        subject=subject,
+        section=section,
+        is_archived=is_arch,
+        weights=gb["weights"],
+        locked=gb["locked"],
+        period=gb["period"],
+        items=[
+            {"id": it["id"], "category": it["category"], "label": it["label"], "title": it["title"], "max_score": it["max_score"]}
+            for it in gb["items"]
+        ],
+        rows=[
+            {
+                "enrollment_id": r["enrollment_id"],
+                "name": r["name"],
+                "student_no": r["student_no"],
+                "scores": r["scores"],
+                "cat_pct": r["cat_pct"],
+                "final_pct": r["final_pct"],
+                "scale": r["scale"],
+                "passing": r["passing"],
+            }
+            for r in gb["rows"]
+        ],
+    )
+
+
+@app.route("/api/lookup", methods=["GET"])
+def api_lookup():
+    """Search students and return profiles, grades, and attendance rates."""
+    from lookup import build_index
+    data = load_data(include_archived=True)
+    people, all_sections = build_index(data)
+    q = clean_name(request.args.get("q", "")).lower()
+    results = []
+    for key, p in people.items():
+        if not q or q in p["name"].lower() or q in p.get("student_no", "").lower():
+            results.append({
+                "name": p["name"],
+                "student_no": p.get("student_no", ""),
+                "guardian_name": p.get("guardian_name", ""),
+                "guardian_phone": p.get("guardian_phone", ""),
+                "email": p.get("email", ""),
+                "sections": p.get("sections", []),
+                "subjects": [
+                    {
+                        "subject": s["subject"],
+                        "section": s["section"],
+                        "rate": s["rate"],
+                        "final_pct": s["grade"]["final_pct"] if s.get("grade") else None,
+                        "scale": s["grade"]["scale"] if s.get("grade") else None,
+                    }
+                    for s in p.get("subjects", [])
+                ],
+            })
+    return jsonify(
+        ok=True,
+        query=q,
+        total_matches=len(results),
+        results=results[:100],
+    )

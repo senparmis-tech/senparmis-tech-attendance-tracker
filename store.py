@@ -433,28 +433,30 @@ def _dates_cells(conn, sec, period_id):
     return dates, cells
 
 
-def load_data(teacher_id=None, is_admin=None):
+def load_data(teacher_id=None, is_admin=None, include_archived=False):
     """Every subject's students and attendance for its OPEN term."""
     if teacher_id is None and is_admin is None:
         teacher_id, is_admin, monitor_section_id = _current_teacher_filter()
     else:
         _, _, monitor_section_id = _current_teacher_filter()
+    arch_clause = "" if include_archived else "AND (s.archived IS NULL OR s.archived = 0) "
     with _Tx() as conn:
         out = {}
         if not is_admin and teacher_id is not None and monitor_section_id is None:
             subjects = conn.execute(
-                "SELECT s.id, s.name FROM subjects s WHERE s.teacher_id = ? ORDER BY s.position, s.id",
+                f"SELECT s.id, s.name, s.archived FROM subjects s WHERE s.teacher_id = ? {arch_clause}ORDER BY s.position, s.id",
                 (teacher_id,)).fetchall()
         elif monitor_section_id is not None:
             # Monitor: show only the subject that contains their section
             subjects = conn.execute(
-                "SELECT s.id, s.name FROM subjects s "
-                "JOIN sections sec ON sec.subject_id = s.id "
-                "WHERE sec.id = ? ORDER BY s.position, s.id",
+                f"SELECT s.id, s.name, s.archived FROM subjects s "
+                f"JOIN sections sec ON sec.subject_id = s.id "
+                f"WHERE sec.id = ? {arch_clause}ORDER BY s.position, s.id",
                 (monitor_section_id,)).fetchall()
         else:
+            where = "" if include_archived else "WHERE (s.archived IS NULL OR s.archived = 0) "
             subjects = conn.execute(
-                "SELECT s.id, s.name FROM subjects s ORDER BY s.position, s.id").fetchall()
+                f"SELECT s.id, s.name, s.archived FROM subjects s {where}ORDER BY s.position, s.id").fetchall()
         for sub in subjects:
             if monitor_section_id is not None:
                 secs = conn.execute(
@@ -466,6 +468,7 @@ def load_data(teacher_id=None, is_admin=None):
                 continue
             sections_map = {}
             section_names = []
+            is_sub_arch = bool(sub["archived"]) if "archived" in sub.keys() else False
             for sec_row in secs:
                 sec = sec_row["id"]
                 sec_name = sec_row["name"]
@@ -480,6 +483,7 @@ def load_data(teacher_id=None, is_admin=None):
                     "period": _period_dict(period),
                     "section_names": section_names,
                     "sections": sections_map,
+                    "archived": is_sub_arch,
                 }
             first_sec = sections_map[section_names[0]]
             out[sub["name"]] = dict(first_sec)
@@ -667,6 +671,8 @@ def mutate(fn):
 # ------------------------------------------------------------ writing data
 def apply_marks(subject, d, topic, items, new_names=(), section=None):
     def run(conn):
+        if is_subject_archived(subject):
+            raise ValueError(f"Subject '{subject}' is archived. Unarchive it first to record attendance.")
         sec = _section_of(conn, subject, section)
         iso = d.isoformat()
         row = conn.execute("SELECT id, period_id FROM sessions WHERE section_id = ? AND date = ?",
@@ -843,6 +849,72 @@ def remove_subject_image(subject):
                 os.remove(p)
             except OSError:
                 pass
+
+
+def is_subject_archived(name):
+    """Check if a subject is marked archived."""
+    with _Tx() as conn:
+        row = conn.execute("SELECT archived FROM subjects WHERE name = ?", (name,)).fetchone()
+        return bool(row["archived"]) if row and "archived" in row.keys() else False
+
+
+def list_archived_subjects():
+    """List archived subjects accessible to the current user."""
+    tid, is_adm, _mon = _current_teacher_filter()
+    with _Tx() as conn:
+        if not is_adm and tid is not None and _mon is None:
+            rows = conn.execute(
+                "SELECT s.id, s.name, s.archived_at, s.archive_note, "
+                "(SELECT COUNT(DISTINCT e.student_id) FROM enrollments e "
+                " JOIN sections sec ON sec.id = e.section_id WHERE sec.subject_id = s.id) AS n_students "
+                "FROM subjects s WHERE s.teacher_id = ? AND s.archived = 1 ORDER BY s.name",
+                (tid,)).fetchall()
+        elif _mon is not None:
+            rows = []
+        else:
+            rows = conn.execute(
+                "SELECT s.id, s.name, s.archived_at, s.archive_note, "
+                "(SELECT COUNT(DISTINCT e.student_id) FROM enrollments e "
+                " JOIN sections sec ON sec.id = e.section_id WHERE sec.subject_id = s.id) AS n_students "
+                "FROM subjects s WHERE s.archived = 1 ORDER BY s.name").fetchall()
+        return [dict(r) for r in rows]
+
+
+def archive_subject(name, note=""):
+    """Archive a subject: marks it read-only and hides from active roll calls while keeping all records."""
+    ensure_db()
+    backup_workbook("before_archive_subject", min_gap_min=0)
+
+    def run(conn):
+        tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot archive subjects.")
+        row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
+        if not row:
+            raise ValueError("That subject was not found.")
+        if not is_adm and tid is not None and row["teacher_id"] != tid:
+            raise ValueError("You do not have permission to archive that subject.")
+        conn.execute("UPDATE subjects SET archived = 1, archived_at = ?, archive_note = ? WHERE id = ?",
+                     (datetime.now().isoformat(), safe_text(note)[:200] if note else None, row["id"]))
+    mutate(run)
+
+
+def unarchive_subject(name):
+    """Restore an archived subject back to active status."""
+    ensure_db()
+
+    def run(conn):
+        tid, is_adm, _mon = _current_teacher_filter()
+        if _mon is not None:
+            raise ValueError("Section monitors cannot unarchive subjects.")
+        row = conn.execute("SELECT id, teacher_id FROM subjects WHERE name = ?", (name,)).fetchone()
+        if not row:
+            raise ValueError("That subject was not found.")
+        if not is_adm and tid is not None and row["teacher_id"] != tid:
+            raise ValueError("You do not have permission to unarchive that subject.")
+        conn.execute("UPDATE subjects SET archived = 0, archived_at = NULL, archive_note = NULL WHERE id = ?",
+                     (row["id"],))
+    mutate(run)
 
 
 def delete_subject(name):
@@ -1205,12 +1277,14 @@ def load_grades(subject, section=None, period_id=None):
                 "scale": pct_to_scale(final_pct),
                 "passing": (final_pct >= 70.0) if final_pct is not None else None,
             })
+        is_sub_arch = is_subject_archived(subject)
         return {
             "section": sec_row["name"],
             "weights": weights,
-            "locked": locked,
+            "locked": locked or is_sub_arch,
             "period": _period_dict(period),
-            "period_locked": bool(period["locked"]),
+            "period_locked": bool(period["locked"]) or is_sub_arch,
+            "archived": is_sub_arch,
             "items": items,
             "items_by_cat": items_by_cat,
             "cat_max": cat_max,
@@ -1219,6 +1293,8 @@ def load_grades(subject, section=None, period_id=None):
 
 
 def save_grade_weights(subject, section, exam_w, quiz_w, activity_w):
+    if is_subject_archived(subject):
+        raise ValueError(f"Subject '{subject}' is archived and read-only.")
     try:
         ew, qw, aw = float(exam_w), float(quiz_w), float(activity_w)
     except (TypeError, ValueError):
@@ -1238,6 +1314,8 @@ def save_grade_weights(subject, section, exam_w, quiz_w, activity_w):
 
 
 def set_weights_lock(subject, section, locked):
+    if is_subject_archived(subject):
+        raise ValueError(f"Subject '{subject}' is archived and read-only.")
     def run(conn):
         sec_id = _section_of(conn, subject, section)
         conn.execute("UPDATE sections SET weights_locked = ? WHERE id = ?", (1 if locked else 0, sec_id))
@@ -1245,6 +1323,8 @@ def set_weights_lock(subject, section, locked):
 
 
 def add_grade_item(subject, section, category, title, max_score, date_str=""):
+    if is_subject_archived(subject):
+        raise ValueError(f"Subject '{subject}' is archived and read-only.")
     cat = (category or "").strip().lower()
     if cat not in GRADE_CATEGORIES:
         raise ValueError("Choose Exam, Quiz, or Activity.")
@@ -1267,6 +1347,8 @@ def add_grade_item(subject, section, category, title, max_score, date_str=""):
 
 
 def delete_grade_item(subject, section, item_id):
+    if is_subject_archived(subject):
+        raise ValueError(f"Subject '{subject}' is archived and read-only.")
     def run(conn):
         sec_id = _section_of(conn, subject, section)
         row = conn.execute("SELECT id, title, period_id FROM grade_items WHERE id = ? AND section_id = ?",
@@ -1281,6 +1363,8 @@ def delete_grade_item(subject, section, item_id):
 
 def save_grade_scores(subject, section, entries):
     """Save [(enrollment_id, item_id, score_or_none), ...] for a section."""
+    if is_subject_archived(subject):
+        raise ValueError(f"Subject '{subject}' is archived and read-only.")
     def run(conn):
         sec_id = _section_of(conn, subject, section)
         valid_items, locked_items = {}, {}

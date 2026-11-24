@@ -188,9 +188,25 @@ table.stu-table tr:hover td { background: var(--hover); }
       </div>
     </div>
 
-    <!-- Danger Subject Actions -->
+    <!-- Subject Action Buttons -->
     {% if not is_monitor %}
-    <div>
+    <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+      {% if is_archived %}
+      <form class="inline" method="post" action="{{ url_for('subjects_unarchive') }}"
+            onsubmit="return confirm('Restore {{ subject|e }} to active status?')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <button class="btn small primary" type="submit">Restore Active</button>
+      </form>
+      {% else %}
+      <form class="inline" method="post" action="{{ url_for('subjects_archive') }}"
+            onsubmit="return confirm('📦 ARCHIVE {{ subject|e }}?\n\nThis marks the subject as completed. It will be hidden from daily roll calls and active workflows, but all attendance records, grades, and logs are preserved and read-only. Continue?')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <button class="btn small secondary" type="submit" title="Archive this completed subject">
+          <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+          <span>Archive</span>
+        </button>
+      </form>
+      {% endif %}
       <form class="inline" method="post" action="{{ url_for('subjects_delete') }}"
             onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently remove this subject, all sections, and attendance records. Continue?')">
         <input type="hidden" name="subject" value="{{ subject }}">
@@ -384,6 +400,60 @@ table.stu-table tr:hover td { background: var(--hover); }
   {% if rows %}
   <div class="stu-noresult" id="stuNoResult">No students match this search filter.</div>
   {% endif %}
+</div>
+{% endif %}
+
+<!-- Preserved Archived Subjects -->
+{% if archived_subjects %}
+<div class="card" style="margin-top:24px;border-color:var(--line-strong)">
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none" style="color:var(--muted)"><rect width="20" height="5" x="2" y="3" rx="1"/><path d="M4 8v11a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8"/><path d="M10 12h4"/></svg>
+      <h2 style="font-size:15px">Archived Subjects (Preserved Records)</h2>
+    </div>
+    <span class="badge" style="background:var(--surface);border:1px solid var(--line);font-size:11.5px">{{ archived_subjects|length }} Archived</span>
+  </div>
+  <p class="muted" style="margin-top:0;font-size:12.5px">
+    These subjects are marked as completed. Their attendance sheets and grade records are preserved in read-only mode and remain accessible for search, inspection, and Excel exports.
+  </p>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Subject Name</th>
+          <th>Enrolled Students</th>
+          <th>Archived Date</th>
+          <th>Note</th>
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for asub in archived_subjects %}
+        <tr>
+          <td>
+            <div style="display:flex;align-items:center;gap:6px">
+              <b>{{ asub.name }}</b>
+              <span class="badge" style="background:var(--surface);border:1px solid var(--line);font-size:10px">Archived</span>
+            </div>
+          </td>
+          <td>{{ asub.n_students }} students</td>
+          <td style="font-size:12px;color:var(--muted)">{{ asub.archived_at[:10] if asub.archived_at else '—' }}</td>
+          <td style="font-size:12px;color:var(--muted)">{{ asub.archive_note or '—' }}</td>
+          <td style="text-align:right;white-space:nowrap">
+            <a class="btn small secondary" href="{{ url_for('records', subject=asub.name) }}">View Records</a>
+            <a class="btn small secondary" href="{{ url_for('grades_page', subject=asub.name) }}">Gradebook</a>
+            {% if not is_monitor %}
+            <form class="inline" method="post" action="{{ url_for('subjects_unarchive') }}" style="display:inline;margin-left:4px" onsubmit="return confirm('Restore {{ asub.name|e }} back to active status?')">
+              <input type="hidden" name="subject" value="{{ asub.name }}">
+              <button class="btn small primary" type="submit">Restore Active</button>
+            </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
 </div>
 {% endif %}
 

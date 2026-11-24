@@ -52,6 +52,19 @@ class AttendanceRepository(
         }
     }
 
+    suspend fun getMe(): Result<UserProfileResponse> = withContext(Dispatchers.IO) {
+        try {
+            val resp = apiService.getCurrentUser()
+            if (resp.isSuccessful && resp.body()?.ok == true) {
+                Result.success(resp.body()!!)
+            } else {
+                Result.failure(Exception("Failed to fetch user profile"))
+            }
+        } catch (e: Exception) {
+            Result.failure(e)
+        }
+    }
+
     suspend fun getDashboard(): Result<DashboardResponse> = withContext(Dispatchers.IO) {
         try {
             val resp = apiService.getDashboard()

@@ -312,6 +312,117 @@ def test_grades_weights_lock_and_scale():
     assert "Midterm" in lk
 
 
+def test_archive_and_unarchive_subject():
+    c = _teacher_client()
+    # Add a dedicated test subject
+    c.post("/subjects/add", data={"name": "Test History 101"})
+    assert "Test History 101" in [s["name"] for s in store.list_subjects_with_owners()]
+    assert not store.is_subject_archived("Test History 101")
+
+    # Archive the subject
+    res = c.post("/subjects/archive", data={"subject": "Test History 101", "note": "Finished semester"})
+    assert res.status_code == 302
+    assert store.is_subject_archived("Test History 101")
+
+    # It must not show up in active dashboard or load_data
+    assert "Test History 101" not in store.load_data()
+    assert "Test History 101" in store.load_data(include_archived=True)
+
+    # Navigating to mark should redirect with warning
+    mark_res = c.get("/mark?subject=Test+History+101")
+    assert mark_res.status_code == 302
+    assert "/records" in mark_res.headers["Location"]
+
+    # Records and Gradebook remain accessible and display ARCHIVED SUBJECT
+    rec_html = c.get("/records?subject=Test+History+101").get_data(as_text=True)
+    assert "ARCHIVED SUBJECT" in rec_html
+
+    gb_html = c.get("/grades?subject=Test+History+101").get_data(as_text=True)
+    assert "ARCHIVED SUBJECT" in gb_html
+
+    # Students page shows it under Archived Subjects
+    stu_html = c.get("/students").get_data(as_text=True)
+    assert "Archived Subjects (Preserved Records)" in stu_html
+    assert "Test History 101" in stu_html
+
+    # Restore the subject
+    unres = c.post("/subjects/unarchive", data={"subject": "Test History 101"})
+    assert unres.status_code == 302
+    assert not store.is_subject_archived("Test History 101")
+
+    # Clean up
+    c.post("/subjects/delete", data={"subject": "Test History 101"})
+
+
+def test_mobile_rest_api_endpoints():
+    client = app.test_client()
+
+    # 1. Unauthenticated requests to API endpoints return 401
+    assert client.get("/api/me").status_code == 401
+    assert client.get("/api/dashboard").status_code == 401
+    assert client.get("/api/subjects").status_code == 401
+
+    # 2. Login via /api/login with invalid password
+    bad_login = client.post("/api/login", json={"password": "wrongpassword"})
+    assert bad_login.status_code == 401
+    assert not bad_login.get_json()["ok"]
+
+    # 3. Login via /api/login with valid teacher password
+    good_login = client.post("/api/login", json={"password": "teacherpass1"})
+    assert good_login.status_code == 200
+    login_data = good_login.get_json()
+    assert login_data["ok"]
+    assert login_data["role"] == "teacher"
+
+    # 4. /api/me returns active session
+    me = client.get("/api/me").get_json()
+    assert me["ok"]
+    assert me["authenticated"]
+    assert me["role"] == "teacher"
+
+    # 5. /api/dashboard returns academic overview stats & cards
+    dash = client.get("/api/dashboard").get_json()
+    assert dash["ok"]
+    assert "overview" in dash
+    assert dash["overview"]["total_students"] > 0
+    assert len(dash["cards"]) > 0
+
+    # 6. /api/subjects returns active and archived subjects
+    subs = client.get("/api/subjects").get_json()
+    assert subs["ok"]
+    assert len(subs["subjects"]) > 0
+    sub_name = subs["subjects"][0]["name"]
+    sec_name = subs["subjects"][0]["sections"][0]
+
+    # 7. /api/mark returns roster and attendance state
+    mark_data = client.get(f"/api/mark?subject={sub_name}&section={sec_name}").get_json()
+    assert mark_data["ok"]
+    assert mark_data["subject"] == sub_name
+    assert len(mark_data["students"]) > 0
+
+    # 8. /api/records returns attendance matrix
+    rec_data = client.get(f"/api/records?subject={sub_name}&section={sec_name}").get_json()
+    assert rec_data["ok"]
+    assert "rows" in rec_data
+
+    # 9. /api/grades returns gradebook items and rows
+    grade_data = client.get(f"/api/grades?subject={sub_name}&section={sec_name}").get_json()
+    assert grade_data["ok"]
+    assert "weights" in grade_data
+
+    # 10. /api/lookup returns matching students
+    lookup_data = client.get("/api/lookup?q=Sample").get_json()
+    assert lookup_data["ok"]
+    assert lookup_data["total_matches"] > 0
+
+    # 11. /api/logout terminates the session
+    logout_res = client.post("/api/logout")
+    assert logout_res.status_code == 200
+    assert client.get("/api/me").status_code == 401
+
+
+
+
 
 
 

@@ -82,7 +82,7 @@ def build_index(data):
 
 @app.route("/lookup")
 def lookup():
-    data = load_data()
+    data = load_data(include_archived=True)
     people, all_sections = build_index(data)
     q = clean_name(request.args.get("q", ""))
     subject = request.args.get("subject", "")
