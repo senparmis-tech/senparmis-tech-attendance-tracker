@@ -35,6 +35,11 @@ import kotlinx.coroutines.launch
 @Composable
 fun SettingsScreen(
     onNavigateBack: () -> Unit,
+    onManageStudents: () -> Unit,
+    onManageTerms: () -> Unit,
+    onManageActivity: () -> Unit,
+    onManageAccounts: () -> Unit,
+    onManageGrades: () -> Unit,
     onLogout: () -> Unit
 ) {
     val sessionManager = AttendanceApp.instance.sessionManager
@@ -160,6 +165,26 @@ fun SettingsScreen(
                         color = Slate400,
                         fontSize = 11.sp
                     )
+                }
+            }
+
+            // Server Configuration section
+            SectionHeader(icon = Icons.Default.Settings, title = "MANAGEMENT")
+            Card(
+                colors = CardDefaults.cardColors(containerColor = Navy900),
+                border = androidx.compose.foundation.BorderStroke(1.dp, Slate800),
+                shape = RoundedCornerShape(8.dp), modifier = Modifier.fillMaxWidth()
+            ) {
+                Column(Modifier.padding(12.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onManageStudents, modifier = Modifier.weight(1f)) { Text("Students") }
+                        OutlinedButton(onClick = onManageGrades, modifier = Modifier.weight(1f)) { Text("Grade setup") }
+                    }
+                    Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        OutlinedButton(onClick = onManageTerms, modifier = Modifier.weight(1f)) { Text("Terms") }
+                        OutlinedButton(onClick = onManageActivity, modifier = Modifier.weight(1f)) { Text("Activity log") }
+                    }
+                    OutlinedButton(onClick = onManageAccounts, modifier = Modifier.fillMaxWidth()) { Text("Accounts") }
                 }
             }
 

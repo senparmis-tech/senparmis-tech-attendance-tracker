@@ -5,6 +5,7 @@ import com.senparmitech.attendancetracker.data.api.ApiClient
 import com.senparmitech.attendancetracker.data.api.SessionManager
 import com.senparmitech.attendancetracker.data.local.AppDatabase
 import com.senparmitech.attendancetracker.data.repository.AttendanceRepository
+import com.senparmitech.attendancetracker.data.repository.ManageRepository
 
 class AttendanceApp : Application() {
 
@@ -15,6 +16,9 @@ class AttendanceApp : Application() {
         private set
 
     lateinit var repository: AttendanceRepository
+        private set
+
+    lateinit var manage: ManageRepository
         private set
 
     override fun onCreate() {
@@ -29,6 +33,7 @@ class AttendanceApp : Application() {
             database.draftDao(),
             sessionManager
         )
+        manage = ManageRepository { ApiClient.getApiService(sessionManager) }
     }
 
     companion object {

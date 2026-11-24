@@ -2,12 +2,12 @@ package com.senparmitech.attendancetracker.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Dark Navy Palette
-val Navy950 = Color(0xFF020D2E)
-val Navy900 = Color(0xFF071544)
-val Navy850 = Color(0xFF0A1B55)
-val Navy800 = Color(0xFF0E2266)
-val Navy700 = Color(0xFF17307F)
+// Same dark navy and blue as the website (static/css/app.css)
+val Navy950 = Color(0xFF070D18)
+val Navy900 = Color(0xFF0B1526)
+val Navy850 = Color(0xFF0F1C32)
+val Navy800 = Color(0xFF14243E)
+val Navy700 = Color(0xFF1C3254)
 val Slate800 = Color(0xFF1E293B)
 val Slate700 = Color(0xFF334155)
 val Slate500 = Color(0xFF64748B)
@@ -16,14 +16,12 @@ val Slate300 = Color(0xFFCBD5E1)
 val Slate200 = Color(0xFFE2E8F0)
 val Slate50  = Color(0xFFF8FAFC)
 
-// Accent. The names say Blue for historical reasons; these are the school's lime green.
-// Blue600/500 are the darker greens for filled buttons (white text), Blue400 is the bright
-// logo green for text and icons on navy.
-val Blue600 = Color(0xFF4D7C0F)
-val Blue500 = Color(0xFF5F9A12)
-val Blue400 = Color(0xFF9DC92F)
+// Blue600 is for filled buttons (white text), Blue400 for text and icons on navy.
+val Blue600 = Color(0xFF1D4ED8)
+val Blue500 = Color(0xFF2563EB)
+val Blue400 = Color(0xFF60A5FA)
 
-// Attendance Status Colors (Philippine Standard)
+// Attendance status colors
 val PresentGreen = Color(0xFF15803D)
 val PresentBg    = Color(0xFFDCFCE7)
 val AbsentRed    = Color(0xFFB91C1C)

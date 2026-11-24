@@ -37,6 +37,17 @@ sealed class Screen(val route: String) {
     object Subjects    : Screen("subjects")
     object Lookup      : Screen("lookup")
     object Settings    : Screen("settings")
+    object Students    : Screen("manage/students")
+    object Terms       : Screen("manage/terms")
+    object ActivityLog : Screen("manage/activity")
+    object Accounts    : Screen("manage/accounts")
+    object GradeSetupPicker : Screen("manage/grade-setup")
+    object GradeSetup  : Screen("manage/grade-setup/{subject}/{section}") {
+        fun route(subject: String, section: String) = "manage/grade-setup/${URLEncoder.encode(subject, "UTF-8")}/${URLEncoder.encode(section, "UTF-8")}"
+    }
+    object ScoreRollCall : Screen("manage/score-roll-call/{subject}/{section}/{itemId}") {
+        fun route(subject: String, section: String, itemId: Int) = "manage/score-roll-call/${URLEncoder.encode(subject, "UTF-8")}/${URLEncoder.encode(section, "UTF-8")}/$itemId"
+    }
     object Mark        : Screen("mark/{subject}/{section}/{date}") {
         fun route(subject: String, section: String, date: String): String {
             val encS = URLEncoder.encode(subject, StandardCharsets.UTF_8.toString())
@@ -175,12 +186,35 @@ fun AppNavigation() {
             composable(Screen.Settings.route) {
                 SettingsScreen(
                     onNavigateBack = { navController.popBackStack() },
+                    onManageStudents = { navController.navigate(Screen.Students.route) },
+                    onManageTerms = { navController.navigate(Screen.Terms.route) },
+                    onManageActivity = { navController.navigate(Screen.ActivityLog.route) },
+                    onManageAccounts = { navController.navigate(Screen.Accounts.route) },
+                    onManageGrades = { navController.navigate(Screen.GradeSetupPicker.route) },
                     onLogout = {
                         navController.navigate(Screen.Login.route) {
                             popUpTo(0) { inclusive = true }
                         }
                     }
                 )
+            }
+
+            composable(Screen.Students.route) { StudentsScreen() }
+            composable(Screen.Terms.route) { TermsScreen(onBack = { navController.popBackStack() }) }
+            composable(Screen.ActivityLog.route) { ActivityLogScreen(onBack = { navController.popBackStack() }) }
+            composable(Screen.Accounts.route) { AccountsScreen(onBack = { navController.popBackStack() }) }
+            composable(Screen.GradeSetupPicker.route) {
+                GradeSetupPickerScreen(onBack = { navController.popBackStack() }, onPick = { s, sec -> navController.navigate(Screen.GradeSetup.route(s, sec)) })
+            }
+            composable(Screen.GradeSetup.route, arguments = listOf(navArgument("subject") { type = NavType.StringType }, navArgument("section") { type = NavType.StringType })) { entry ->
+                val s = URLDecoder.decode(entry.arguments?.getString("subject") ?: "", "UTF-8")
+                val sec = URLDecoder.decode(entry.arguments?.getString("section") ?: "", "UTF-8")
+                GradeSetupScreen(s, sec, onNavigateBack = { navController.popBackStack() }, onRollCall = { id -> navController.navigate(Screen.ScoreRollCall.route(s, sec, id)) })
+            }
+            composable(Screen.ScoreRollCall.route, arguments = listOf(navArgument("subject") { type = NavType.StringType }, navArgument("section") { type = NavType.StringType }, navArgument("itemId") { type = NavType.IntType })) { entry ->
+                val s = URLDecoder.decode(entry.arguments?.getString("subject") ?: "", "UTF-8")
+                val sec = URLDecoder.decode(entry.arguments?.getString("section") ?: "", "UTF-8")
+                ScoreRollCallScreen(s, sec, entry.arguments?.getInt("itemId") ?: 0, onNavigateBack = { navController.popBackStack() })
             }
 
             // ── Mark Attendance ───────────────────────────────────────────────

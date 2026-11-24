@@ -105,7 +105,36 @@ fun DashboardScreen(
                 contentPadding = PaddingValues(vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(14.dp)
             ) {
-                // Academic Statistics 2x3 Grid
+                item {
+                    Text(
+                        text = "TODAY'S CLASSES",
+                        style = MaterialTheme.typography.labelSmall,
+                        color = Slate400,
+                        fontWeight = FontWeight.Bold,
+                        modifier = Modifier.padding(bottom = 2.dp)
+                    )
+                }
+                items(data.cards) { card ->
+                    SubjectSectionCard(
+                        card = card,
+                        todayIso = data.today_iso,
+                        onMark = { onNavigateToMark(card.subject, card.section, data.today_iso) },
+                        onRecords = { onNavigateToRecords(card.subject, card.section) },
+                        onGrades = { onNavigateToGrades(card.subject, card.section) }
+                    )
+                }
+                if (data.cards.isEmpty()) {
+                    item {
+                        Text(
+                            "No classes are assigned to your account yet.",
+                            color = Slate400,
+                            style = MaterialTheme.typography.bodyMedium,
+                            modifier = Modifier.padding(vertical = 8.dp)
+                        )
+                    }
+                }
+
+                // Secondary academic overview follows the daily actions.
                 item {
                     Text(
                         text = "ACADEMIC OVERVIEW",
@@ -162,25 +191,6 @@ fun DashboardScreen(
                     }
                 }
 
-                item {
-                    Text(
-                        text = "CLASS SECTIONS & ROLL CALL STATUS",
-                        style = MaterialTheme.typography.labelSmall,
-                        color = Slate400,
-                        fontWeight = FontWeight.Bold,
-                        modifier = Modifier.padding(top = 8.dp)
-                    )
-                }
-
-                items(data.cards) { card ->
-                    SubjectSectionCard(
-                        card = card,
-                        todayIso = data.today_iso,
-                        onMark = { onNavigateToMark(card.subject, card.section, data.today_iso) },
-                        onRecords = { onNavigateToRecords(card.subject, card.section) },
-                        onGrades = { onNavigateToGrades(card.subject, card.section) }
-                    )
-                }
             }
         }
     }
@@ -306,37 +316,40 @@ fun SubjectSectionCard(
 
             Spacer(modifier = Modifier.height(12.dp))
 
-            Row(
+            Column(
                 modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                verticalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 Button(
                     onClick = onMark,
                     shape = RoundedCornerShape(6.dp),
                     colors = ButtonDefaults.buttonColors(containerColor = if (card.today_recorded) Navy800 else Blue600),
-                    modifier = Modifier.weight(1.3f)
+                    modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 10.dp)
                 ) {
                     Text(
-                        text = if (card.today_recorded) "Update Roll Call" else "Take Roll Call",
+                        text = if (card.today_recorded) "Update attendance" else "Take attendance",
                         fontWeight = FontWeight.Bold,
-                        fontSize = 12.5.sp
+                        fontSize = 14.sp
                     )
                 }
-                OutlinedButton(
-                    onClick = onRecords,
-                    shape = RoundedCornerShape(6.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Records", fontSize = 12.sp, color = Slate200)
-                }
-                OutlinedButton(
-                    onClick = onGrades,
-                    shape = RoundedCornerShape(6.dp),
-                    border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
-                    modifier = Modifier.weight(1f)
-                ) {
-                    Text("Grades", fontSize = 12.sp, color = Slate200)
+                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    OutlinedButton(
+                        onClick = onRecords,
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
+                        modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                    ) {
+                        Text("Records", fontSize = 13.sp, color = Slate200, maxLines = 1)
+                    }
+                    OutlinedButton(
+                        onClick = onGrades,
+                        shape = RoundedCornerShape(6.dp),
+                        border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
+                        modifier = Modifier.weight(1f).heightIn(min = 44.dp)
+                    ) {
+                        Text("Grades", fontSize = 13.sp, color = Slate200, maxLines = 1)
+                    }
                 }
             }
         }

@@ -76,13 +76,16 @@
       <form method="post" action="{{ url_for('login') }}">
         <div class="portal-field">
           <label for="username">Username / Account ID</label>
-          <input type="text" id="username" name="username" value="{{ username or '' }}" autocomplete="username" placeholder="e.g. prof_name (or blank for student)">
-          <div class="portal-hint">Students: Leave blank to view class records.</div>
+          <input type="text" id="username" name="username" value="{{ username or '' }}" autocomplete="username" autocapitalize="none" spellcheck="false" placeholder="Faculty username (leave blank if you are a student)" aria-describedby="username-help">
+          <div class="portal-hint" id="username-help">Students: leave this blank and enter your student access key.</div>
         </div>
 
         <div class="portal-field">
           <label for="password">Password or Student Key</label>
-          <input type="password" id="password" name="password" autofocus autocomplete="current-password" placeholder="Enter your password or access key" required>
+          <div class="portal-password-wrap">
+            <input type="password" id="password" name="password" autocomplete="current-password" placeholder="Enter your password or access key" required>
+            <button class="portal-password-toggle" type="button" id="passwordToggle" aria-label="Show password" aria-pressed="false">Show</button>
+          </div>
         </div>
 
         <button class="btn primary" type="submit" style="width:100%;margin-top:8px;min-height:44px;font-size:14.5px;font-weight:700">
@@ -97,4 +100,19 @@
     </div>
   </div>
 </div>
+<script>
+  (() => {
+    const input = document.getElementById('password');
+    const toggle = document.getElementById('passwordToggle');
+    if (!input || !toggle) return;
+    toggle.addEventListener('click', () => {
+      const reveal = input.type === 'password';
+      input.type = reveal ? 'text' : 'password';
+      toggle.textContent = reveal ? 'Hide' : 'Show';
+      toggle.setAttribute('aria-label', reveal ? 'Hide password' : 'Show password');
+      toggle.setAttribute('aria-pressed', String(reveal));
+      input.focus();
+    });
+  })();
+</script>
 {% endblock %}

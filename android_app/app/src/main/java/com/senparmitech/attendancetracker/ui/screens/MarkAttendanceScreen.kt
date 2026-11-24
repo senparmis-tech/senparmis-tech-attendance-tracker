@@ -6,11 +6,13 @@ import androidx.compose.animation.core.tween
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
@@ -506,7 +508,7 @@ private fun ListModeView(
                             border = androidx.compose.foundation.BorderStroke(1.dp, PresentGreen.copy(alpha = 0.5f)),
                             shape = RoundedCornerShape(4.dp),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(30.dp)
+                            modifier = Modifier.heightIn(min = 44.dp)
                         ) {
                             Icon(Icons.Default.Check, contentDescription = null, tint = PresentGreen, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -517,7 +519,7 @@ private fun ListModeView(
                             shape = RoundedCornerShape(4.dp),
                             border = androidx.compose.foundation.BorderStroke(1.dp, Slate700),
                             contentPadding = PaddingValues(horizontal = 10.dp, vertical = 4.dp),
-                            modifier = Modifier.height(30.dp)
+                            modifier = Modifier.heightIn(min = 44.dp)
                         ) {
                             Icon(Icons.Default.Refresh, contentDescription = null, tint = Slate400, modifier = Modifier.size(12.dp))
                             Spacer(modifier = Modifier.width(4.dp))
@@ -577,6 +579,7 @@ private fun ListModeView(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
+                .horizontalScroll(rememberScrollState())
                 .padding(horizontal = 14.dp, vertical = 2.dp),
             horizontalArrangement = Arrangement.spacedBy(4.dp)
         ) {
@@ -1121,7 +1124,8 @@ private fun CountFilterPill(
             .background(if (isSelected) Navy800 else Navy950, RoundedCornerShape(16.dp))
             .border(1.dp, if (isSelected) accentColor else Slate800, RoundedCornerShape(16.dp))
             .clickable { onClick() }
-            .padding(horizontal = 8.dp, vertical = 4.dp),
+            .heightIn(min = 40.dp)
+            .padding(horizontal = 10.dp, vertical = 6.dp),
         contentAlignment = Alignment.Center
     ) {
         Row(verticalAlignment = Alignment.CenterVertically) {

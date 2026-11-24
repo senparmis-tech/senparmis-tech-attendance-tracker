@@ -1447,22 +1447,21 @@ td.c.r { background: var(--rbg); color: var(--r-ink); }
    PORTAL / SIGN IN STYLING
    ===================================================================== */
 .portal-wrap {
-  max-width: 960px;
-  margin: 32px auto;
-  padding: 0 16px;
+  width: min(1180px, calc(100% - 40px));
+  margin: clamp(20px, 4vh, 42px) auto 48px;
 }
 .portal-grid {
   display: grid;
-  grid-template-columns: 1.15fr 0.85fr;
-  gap: 24px;
-  align-items: stretch;
+  grid-template-columns: minmax(0, 1.08fr) minmax(360px, 0.92fr);
+  gap: clamp(18px, 2.5vw, 30px);
+  align-items: start;
 }
 .portal-banner {
   background: var(--navy-900);
   color: #ffffff;
   border: 1px solid var(--navy-700);
-  border-radius: var(--radius-md);
-  padding: 32px 28px;
+  border-radius: 16px;
+  padding: clamp(24px, 3vw, 36px);
   display: flex;
   flex-direction: column;
   box-shadow: var(--shadow-md);
@@ -1560,11 +1559,11 @@ td.c.r { background: var(--rbg); color: var(--r-ink); }
 .portal-card {
   background: var(--card);
   border: 1px solid var(--line);
-  border-radius: var(--radius-md);
-  padding: 32px 28px;
+  border-radius: 16px;
+  padding: clamp(26px, 3vw, 38px);
   display: flex;
   flex-direction: column;
-  justify-content: center;
+  justify-content: flex-start;
   box-shadow: var(--shadow-sm);
 }
 .portal-card-header {
@@ -1600,6 +1599,31 @@ td.c.r { background: var(--rbg); color: var(--r-ink); }
   background: var(--card);
   color: var(--ink);
 }
+.portal-field input:focus-visible {
+  outline: 3px solid rgba(37, 99, 235, 0.22);
+  outline-offset: 1px;
+  border-color: var(--blue-500);
+}
+.portal-password-wrap { position: relative; }
+.portal-password-wrap input { padding-right: 66px; }
+.portal-password-toggle {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  min-width: 48px;
+  min-height: 40px;
+  border: 0;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--blue-500);
+  font: inherit;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+.portal-password-toggle:hover { background: rgba(37, 99, 235, 0.08); }
+.portal-password-toggle:focus-visible { outline: 2px solid var(--blue-500); }
 .portal-hint {
   font-size: 11.5px;
   color: var(--muted);
@@ -1607,10 +1631,20 @@ td.c.r { background: var(--rbg); color: var(--r-ink); }
 }
 
 @media (max-width: 820px) {
-  .portal-wrap { margin: 16px auto; padding: 0 8px; }
-  .portal-grid { grid-template-columns: 1fr; gap: 16px; }
+  .portal-wrap { width: min(620px, calc(100% - 28px)); margin: 14px auto 28px; }
+  .portal-grid { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .portal-card { order: -1; }
   .portal-banner { padding: 22px 18px; }
   .portal-card { padding: 24px 20px; }
+  .portal-guide-list { gap: 8px; margin-bottom: 16px; }
+}
+
+@media (max-width: 420px) {
+  .portal-wrap { width: calc(100% - 20px); margin-top: 10px; }
+  .portal-card { padding: 22px 16px; }
+  .portal-banner { padding: 20px 16px; }
+  .portal-title { font-size: 20px; }
+  .portal-logo-wrap { margin-bottom: 14px; }
 }
 
 /* Institutional Footer */
