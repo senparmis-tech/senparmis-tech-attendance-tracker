@@ -38,33 +38,33 @@
       <!-- Desktop Primary Segmented Navigation -->
       <nav class="desktop-nav" aria-label="Academic workspace navigation">
         <div class="nav-pill-group">
-          <a href="{{ url_for('dashboard') }}" title="Overview Dashboard" class="nav-item {{ 'on' if page=='dashboard' }}">
+          <a href="{{ url_for('dashboard') }}" title="Overview Dashboard" aria-label="Dashboard" class="nav-item {{ 'on' if page=='dashboard' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
             <span>Dashboard</span>
           </a>
-          <a href="{{ url_for('mark') }}" title="Mark Daily Attendance" class="nav-item {{ 'on' if page=='mark' }}">
+          <a href="{{ url_for('mark') }}" title="Mark Daily Attendance" aria-label="Mark attendance" class="nav-item {{ 'on' if page=='mark' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
             <span>Mark</span>
           </a>
-          <a href="{{ url_for('scan') }}" title="Import Attendance Records" class="nav-item {{ 'on' if page=='scan' }}">
+          <a href="{{ url_for('scan') }}" title="Import Attendance Records" aria-label="Import" class="nav-item {{ 'on' if page=='scan' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
             <span>Import</span>
           </a>
-          <a href="{{ url_for('records') }}" title="Class Attendance Records" class="nav-item {{ 'on' if page=='records' }}">
+          <a href="{{ url_for('records') }}" title="Class Attendance Records" aria-label="Records" class="nav-item {{ 'on' if page=='records' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
             <span>Records</span>
           </a>
           {% if not is_monitor %}
-          <a href="{{ url_for('grades_page') }}" title="Gradebook & Philippine Scale" class="nav-item {{ 'on' if page=='grades' }}">
+          <a href="{{ url_for('grades_page') }}" title="Gradebook & Philippine Scale" aria-label="Gradebook" class="nav-item {{ 'on' if page=='grades' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
             <span>Gradebook</span>
           </a>
           {% endif %}
-          <a href="{{ url_for('students') }}" title="Manage Students & Subjects" class="nav-item {{ 'on' if page=='students' }}">
+          <a href="{{ url_for('students') }}" title="Manage Students & Subjects" aria-label="Students" class="nav-item {{ 'on' if page=='students' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
             <span>Students</span>
           </a>
-          <a href="{{ url_for('lookup') }}" title="Student Profile & Attendance Lookup" class="nav-item {{ 'on' if page=='lookup' }}">
+          <a href="{{ url_for('lookup') }}" title="Student Profile & Attendance Lookup" aria-label="Student lookup" class="nav-item {{ 'on' if page=='lookup' }}">
             <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
             <span>Lookup</span>
           </a>

@@ -349,6 +349,23 @@ nav.desktop-nav {
   margin: 0 4px;
 }
 
+/* Give primary pages room on laptop-sized viewports. Keep less-used admin
+   actions in the existing navigation drawer before the desktop header crowds. */
+@media (max-width: 1550px) and (min-width: 961px) {
+  .header-inner { gap: 10px; }
+  .brand { gap: 8px; }
+  .brand-sub { display: none; }
+  .desktop-tools, .header-actions .desktop-signout { display: none; }
+  .header-actions .nav-toggle-btn { display: inline-flex; }
+  .nav-item { padding-inline: 8px; font-size: 12px; gap: 4px; }
+  .header-actions { gap: 5px; }
+}
+
+@media (max-width: 1240px) and (min-width: 961px) {
+  .nav-item span { display: none; }
+  .nav-item { min-width: 38px; justify-content: center; padding-inline: 8px; }
+}
+
 /* Theme Toggle Button */
 .theme-toggle-btn {
   width: 34px;
