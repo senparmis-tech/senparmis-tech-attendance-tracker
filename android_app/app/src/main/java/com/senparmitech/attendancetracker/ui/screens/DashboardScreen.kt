@@ -279,6 +279,31 @@ fun SubjectSectionCard(
                 }
             }
 
+            if (card.today_recorded && card.absent_today.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Absent Today: ", fontSize = 11.sp, color = Slate400, fontWeight = FontWeight.SemiBold)
+                    Spacer(modifier = Modifier.width(4.dp))
+                    Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                        card.absent_today.take(3).forEach { name ->
+                            Box(
+                                modifier = Modifier
+                                    .background(AbsentBg, RoundedCornerShape(4.dp))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(name, fontSize = 10.sp, color = AbsentRed, fontWeight = FontWeight.Bold)
+                            }
+                        }
+                        if (card.absent_today.size > 3) {
+                            Text("+${card.absent_today.size - 3} more", fontSize = 10.sp, color = Slate500)
+                        }
+                    }
+                }
+            }
+
             Spacer(modifier = Modifier.height(12.dp))
 
             Row(

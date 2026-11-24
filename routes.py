@@ -989,12 +989,15 @@ def api_dashboard():
             total_sections_count += 1
             today_col = next((x["col"] for x in sec_sd["dates"] if x["date"] == today), None)
             today_counts = None
+            absent_today = []
             if today_col is not None:
                 counts = {"p": 0, "x": 0, "l": 0, "e": 0, "r": 0}
                 for s in sec_sd["students"]:
                     c = sec_sd["cells"].get((s["row"], today_col), "")
                     if c in counts:
                         counts[c] += 1
+                    if c == "x":
+                        absent_today.append(s["name"])
                 today_counts = counts
             else:
                 pending_rollcalls += 1
@@ -1011,6 +1014,7 @@ def api_dashboard():
                 "avg": round(avg, 2) if avg is not None else None,
                 "today_recorded": today_col is not None,
                 "today_counts": today_counts,
+                "absent_today": absent_today,
                 "watch_count": len(watch),
                 "image_url": subject_image_url(subject),
             })

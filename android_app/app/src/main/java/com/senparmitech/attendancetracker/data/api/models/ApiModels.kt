@@ -58,6 +58,7 @@ data class DashboardCard(
     val avg: Double? = null,
     val today_recorded: Boolean = false,
     val today_counts: AttendanceCounts? = null,
+    val absent_today: List<String> = emptyList(),
     val watch_count: Int = 0,
     val image_url: String? = null
 )
