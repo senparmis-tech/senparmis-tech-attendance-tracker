@@ -2,6 +2,7 @@
    SENPARMIS TECH ATTENDANCE TRACKER — MARK ATTENDANCE STYLES
    Institution: Eclaro Academy
    Mobile-First Academic Attendance Marking & Roll Call
+   Enhanced: Gestures, Haptics, Offline, Animations
    ===================================================================== */
 
 .mark-card {
@@ -242,7 +243,39 @@
   padding: 10px 14px;
   box-shadow: var(--shadow-xs);
   transition: all 0.12s ease;
+  position: relative;
+  overflow: visible;
 }
+/* Swipe hint indicators */
+.student-card::before {
+  content: '';
+  position: absolute;
+  left: -12px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--p);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.student-card::after {
+  content: '';
+  position: absolute;
+  right: -12px; top: 50%; transform: translateY(-50%);
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--x);
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  pointer-events: none;
+}
+.student-card[data-swipe-hint="present"]::before {
+  opacity: 0.8; transform: translateY(-50%) scale(1.5);
+}
+.student-card[data-swipe-hint="absent"]::after {
+  opacity: 0.8; transform: translateY(-50%) scale(1.5);
+}
+
 .student-card-head {
   display: flex;
   justify-content: space-between;
@@ -312,7 +345,19 @@
   justify-content: center;
   user-select: none;
   transition: all 0.12s ease;
+  position: relative;
+  overflow: hidden;
 }
+.cb::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.1s;
+  pointer-events: none;
+}
+.cb:active::after { opacity: 0.15; }
 .cb small {
   font-size: 9px;
   font-weight: 600;
@@ -320,9 +365,7 @@
   opacity: 0.85;
   margin-top: 1px;
 }
-.cb:active {
-  transform: scale(0.95);
-}
+.cb:active { transform: scale(0.95); }
 .cb.p.on { background: var(--p); border-color: var(--p); color: #fff; box-shadow: 0 1px 3px rgba(21,128,61,0.3); }
 .cb.x.on { background: var(--x); border-color: var(--x); color: #fff; box-shadow: 0 1px 3px rgba(185,28,28,0.3); }
 .cb.l.on { background: var(--l); border-color: var(--l); color: #fff; box-shadow: 0 1px 3px rgba(180,83,9,0.3); }
@@ -351,6 +394,18 @@
   background: var(--blue-600);
   border-radius: var(--radius-pill);
   transition: width 0.25s ease;
+  position: relative;
+}
+.rc-progress-bar::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: shimmer 1.5s infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
 }
 
 .rc-flashcard {
@@ -358,7 +413,9 @@
   padding: 28px 18px;
   border-radius: var(--radius-md);
   box-shadow: var(--shadow-sm);
+  transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1), box-shadow 0.2s;
 }
+.rc-flashcard:active { transform: scale(0.98); }
 .rc-flashcard-index {
   font-size: 12px;
   font-weight: 700;
@@ -373,6 +430,11 @@
   margin: 10px 0 12px;
   word-break: break-word;
   line-height: 1.25;
+  animation: nameIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes nameIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 .rc-current-badge-slot {
   margin-bottom: 22px;
@@ -386,6 +448,7 @@
   background: var(--surface);
   color: var(--muted);
   border: 1px solid var(--line);
+  transition: all 0.2s ease;
 }
 .rc-current-pill.p { background: var(--pbg); color: var(--p-ink); border-color: var(--p-border); }
 .rc-current-pill.x { background: var(--xbg); color: var(--x-ink); border-color: var(--x-border); }
@@ -415,10 +478,18 @@
   justify-content: center;
   transition: all 0.12s ease;
   user-select: none;
+  position: relative;
+  overflow: hidden;
 }
-.rc-big-btn:active {
-  transform: scale(0.96);
+.rc-big-btn::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: currentColor;
+  opacity: 0;
+  transition: opacity 0.1s;
 }
+.rc-big-btn:active::after { opacity: 0.15; }
 .rc-big-btn .rc-code {
   font-size: 16px;
   font-weight: 800;
@@ -477,6 +548,13 @@
   gap: 10px;
   z-index: 40;
   box-shadow: 0 -4px 12px rgba(0,0,0,0.06);
+  transition: transform 0.3s ease, box-shadow 0.2s;
+}
+.mobile-dock.hidden { transform: translateY(100%); }
+.mobile-dock.dirty .save-btn { animation: pulse 1.5s infinite; }
+@keyframes pulse {
+  0%, 100% { box-shadow: 0 0 0 0 rgba(29, 78, 216, 0.4); }
+  50% { box-shadow: 0 0 0 8px rgba(29, 78, 216, 0); }
 }
 .dock-counts {
   display: flex;
@@ -489,16 +567,20 @@
   border-radius: var(--radius-sm);
   font-size: 12px;
   font-weight: 700;
+  transition: transform 0.15s ease;
 }
+.dcount:active { transform: scale(0.9); }
 .save-btn {
-  height: 42px;
-  padding: 0 16px;
+  min-width: 110px;
+  height: 44px;
+  padding: 0 20px;
   border-radius: var(--radius);
-  font-size: 14px;
+  font-size: 14.5px;
   font-weight: 700;
   flex-shrink: 0;
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
 }
 .save-status-dot {
@@ -507,34 +589,86 @@
   border-radius: 50%;
   background: #cbd5e1;
   display: inline-block;
+  transition: all 0.2s ease;
 }
 .save-status-dot.dirty {
   background: #f59e0b;
   box-shadow: 0 0 6px #f59e0b;
+  animation: dotPulse 1s infinite;
+}
+@keyframes dotPulse {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50% { opacity: 0.6; transform: scale(0.9); }
 }
 
+/* Toast */
 .toast {
   position: fixed;
   left: 50%;
-  transform: translateX(-50%);
-  bottom: calc(72px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%) translateY(20px);
   background: var(--navy-900);
-  color: #fff;
+  color: #ffffff;
   padding: 10px 18px;
   border-radius: var(--radius);
   font-weight: 600;
   font-size: 13.5px;
-  z-index: 60;
-  display: none;
   box-shadow: var(--shadow-md);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease, transform 0.2s ease;
+  z-index: 99;
   white-space: nowrap;
   max-width: 90vw;
 }
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+.toast.err { background: var(--x); color: #fff; }
+.toast.warn { background: var(--l); color: #fff; }
+@keyframes toastIn {
+  from { opacity: 0; transform: translateX(-50%) translateY(20px) scale(0.95); }
+  to { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+}
+@keyframes toastOut {
+  to { opacity: 0; transform: translateX(-50%) translateY(-10px) scale(0.95); }
+}
+
+/* Pull to Refresh Indicator */
+.list-view-area[data-pull-ready="true"]::before {
+  content: '↻ Release to refresh';
+  position: sticky;
+  top: -50px;
+  display: block;
+  text-align: center;
+  padding: 10px;
+  color: var(--brand-accent);
+  font-weight: 600;
+  font-size: 13px;
+  animation: bounce 1s infinite;
+}
+@keyframes bounce { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-4px); } }
+
+/* Offline Indicator */
+body.offline .mobile-dock::before {
+  content: '📴 Offline Mode — Changes saved locally';
+  position: absolute;
+  top: -28px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--l);
+  color: #fff;
+  padding: 4px 12px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+  z-index: 50;
+  animation: slideDown 0.3s ease;
+}
+@keyframes slideDown { from { opacity: 0; transform: translateX(-50%) translateY(-10px); } to { opacity: 1; transform: translateX(-50%) translateY(0); } }
+
 /* =====================================================================
    MARK ATTENDANCE — MOBILE-FIRST IMPROVEMENTS (Pass 2)
    ===================================================================== */
 
-/* Date header on small screens — stack elements */
 @media (max-width: 540px) {
   .date-header-row {
     flex-direction: column;
@@ -544,26 +678,21 @@
   .date-nav-group {
     justify-content: space-between;
   }
-  .date-meta {
-    justify-content: flex-start;
-  }
+  .date-meta { justify-content: flex-start; }
   .date-title-text { font-size: 13.5px; }
   .mark-card { padding: 10px 12px; }
 }
 
-/* Search input larger touch target on phones */
 @media (max-width: 540px) {
   .search-wrapper input { min-height: 44px; font-size: 15px; padding: 10px 36px 10px 12px; }
   .fast-btn { min-height: 44px; padding: 8px 12px; font-size: 13px; }
 }
 
-/* Filter pills - ensure scrolling never cuts content */
 @media (max-width: 540px) {
   .filter-pills-bar { padding: 2px 0 12px; margin-bottom: 8px; }
   .fpill { min-height: 36px; padding: 6px 12px; font-size: 13px; }
 }
 
-/* Student card buttons — larger on mobile */
 @media (max-width: 540px) {
   .thumb-buttons-grid { gap: 5px; }
   .cb { height: 48px; font-size: 14px; }
@@ -572,7 +701,6 @@
   .student-card { padding: 10px 12px; }
 }
 
-/* Roll-call flashcard — better on tiny screens */
 @media (max-width: 430px) {
   .rc-flashcard { padding: 20px 12px; }
   .rc-flashcard-name { font-size: 20px; }
@@ -584,7 +712,6 @@
   .rc-nav-row .btn { flex: 1; justify-content: center; }
 }
 
-/* Mobile dock — ensure dcount text doesn't overflow */
 @media (max-width: 430px) {
   .mobile-dock { padding: 8px 10px; gap: 6px; }
   .dcount { font-size: 11px; padding: 2px 5px; }
@@ -600,4 +727,54 @@
 /* Toast position adjustment on has-tabbar */
 body.has-tabbar .toast {
   bottom: calc(var(--tabbar-h) + 70px + env(safe-area-inset-bottom, 0px));
+}
+
+/* =====================================================================
+   GESTURE HINTS & VISUAL POLISH
+   ===================================================================== */
+
+.rc-flashcard[data-gesture="right"]::after {
+  content: '✓ Present';
+  position: absolute;
+  right: -80px; top: 50%; transform: translateY(-50%);
+  background: var(--p); color: #fff;
+  padding: 4px 12px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+  animation: gestureHint 0.2s ease;
+}
+.rc-flashcard[data-gesture="left"]::after {
+  content: '✗ Absent';
+  position: absolute;
+  left: -80px; top: 50%; transform: translateY(-50%);
+  background: var(--x); color: #fff;
+  padding: 4px 12px; border-radius: var(--radius-pill);
+  font-size: 12px; font-weight: 700;
+  white-space: nowrap;
+  animation: gestureHint 0.2s ease;
+}
+@keyframes gestureHint { from { opacity: 0; transform: translateY(-50%) scale(0.8); } to { opacity: 1; transform: translateY(-50%) scale(1); } }
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus visible for accessibility */
+.cb:focus-visible, .rc-big-btn:focus-visible, .fpill:focus-visible,
+.mode-btn:focus-visible, .fast-btn:focus-visible, .date-arrow-btn:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Save button dirty state */
+.save-btn.dirty {
+  background: var(--blue-600);
+  border-color: var(--blue-600);
+  color: #fff;
+  animation: pulse 1.5s infinite;
 }

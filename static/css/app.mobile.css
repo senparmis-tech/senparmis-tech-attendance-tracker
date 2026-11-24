@@ -1,0 +1,447 @@
+/* =====================================================================
+   MOBILE UX ENHANCEMENTS — Global additions to app.css
+   Add these to your existing app.css or include as separate file
+   ===================================================================== */
+
+/* =====================================================================
+   TOUCH TARGETS & INTERACTIONS
+   ===================================================================== */
+
+/* Minimum 44x44 touch targets everywhere */
+button, .btn, a.btn, input[type=submit], input[type=button],
+.nav-item, .tool-link, .tab, .fpill, .cb, .rc-big-btn,
+.mode-btn, .fast-btn, .date-arrow-btn, .today-chip,
+.mnav-tile, .mnav-chip, .sec-pill, .tabbar a, .tabbar button {
+  min-height: 44px;
+  min-width: 44px;
+  touch-action: manipulation;
+}
+
+/* Active/touch states for better feedback */
+@media (hover: none) and (pointer: coarse) {
+  .btn:active, .nav-item:active, .tool-link:active,
+  .tab:active, .fpill:active, .cb:active, .rc-big-btn:active,
+  .mode-btn:active, .fast-btn:active, .mnav-tile:active,
+  .mnav-chip:active, .sec-pill:active, .tabbar a:active {
+    transform: scale(0.97);
+    transition: transform 0.05s ease;
+  }
+}
+
+/* Ripple effect for primary actions */
+@supports (background: paint(ripple)) {
+  .btn.primary, .rc-big-btn, .save-btn {
+    position: relative;
+    overflow: hidden;
+  }
+  .btn.primary::before, .rc-big-btn::before, .save-btn::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(circle at center, currentColor 0%, transparent 70%);
+    opacity: 0;
+    pointer-events: none;
+  }
+  .btn.primary:active::before, .rc-big-btn:active::before, .save-btn:active::before {
+    animation: ripple 0.4s ease-out;
+    opacity: 0.15;
+  }
+}
+@keyframes ripple {
+  from { transform: scale(0); opacity: 0.2; }
+  to { transform: scale(2.5); opacity: 0; }
+}
+
+/* =====================================================================
+   GESTURE AFFORDANCES
+   ===================================================================== */
+
+/* Swipe indicator on cards */
+.swipe-hint {
+  position: relative;
+}
+.swipe-hint::before {
+  content: '← Swipe for Absent';
+  position: absolute;
+  right: -120px; top: 50%; transform: translateY(-50%);
+  background: var(--x); color: #fff;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: 600; white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.swipe-hint.swiping-left::before { opacity: 0.8; }
+
+.swipe-hint::after {
+  content: 'Swipe for Present →';
+  position: absolute;
+  left: -120px; top: 50%; transform: translateY(-50%);
+  background: var(--p); color: #fff;
+  padding: 2px 8px; border-radius: var(--radius-pill);
+  font-size: 10px; font-weight: 600; white-space: nowrap;
+  opacity: 0; pointer-events: none;
+  transition: opacity 0.2s;
+}
+.swipe-hint.swiping-right::after { opacity: 0.8; }
+
+/* =====================================================================
+   BOTTOM SHEET / ACTION SHEET (for mobile actions)
+   ===================================================================== */
+
+.action-sheet {
+  position: fixed;
+  bottom: 0; left: 0; right: 0;
+  background: var(--card);
+  border-top-left-radius: var(--radius-lg);
+  border-top-right-radius: var(--radius-lg);
+  box-shadow: 0 -4px 20px rgba(0,0,0,0.15);
+  z-index: 100;
+  transform: translateY(100%);
+  transition: transform 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  max-height: 80vh;
+  overflow-y: auto;
+  padding-bottom: env(safe-area-inset-bottom, 0px);
+}
+.action-sheet.open { transform: translateY(0); }
+.action-sheet-backdrop {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,0.4);
+  backdrop-filter: blur(4px);
+  z-index: 99;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+.action-sheet-backdrop.open { opacity: 1; visibility: visible; }
+.action-sheet-handle {
+  width: 36px; height: 4px;
+  background: var(--line); border-radius: 2px;
+  margin: 10px auto 6px;
+}
+.action-sheet-title {
+  padding: 0 16px 12px;
+  font-weight: 700; font-size: 15px;
+  color: var(--ink);
+  border-bottom: 1px solid var(--line);
+  margin-bottom: 8px;
+}
+.action-sheet-content { padding: 8px 16px 16px; }
+.action-sheet-item {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 12px;
+  border-radius: var(--radius);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  margin-bottom: 8px;
+  font-size: 14px; font-weight: 600;
+  color: var(--ink);
+  cursor: pointer;
+  touch-action: manipulation;
+  transition: all 0.1s;
+}
+.action-sheet-item:active { background: var(--hover); transform: scale(0.98); }
+.action-sheet-item.danger { color: var(--x-ink); background: var(--xbg); border-color: var(--x-border); }
+.action-sheet-item.primary { color: #fff; background: var(--blue-600); border-color: var(--blue-600); }
+.action-sheet-close {
+  width: 100%; padding: 12px;
+  margin-top: 8px;
+  background: var(--surface); border: 1px solid var(--line);
+  border-radius: var(--radius); font-weight: 600;
+}
+
+/* =====================================================================
+   SKELETON LOADERS
+   ===================================================================== */
+
+.skeleton {
+  background: linear-gradient(90deg, var(--surface) 25%, var(--surface-alt) 50%, var(--surface) 75%);
+  background-size: 200% 100%;
+  animation: skeleton 1.2s ease-in-out infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+.skeleton-text { height: 1em; margin: 0.5em 0; }
+.skeleton-avatar { width: 40px; height: 40px; border-radius: 50%; }
+.skeleton-card { height: 80px; border-radius: var(--radius); margin-bottom: 8px; }
+.skeleton-btn { height: 44px; width: 100%; border-radius: var(--radius); }
+
+/* =====================================================================
+   ENHANCED FORM CONTROLS (Mobile)
+   ===================================================================== */
+
+@media (max-width: 768px) {
+  input[type=text], input[type=email], input[type=password],
+  input[type=search], input[type=number], input[type=date],
+  select, textarea {
+    font-size: 16px !important; /* Prevents zoom on iOS */
+    min-height: 48px;
+    padding: 12px 14px;
+  }
+  select { padding-right: 40px; }
+  label { font-size: 13px; margin-bottom: 6px; }
+
+  /* Larger checkboxes/radios */
+  input[type=checkbox], input[type=radio] {
+    width: 20px; height: 20px;
+    accent-color: var(--blue-600);
+  }
+}
+
+/* Floating label inputs */
+.field-floating { position: relative; margin-bottom: 20px; }
+.field-floating input, .field-floating select, .field-floating textarea {
+  width: 100%; padding: 16px 12px 8px;
+  border: 1px solid var(--line-strong); border-radius: var(--radius);
+  background: var(--card); color: var(--ink); font-size: 15px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.field-floating label {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); font-size: 15px; font-weight: 500;
+  pointer-events: none; transition: all 0.15s ease;
+  background: var(--card); padding: 0 4px;
+}
+.field-floating input:focus, .field-floating select:focus, .field-floating textarea:focus {
+  border-color: var(--focus); box-shadow: 0 0 0 3px rgba(37,99,235,0.12);
+  outline: none;
+}
+.field-floating input:focus + label,
+.field-floating input:not(:placeholder-shown) + label,
+.field-floating select:focus + label,
+.field-floating select:not([value=""]) + label,
+.field-floating textarea:focus + label,
+.field-floating textarea:not(:placeholder-shown) + label {
+  top: 0; font-size: 11px; font-weight: 600; color: var(--blue-600);
+  transform: translateY(-50%) scale(0.9);
+}
+
+/* =====================================================================
+   IMPROVED MODAL / DIALOG
+   ===================================================================== */
+
+.dialog-overlay {
+  position: fixed; inset: 0;
+  background: rgba(7,13,24,0.6);
+  backdrop-filter: blur(4px);
+  z-index: 200;
+  display: flex; align-items: center; justify-content: center;
+  padding: 16px;
+  opacity: 0; visibility: hidden;
+  transition: opacity 0.2s, visibility 0.2s;
+}
+.dialog-overlay.open { opacity: 1; visibility: visible; }
+.dialog {
+  background: var(--card);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow-lg);
+  max-width: 90vw; max-height: 80vh;
+  width: 100%; max-width: 420px;
+  overflow: hidden;
+  transform: scale(0.9) translateY(20px);
+  transition: transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+.dialog-overlay.open .dialog { transform: scale(1) translateY(0); }
+.dialog-header {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px 20px;
+  border-bottom: 1px solid var(--line);
+}
+.dialog-title { font-size: 16px; font-weight: 700; margin: 0; }
+.dialog-close {
+  width: 32px; height: 32px;
+  border-radius: 50%; border: none;
+  background: var(--surface); color: var(--muted);
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer; transition: all 0.1s;
+}
+.dialog-close:active { background: var(--hover); transform: scale(0.95); }
+.dialog-body { padding: 20px; max-height: 60vh; overflow-y: auto; }
+.dialog-footer {
+  display: flex; gap: 8px; justify-content: flex-end;
+  padding: 12px 20px; border-top: 1px solid var(--line);
+  background: var(--surface);
+}
+
+/* =====================================================================
+   PROGRESS INDICATORS
+   ===================================================================== */
+
+.progress-ring {
+  width: 48px; height: 48px;
+  transform: rotate(-90deg);
+}
+.progress-ring-bg { fill: none; stroke: var(--line); stroke-width: 4; }
+.progress-ring-fg {
+  fill: none; stroke: var(--blue-600); stroke-width: 4;
+  stroke-linecap: round;
+  stroke-dasharray: 283; stroke-dashoffset: 283;
+  transition: stroke-dashoffset 0.3s ease;
+}
+
+/* =====================================================================
+   EMPTY STATES (Delightful)
+   ===================================================================== */
+
+.empty-state {
+  text-align: center; padding: 48px 20px;
+  color: var(--muted);
+}
+.empty-state-icon {
+  width: 80px; height: 80px;
+  margin: 0 auto 16px;
+  opacity: 0.5;
+  color: var(--muted);
+}
+.empty-state-title { font-size: 16px; font-weight: 700; color: var(--ink); margin: 0 0 8px; }
+.empty-state-desc { font-size: 13.5px; line-height: 1.5; margin: 0 0 20px; }
+.empty-state-action { margin-top: 8px; }
+
+/* =====================================================================
+   ONBOARDING / COACH MARKS
+   ===================================================================== */
+
+.coach-mark {
+  position: fixed; z-index: 1000;
+  pointer-events: none;
+}
+.coach-mark-spotlight {
+  position: absolute;
+  border-radius: var(--radius);
+  box-shadow: 0 0 0 9999px rgba(7,13,24,0.85);
+  pointer-events: auto;
+  animation: pulse-ring 2s ease-in-out infinite;
+}
+@keyframes pulse-ring {
+  0%, 100% { box-shadow: 0 0 0 9999px rgba(7,13,24,0.85); }
+  50% { box-shadow: 0 0 0 9999px rgba(7,13,24,0.75); }
+}
+.coach-mark-tooltip {
+  position: absolute;
+  max-width: 280px;
+  background: var(--card); border: 1px solid var(--line);
+  border-radius: var(--radius); padding: 16px;
+  box-shadow: var(--shadow-lg);
+  pointer-events: auto;
+  animation: tooltipIn 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+@keyframes tooltipIn {
+  from { opacity: 0; transform: translateY(10px) scale(0.95); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+.coach-mark-tooltip-title { font-weight: 700; margin-bottom: 6px; }
+.coach-mark-tooltip-desc { font-size: 13px; color: var(--ink-secondary); line-height: 1.5; }
+.coach-mark-actions { display: flex; gap: 8px; margin-top: 12px; }
+
+/* =====================================================================
+   TABLET OPTIMIZATIONS (768px - 1024px)
+   ===================================================================== */
+
+@media (min-width: 768px) and (max-width: 1024px) {
+  .mark-card { padding: 18px 24px; }
+  .student-card { padding: 14px 18px; }
+  .rc-flashcard { padding: 36px 24px; }
+  .rc-flashcard-name { font-size: 28px; }
+  .rc-big-btn { height: 64px; }
+  .rc-big-btn .rc-code { font-size: 20px; }
+  .thumb-buttons-grid { gap: 8px; }
+  .cb { height: 52px; font-size: 16px; }
+  .mode-segmented { max-width: 440px; }
+  .filter-pills-bar { gap: 8px; }
+  .fpill { padding: 8px 16px; font-size: 13.5px; }
+}
+
+/* =====================================================================
+   LANDSCAPE PHONE OPTIMIZATIONS
+   ===================================================================== */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .mark-card { padding: 10px 16px; margin-bottom: 10px; }
+  .rc-flashcard { padding: 16px 12px; }
+  .rc-flashcard-name { font-size: 18px; }
+  .rc-buttons-grid { gap: 6px; }
+  .rc-big-btn { height: 44px; }
+  .rc-nav-row { gap: 6px; }
+  .mobile-dock { padding: 6px 12px; }
+  .dcount { padding: 2px 6px; font-size: 11px; }
+  .save-btn { height: 38px; min-width: 80px; font-size: 12.5px; }
+  main { padding-bottom: calc(var(--tabbar-h) + 20px + env(safe-area-inset-bottom)); }
+}
+
+/* =====================================================================
+   DARK MODE POLISH
+   ===================================================================== */
+
+[data-theme="dark"] {
+  /* Ensure good contrast on dark */
+  .student-card { box-shadow: 0 1px 3px rgba(0,0,0,0.3); }
+  .rc-flashcard { box-shadow: 0 4px 12px rgba(0,0,0,0.4); }
+  .mobile-dock { box-shadow: 0 -4px 12px rgba(0,0,0,0.4); }
+  .toast { box-shadow: 0 4px 12px rgba(0,0,0,0.5); }
+  .action-sheet { box-shadow: 0 -4px 20px rgba(0,0,0,0.5); }
+  .dialog { box-shadow: 0 8px 32px rgba(0,0,0,0.5); }
+
+  /* Brighter focus rings */
+  --focus: #60a5fa;
+}
+
+/* =====================================================================
+   ACCESSIBILITY
+   ===================================================================== */
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  .skeleton { animation: none; background: var(--surface-alt); }
+}
+
+@media (prefers-contrast: high) {
+  :root {
+    --line: #000;
+    --line-strong: #000;
+    --muted: #333;
+  }
+  [data-theme="dark"] {
+    --line: #fff;
+    --line-strong: #fff;
+    --muted: #ccc;
+  }
+  .btn, .cb, .rc-big-btn, .fpill, .mode-btn {
+    border-width: 2px;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+:focus-visible {
+  outline: 3px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Skip link enhancement */
+.skip-link {
+  top: -100px;
+  left: 16px;
+  right: 16px;
+  text-align: center;
+}
+.skip-link:focus { top: 12px; }
+
+/* =====================================================================
+   PRINT STYLES (Preserve for attendance sheets)
+   ===================================================================== */
+
+@media print {
+  .mobile-dock, .tabbar, .action-sheet, .dialog-overlay,
+  .coach-mark, .toast, .mode-switch-wrap, .list-toolbar,
+  .filter-pills-bar, .rc-nav-row, .rc-progress-card,
+  .date-nav-group, .topic-container {
+    display: none !important;
+  }
+  .student-card { break-inside: avoid; page-break-inside: avoid; }
+  .rc-flashcard { break-inside: avoid; page-break-inside: avoid; }
+  body { background: #fff; }
+  main { padding: 0; max-width: 100%; }
+}
