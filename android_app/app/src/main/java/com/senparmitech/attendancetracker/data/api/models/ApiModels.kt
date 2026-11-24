@@ -9,6 +9,21 @@ data class ApiResponse(
     val message: String? = null
 )
 
+// Archive / restore a subject
+data class ArchiveRequest(
+    val subject: String,
+    val note: String = ""
+)
+
+// One score in the gradebook (a null score clears it)
+data class GradeScoreRequest(
+    val subject: String,
+    val section: String? = null,
+    val item_id: Int,
+    val enrollment_id: Int,
+    val score: Double? = null
+)
+
 // Login Request & Response
 data class LoginRequest(
     val username: String = "",

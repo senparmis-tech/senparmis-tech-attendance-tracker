@@ -24,8 +24,11 @@ class AttendanceApp : Application() {
         sessionManager = SessionManager(this)
         database = AppDatabase.getInstance(this)
 
-        val apiService = ApiClient.getApiService(sessionManager)
-        repository = AttendanceRepository(apiService, database.draftDao(), sessionManager)
+        repository = AttendanceRepository(
+            { ApiClient.getApiService(sessionManager) },
+            database.draftDao(),
+            sessionManager
+        )
     }
 
     companion object {

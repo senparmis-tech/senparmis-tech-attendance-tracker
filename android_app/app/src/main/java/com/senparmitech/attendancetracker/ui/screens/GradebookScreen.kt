@@ -5,6 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -19,6 +22,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.senparmitech.attendancetracker.AttendanceApp
@@ -43,6 +47,11 @@ fun GradebookScreen(
     var gradebookData by remember { mutableStateOf<GradebookResponse?>(null) }
     var isLoading by remember { mutableStateOf(true) }
     var errorMessage by remember { mutableStateOf<String?>(null) }
+    var editRow by remember { mutableStateOf<GradebookStudentRow?>(null) }
+
+    // Teachers and admins can enter scores; monitors and archived subjects are read-only.
+    val sessionManager = AttendanceApp.instance.sessionManager
+    val isTeacher = sessionManager.getUserRole() == "teacher" && !sessionManager.isMonitor()
 
     fun loadGrades() {
         if (subject.isBlank()) return
@@ -80,8 +89,8 @@ fun GradebookScreen(
     Scaffold(
         topBar = {
             AcademicTopBar(
-                title = "Academic Gradebook",
-                subtitle = if (subject.isNotBlank()) "$subject · $section" else "Philippine Scale (1.00 – 5.00)",
+                title = "Gradebook",
+                subtitle = if (subject.isNotBlank()) "$subject, $section" else "Philippine Scale (1.00 – 5.00)",
                 actions = {
                     IconButton(onClick = onNavigateBack) {
                         Icon(Icons.Default.ArrowBack, contentDescription = "Back", tint = Slate400)
@@ -104,6 +113,23 @@ fun GradebookScreen(
             }
         } else {
             val data = gradebookData ?: return@Scaffold
+            val canEdit = isTeacher && !data.is_archived
+
+            editRow?.let { target ->
+                ScoreEntryDialog(
+                    row = target,
+                    items = data.items,
+                    onDismiss = { editRow = null },
+                    onSave = { changes ->
+                        val err = repository.saveScores(subject, section.ifBlank { null }, target.enrollment_id, changes)
+                        if (err == null) {
+                            editRow = null
+                            loadGrades()
+                        }
+                        err
+                    }
+                )
+            }
             Column(
                 modifier = Modifier
                     .fillMaxSize()
@@ -121,7 +147,7 @@ fun GradebookScreen(
                             Icon(Icons.Default.Archive, contentDescription = null, tint = Blue400, modifier = Modifier.size(16.dp))
                             Spacer(modifier = Modifier.width(8.dp))
                             Text(
-                                text = "Archived Subject · Grade records preserved (Read-Only)",
+                                text = "Archived subject. Grades are kept and read-only.",
                                 fontSize = 12.sp,
                                 fontWeight = FontWeight.SemiBold,
                                 color = Slate200
@@ -142,13 +168,13 @@ fun GradebookScreen(
                     verticalAlignment = Alignment.CenterVertically
                 ) {
                     Text(
-                        text = "Weights: Exam ${data.weights.exam.toInt()}% · Quiz ${data.weights.quiz.toInt()}% · Activity ${data.weights.activity.toInt()}%",
+                        text = "Weights: Exam ${data.weights.exam.toInt()}%, Quiz ${data.weights.quiz.toInt()}%, Activity ${data.weights.activity.toInt()}%",
                         fontSize = 11.5.sp,
                         color = Slate400,
                         fontWeight = FontWeight.SemiBold
                     )
                     Text(
-                        text = "${data.items.size} Graded Items",
+                        text = "${data.items.size} graded items",
                         fontSize = 11.sp,
                         color = Blue400,
                         fontWeight = FontWeight.Bold
@@ -165,7 +191,7 @@ fun GradebookScreen(
                     contentPadding = PaddingValues(bottom = 16.dp)
                 ) {
                     items(data.rows, key = { it.enrollment_id }) { row ->
-                        StudentGradeCard(row = row, items = data.items)
+                        StudentGradeCard(row = row, items = data.items, canEdit = canEdit, onEdit = { editRow = row })
                     }
                 }
             }
@@ -174,7 +200,12 @@ fun GradebookScreen(
 }
 
 @Composable
-fun StudentGradeCard(row: GradebookStudentRow, items: List<GradeItem>) {
+fun StudentGradeCard(
+    row: GradebookStudentRow,
+    items: List<GradeItem>,
+    canEdit: Boolean = false,
+    onEdit: () -> Unit = {}
+) {
     var isExpanded by remember { mutableStateOf(false) }
 
     Card(
@@ -241,7 +272,19 @@ fun StudentGradeCard(row: GradebookStudentRow, items: List<GradeItem>) {
                     Divider(color = Slate800, thickness = 1.dp)
                     Spacer(modifier = Modifier.height(8.dp))
 
-                    Text("CATEGORY BREAKDOWN", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Slate400)
+                    if (canEdit && items.isNotEmpty()) {
+                        Button(
+                            onClick = onEdit,
+                            shape = RoundedCornerShape(6.dp),
+                            colors = ButtonDefaults.buttonColors(containerColor = Blue600),
+                            contentPadding = PaddingValues(horizontal = 12.dp, vertical = 6.dp)
+                        ) {
+                            Text("Enter scores", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                        }
+                        Spacer(modifier = Modifier.height(8.dp))
+                    }
+
+                    Text("Category breakdown", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Slate400)
                     Spacer(modifier = Modifier.height(4.dp))
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
                         val examPct = row.cat_pct["exam"]
@@ -254,7 +297,7 @@ fun StudentGradeCard(row: GradebookStudentRow, items: List<GradeItem>) {
 
                     if (items.isNotEmpty()) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        Text("ASSESSMENT SCORES", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Slate400)
+                        Text("Scores", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Slate400)
                         Spacer(modifier = Modifier.height(4.dp))
 
                         items.forEach { it ->
@@ -279,4 +322,86 @@ fun StudentGradeCard(row: GradebookStudentRow, items: List<GradeItem>) {
             }
         }
     }
+}
+
+private fun fmtScore(d: Double): String = if (d % 1.0 == 0.0) d.toInt().toString() else d.toString()
+
+/**
+ * Edit one student's scores. Each field is checked against the item's maximum before saving.
+ * [onSave] returns null on success or the message to show.
+ */
+@Composable
+fun ScoreEntryDialog(
+    row: GradebookStudentRow,
+    items: List<GradeItem>,
+    onDismiss: () -> Unit,
+    onSave: suspend (changes: List<Pair<Int, Double?>>) -> String?
+) {
+    val inputs = remember {
+        mutableStateMapOf<Int, String>().also { m ->
+            items.forEach { m[it.id] = row.scores[it.id.toString()]?.let(::fmtScore) ?: "" }
+        }
+    }
+    var error by remember { mutableStateOf<String?>(null) }
+    var saving by remember { mutableStateOf(false) }
+    val scope = rememberCoroutineScope()
+
+    fun submit() {
+        val changes = mutableListOf<Pair<Int, Double?>>()
+        for (item in items) {
+            val text = (inputs[item.id] ?: "").trim()
+            val old = row.scores[item.id.toString()]
+            val value: Double? = if (text.isEmpty()) null else text.toDoubleOrNull()
+            if (text.isNotEmpty() && value == null) {
+                error = "${item.title}: enter a number."
+                return
+            }
+            if (value != null && (value < 0 || value > item.max_score)) {
+                error = "${item.title}: use 0 to ${fmtScore(item.max_score)}."
+                return
+            }
+            if (value != old) changes.add(item.id to value)
+        }
+        if (changes.isEmpty()) {
+            onDismiss()
+            return
+        }
+        saving = true
+        error = null
+        scope.launch {
+            val err = onSave(changes)
+            saving = false
+            if (err != null) error = err
+        }
+    }
+
+    AlertDialog(
+        onDismissRequest = { if (!saving) onDismiss() },
+        containerColor = Navy900,
+        title = { Text(row.name, color = Slate50, fontSize = 17.sp) },
+        text = {
+            Column(modifier = Modifier.verticalScroll(rememberScrollState())) {
+                items.forEach { item ->
+                    OutlinedTextField(
+                        value = inputs[item.id] ?: "",
+                        onValueChange = { v -> inputs[item.id] = v.filter { c -> c.isDigit() || c == '.' }.take(7) },
+                        label = { Text("${item.label}: ${item.title} (max ${fmtScore(item.max_score)})") },
+                        singleLine = true,
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Decimal),
+                        modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp)
+                    )
+                }
+                if (error != null) {
+                    Spacer(modifier = Modifier.height(6.dp))
+                    Text(error!!, color = AbsentRed, fontSize = 12.sp)
+                }
+            }
+        },
+        confirmButton = {
+            TextButton(enabled = !saving, onClick = { submit() }) { Text("Save") }
+        },
+        dismissButton = {
+            TextButton(enabled = !saving, onClick = onDismiss) { Text("Cancel") }
+        }
+    )
 }

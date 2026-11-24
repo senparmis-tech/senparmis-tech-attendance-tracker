@@ -8,6 +8,19 @@
 
 ---
 
+## What changed in 1.1.0
+
+- **Stays signed in.** The server session lasts 12 hours. The app keeps your sign-in in encrypted storage and signs in again by itself when a request is refused. If that fails (for example the password was changed) it returns to the login screen. Signing out erases the saved sign-in.
+- **No password in logs.** Debug builds log request lines only, never bodies. Release builds log nothing.
+- **Server URL changes apply at once** (before, the app had to be restarted).
+- **Archive and restore subjects** from the Subjects screen (teachers and admins). Archived subjects stay readable in Records and Gradebook.
+- **Enter scores** in the Gradebook: open a student, tap *Enter scores*. Each score is checked against the item's maximum.
+- **Plain sign-in screen** with the Eclaro logo, and the navy and lime colors and eagle icon from the school logos.
+
+### Server side
+
+The two archive endpoints are in `api_mobile.py`, which `flask_app.py` imports. After uploading both files, reload the web app on PythonAnywhere.
+
 ## Overview
 
 This is the official native Android client for **Senparmis Tech Attendance Tracker**. It communicates directly with the Flask backend via session-cookie-authenticated REST APIs, offering teachers and academic administrators a fast, touch-friendly, mobile-optimized experience with offline drafting capabilities.
@@ -17,7 +30,7 @@ This is the official native Android client for **Senparmis Tech Attendance Track
 ## Key Features
 
 1. **Academic Dark Navy Interface**
-   - Matches the web application's professional academic theme (Navy `#070D18`, `#0B1526`, Blue accent `#2563EB`, and Inter typography).
+   - Matches the web application's professional academic theme (school navy and lime green taken from the Eclaro logos).
    - Designed for high readability during active classroom roll calls.
 
 2. **Full Screen Coverage**
@@ -81,10 +94,11 @@ If testing on a physical phone connected to the same Wi-Fi network:
 3. Open the Android app, tap the **Settings** icon on the Login screen, enter `http://192.168.1.100:5000`, and tap **Save URL**.
 
 ### 3. Production / PythonAnywhere
-Enter your live PythonAnywhere HTTPS URL in Settings:
+This is the default. The app opens pointed at:
 ```
-https://<your-username>.pythonanywhere.com
+https://tevtev.pythonanywhere.com
 ```
+Change it in Settings only to test against a local server. Addresses typed without `http://` or `https://` get `https://`, except local-network addresses, which get `http://`.
 
 ---
 
@@ -157,7 +171,10 @@ android_app/
 | `/api/dashboard` | GET | Academic statistics (students, subjects, sections, roll calls) and cards |
 | `/api/subjects` | GET | List of active subjects (with sections) and archived subjects |
 | `/api/mark` | GET | Student roster and existing marks for a given subject, section, and date |
-| `/save_attendance` | POST | Submits attendance marks and topic note |
+| `/api/save` | POST | Submits attendance marks and topic note |
 | `/api/records` | GET | Attendance grid with date headers, student tallies, and percentage rates |
 | `/api/grades` | GET | Gradebook categories, weights, max scores, and student scores |
 | `/api/lookup` | GET | Student lookup by name or ID with guardian info and subject standing |
+| `/api/subject_archive` | POST | Archive a subject (`{"subject", "note"}`). Admin: any subject; teacher: their own; monitor: none |
+| `/api/subject_unarchive` | POST | Restore an archived subject (`{"subject"}`) |
+| `/api/grade_score` | POST | Save or clear one score (`{"subject", "section", "item_id", "enrollment_id", "score"}`) |

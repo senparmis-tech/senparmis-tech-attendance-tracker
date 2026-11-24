@@ -1,5 +1,6 @@
 package com.senparmitech.attendancetracker.ui.screens
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
@@ -18,6 +19,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -45,6 +47,15 @@ fun SubjectsScreen(
     var errorMessage by remember { mutableStateOf<String?>(null) }
     var showArchived by remember { mutableStateOf(false) }
 
+    // Only teachers and admins can archive or restore; section monitors can't.
+    val sessionManager = AttendanceApp.instance.sessionManager
+    val canArchive = sessionManager.getUserRole() == "teacher" && !sessionManager.isMonitor()
+    val context = LocalContext.current
+    var archiveTarget by remember { mutableStateOf<SubjectItem?>(null) }
+    var restoreTarget by remember { mutableStateOf<ArchivedSubjectItem?>(null) }
+    var archiveNote by remember { mutableStateOf("") }
+    var working by remember { mutableStateOf(false) }
+
     val todayIso = remember { LocalDate.now().format(DateTimeFormatter.ISO_LOCAL_DATE) }
 
     fun loadData() {
@@ -65,11 +76,96 @@ fun SubjectsScreen(
 
     LaunchedEffect(Unit) { loadData() }
 
+    archiveTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { if (!working) archiveTarget = null },
+            containerColor = Navy900,
+            title = { Text("Archive ${target.name}?", color = Slate50) },
+            text = {
+                Column {
+                    Text(
+                        "It will be hidden from roll call and the dashboard. Its attendance and grades are kept, and you can restore it later.",
+                        color = Slate300,
+                        fontSize = 13.sp
+                    )
+                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(
+                        value = archiveNote,
+                        onValueChange = { archiveNote = it.take(200) },
+                        label = { Text("Note (optional)") },
+                        singleLine = true,
+                        modifier = Modifier.fillMaxWidth()
+                    )
+                }
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !working,
+                    onClick = {
+                        working = true
+                        scope.launch {
+                            val err = repository.archiveSubject(target.name, archiveNote.trim())
+                            working = false
+                            if (err == null) {
+                                archiveTarget = null
+                                archiveNote = ""
+                                Toast.makeText(context, "Archived ${target.name}", Toast.LENGTH_SHORT).show()
+                                loadData()
+                            } else {
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                ) { Text("Archive") }
+            },
+            dismissButton = {
+                TextButton(enabled = !working, onClick = { archiveTarget = null }) { Text("Cancel") }
+            }
+        )
+    }
+
+    restoreTarget?.let { target ->
+        AlertDialog(
+            onDismissRequest = { if (!working) restoreTarget = null },
+            containerColor = Navy900,
+            title = { Text("Restore ${target.name}?", color = Slate50) },
+            text = {
+                Text(
+                    "It goes back to the active list and roll call can be taken again.",
+                    color = Slate300,
+                    fontSize = 13.sp
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    enabled = !working,
+                    onClick = {
+                        working = true
+                        scope.launch {
+                            val err = repository.unarchiveSubject(target.name)
+                            working = false
+                            if (err == null) {
+                                restoreTarget = null
+                                Toast.makeText(context, "Restored ${target.name}", Toast.LENGTH_SHORT).show()
+                                loadData()
+                            } else {
+                                Toast.makeText(context, err, Toast.LENGTH_LONG).show()
+                            }
+                        }
+                    }
+                ) { Text("Restore") }
+            },
+            dismissButton = {
+                TextButton(enabled = !working, onClick = { restoreTarget = null }) { Text("Cancel") }
+            }
+        )
+    }
+
     Scaffold(
         topBar = {
             AcademicTopBar(
                 title = "Subjects",
-                subtitle = "${subjects.size} active · ${archivedSubjects.size} archived",
+                subtitle = "${subjects.size} active, ${archivedSubjects.size} archived",
                 actions = {
                     IconButton(onClick = { loadData() }) {
                         Icon(Icons.Default.Refresh, contentDescription = "Refresh", tint = Slate400)
@@ -112,7 +208,7 @@ fun SubjectsScreen(
                         Icon(Icons.Default.Book, contentDescription = null, tint = Slate500, modifier = Modifier.size(14.dp))
                         Spacer(modifier = Modifier.width(6.dp))
                         Text(
-                            text = "ACTIVE SUBJECTS (${subjects.size})",
+                            text = "Active subjects (${subjects.size})",
                             style = MaterialTheme.typography.labelSmall,
                             color = Slate400,
                             fontWeight = FontWeight.Bold
@@ -152,6 +248,11 @@ fun SubjectsScreen(
                         },
                         onGrades = { section ->
                             onNavigateToGrades(subject.name, section)
+                        },
+                        canArchive = canArchive,
+                        onArchive = {
+                            archiveNote = ""
+                            archiveTarget = subject
                         }
                     )
                 }
@@ -176,13 +277,13 @@ fun SubjectsScreen(
                                     Spacer(modifier = Modifier.width(8.dp))
                                     Column {
                                         Text(
-                                            text = "ARCHIVED SUBJECTS",
+                                            text = "Archived subjects",
                                             fontWeight = FontWeight.Bold,
                                             color = Slate300,
                                             fontSize = 13.sp
                                         )
                                         Text(
-                                            text = "${archivedSubjects.size} subjects · Records preserved",
+                                            text = "${archivedSubjects.size} subjects, records kept",
                                             fontSize = 11.sp,
                                             color = Slate500
                                         )
@@ -203,7 +304,9 @@ fun SubjectsScreen(
                             ArchivedSubjectCard(
                                 archived = archived,
                                 onRecords = { onNavigateToRecords(archived.name, "") },
-                                onGrades = { onNavigateToGrades(archived.name, "") }
+                                onGrades = { onNavigateToGrades(archived.name, "") },
+                                canRestore = canArchive,
+                                onRestore = { restoreTarget = archived }
                             )
                         }
                     }
@@ -221,7 +324,9 @@ private fun ActiveSubjectCard(
     todayIso: String,
     onMark: (section: String) -> Unit,
     onRecords: (section: String) -> Unit,
-    onGrades: (section: String) -> Unit
+    onGrades: (section: String) -> Unit,
+    canArchive: Boolean,
+    onArchive: () -> Unit
 ) {
     var expanded by remember { mutableStateOf(subject.sections.size == 1) }
 
@@ -246,7 +351,7 @@ private fun ActiveSubjectCard(
                         color = Slate50
                     )
                     Text(
-                        text = "${subject.sections.size} section(s) · ${subject.n_students} students",
+                        text = "${subject.sections.size} section(s), ${subject.n_students} students",
                         fontSize = 11.sp,
                         color = Slate400,
                         modifier = Modifier.padding(top = 2.dp)
@@ -308,6 +413,11 @@ private fun ActiveSubjectCard(
                 Spacer(modifier = Modifier.height(2.dp))
                 TextButton(onClick = { expanded = true }) {
                     Text("Tap to expand sections", fontSize = 11.sp, color = Blue400)
+                }
+            }
+            if (canArchive) {
+                TextButton(onClick = onArchive, modifier = Modifier.align(Alignment.End)) {
+                    Text("Archive subject", fontSize = 12.sp, color = Slate400)
                 }
             }
         }
@@ -377,7 +487,9 @@ private fun SectionRow(
 private fun ArchivedSubjectCard(
     archived: ArchivedSubjectItem,
     onRecords: () -> Unit,
-    onGrades: () -> Unit
+    onGrades: () -> Unit,
+    canRestore: Boolean,
+    onRestore: () -> Unit
 ) {
     Card(
         colors = CardDefaults.cardColors(containerColor = Navy850),
@@ -420,7 +532,7 @@ private fun ArchivedSubjectCard(
                         .border(1.dp, Slate700, RoundedCornerShape(4.dp))
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
-                    Text("ARCHIVED", fontSize = 9.sp, color = Slate500, fontWeight = FontWeight.ExtraBold)
+                    Text("Archived", fontSize = 10.sp, color = Slate500, fontWeight = FontWeight.ExtraBold)
                 }
             }
 
@@ -442,6 +554,16 @@ private fun ArchivedSubjectCard(
                     modifier = Modifier.weight(1f)
                 ) {
                     Text("Gradebook", fontSize = 12.sp, color = Slate300)
+                }
+                if (canRestore) {
+                    Button(
+                        onClick = onRestore,
+                        shape = RoundedCornerShape(6.dp),
+                        colors = ButtonDefaults.buttonColors(containerColor = Blue600),
+                        modifier = Modifier.weight(1f)
+                    ) {
+                        Text("Restore", fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                    }
                 }
             }
         }

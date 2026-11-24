@@ -22,11 +22,12 @@ import routes  # registers page and API routes
 import lookup  # registers the student lookup page
 import grade_roll  # registers the score roll call page and its save endpoints
 import period_routes  # registers the Terms page (lock a term, look back, print, download)
+import api_mobile  # registers the archive/restore JSON endpoints used by the Android app
 from config import DB_FILE, HOST, START_PORT
 from store import ensure_db
 from web import app
 
-__all__ = ["app", "auth", "routes", "lookup", "grade_roll", "period_routes"]
+__all__ = ["app", "auth", "routes", "lookup", "grade_roll", "period_routes", "api_mobile"]
 
 # ---------------------------------------------------------------------- main
 def free_port(start):

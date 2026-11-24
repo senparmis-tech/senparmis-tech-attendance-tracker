@@ -97,6 +97,16 @@ fun AppNavigation() {
     val currentRoute = navBackStackEntry?.destination?.route
     val showBottomBar = currentRoute in bottomNavRoutes
 
+    // If the saved session can no longer be renewed, go back to the sign-in screen.
+    val loggedIn by sessionManager.isLoggedInState.collectAsState()
+    LaunchedEffect(loggedIn) {
+        if (!loggedIn && navController.currentDestination?.route != Screen.Login.route) {
+            navController.navigate(Screen.Login.route) {
+                popUpTo(0) { inclusive = true }
+            }
+        }
+    }
+
     Scaffold(
         containerColor = Navy950,
         bottomBar = {

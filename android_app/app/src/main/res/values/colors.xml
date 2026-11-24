@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="navy_950">#070D18</color>
-    <color name="navy_900">#0B1526</color>
-    <color name="navy_800">#14243E</color>
-    <color name="blue_600">#1D4ED8</color>
-    <color name="blue_500">#2563EB</color>
+    <color name="navy_950">#020D2E</color>
+    <color name="navy_900">#071544</color>
+    <color name="navy_800">#0E2266</color>
+    <color name="blue_600">#4D7C0F</color>
+    <color name="blue_500">#5F9A12</color>
     <color name="white">#FFFFFFFF</color>
     <color name="present_green">#15803D</color>
     <color name="absent_red">#B91C1C</color>
     <color name="late_yellow">#B45309</color>
     <color name="excused_blue">#1D4ED8</color>
     <color name="recited_purple">#6D28D9</color>
+    <color name="ic_launcher_background">#FFFFFF</color>
 </resources>

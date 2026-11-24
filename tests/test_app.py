@@ -426,3 +426,33 @@ def test_mobile_rest_api_endpoints():
 
 
 
+
+
+def test_app_archive_api_and_grade_score_permissions():
+    """The Android app archives/restores through JSON and enters scores through /api/grade_score."""
+    c = _teacher_client()
+    c.post("/subjects/add", data={"name": "App Archive 101", "section_name": "A1"})
+    assert not store.is_subject_archived("App Archive 101")
+
+    anon = app.test_client()
+    assert anon.post("/api/subject_archive", json={"subject": "App Archive 101"}).status_code == 401
+
+    stu = app.test_client()
+    stu.post("/login", data={"password": "studentpass1"})
+    assert stu.post("/api/subject_archive", json={"subject": "App Archive 101"}).status_code == 403
+
+    r = c.post("/api/subject_archive", json={"subject": ""})
+    assert r.status_code == 400 and r.get_json()["ok"] is False
+    r = c.post("/api/subject_archive", json={"subject": "No Such Subject"})
+    assert r.status_code == 400 and "not found" in r.get_json()["error"].lower()
+
+    r = c.post("/api/subject_archive", json={"subject": "App Archive 101", "note": "Done"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert store.is_subject_archived("App Archive 101")
+    # archived subjects are read-only, including scores
+    r = c.post("/api/grade_score", json={"subject": "App Archive 101", "item_id": 1, "enrollment_id": 1, "score": 5})
+    assert r.status_code == 400 and "archived" in r.get_json()["error"].lower()
+
+    r = c.post("/api/subject_unarchive", json={"subject": "App Archive 101"})
+    assert r.status_code == 200 and r.get_json()["ok"] is True
+    assert not store.is_subject_archived("App Archive 101")

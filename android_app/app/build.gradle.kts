@@ -12,8 +12,8 @@ android {
         applicationId = "com.senparmitech.attendancetracker"
         minSdk = 26
         targetSdk = 34
-        versionCode = 1
-        versionName = "1.0.0"
+        versionCode = 2
+        versionName = "1.1.0"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -39,6 +39,7 @@ android {
     }
     buildFeatures {
         compose = true
+        buildConfig = true
     }
     composeOptions {
         kotlinCompilerExtensionVersion = "1.5.11"
@@ -76,6 +77,9 @@ dependencies {
     implementation("androidx.room:room-runtime:2.6.1")
     implementation("androidx.room:room-ktx:2.6.1")
     ksp("androidx.room:room-compiler:2.6.1")
+
+    // Encrypted storage for the saved sign-in
+    implementation("androidx.security:security-crypto:1.1.0-alpha06")
 
     // Preferences DataStore
     implementation("androidx.datastore:datastore-preferences:1.0.0")

@@ -43,6 +43,15 @@ interface AttendanceApiService {
         @Query("section") section: String? = null
     ): Response<GradebookResponse>
 
+    @POST("/api/subject_archive")
+    suspend fun archiveSubject(@Body request: ArchiveRequest): Response<ApiResponse>
+
+    @POST("/api/subject_unarchive")
+    suspend fun unarchiveSubject(@Body request: ArchiveRequest): Response<ApiResponse>
+
+    @POST("/api/grade_score")
+    suspend fun saveGradeScore(@Body request: GradeScoreRequest): Response<ApiResponse>
+
     @GET("/api/lookup")
     suspend fun searchStudents(
         @Query("q") query: String

@@ -9,13 +9,23 @@ import com.senparmitech.attendancetracker.data.local.AttendanceDraft
 import com.senparmitech.attendancetracker.data.local.AttendanceDraftDao
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+import retrofit2.Response
 
 class AttendanceRepository(
-    private val apiService: AttendanceApiService,
+    private val apiServiceProvider: () -> AttendanceApiService,
     private val draftDao: AttendanceDraftDao,
     private val sessionManager: SessionManager
 ) {
+    // Looked up on every call, so a changed server URL takes effect without restarting the app.
+    private val apiService: AttendanceApiService get() = apiServiceProvider()
+
     private val gson = Gson()
+
+    /** The server's own message for a failed request (its JSON "error" field), if it sent one. */
+    private fun serverError(resp: Response<*>): String? {
+        val raw = try { resp.errorBody()?.string() } catch (e: Exception) { null } ?: return null
+        return try { com.google.gson.JsonParser.parseString(raw).asJsonObject.get("error").asString } catch (e: Exception) { null }
+    }
 
     suspend fun login(password: String, username: String = ""): Result<LoginResponse> =
         withContext(Dispatchers.IO) {
@@ -23,6 +33,7 @@ class AttendanceRepository(
                 val resp = apiService.login(LoginRequest(username = username, password = password))
                 if (resp.isSuccessful && resp.body()?.ok == true) {
                     val body = resp.body()!!
+                    sessionManager.saveCredentials(username, password)
                     sessionManager.saveUser(
                         role = body.role ?: "teacher",
                         displayName = body.display_name ?: "Faculty",
@@ -33,7 +44,7 @@ class AttendanceRepository(
                     )
                     Result.success(body)
                 } else {
-                    val errMsg = resp.body()?.error ?: "Sign-in failed. Please check credentials."
+                    val errMsg = resp.body()?.error ?: serverError(resp) ?: "Sign-in failed. Please check credentials."
                     Result.failure(Exception(errMsg))
                 }
             } catch (e: Exception) {
@@ -191,7 +202,7 @@ class AttendanceRepository(
                 if (resp.isSuccessful && resp.body()?.ok == true) {
                     Result.success(resp.body()!!)
                 } else {
-                    Result.failure(Exception("Could not load attendance records."))
+                    Result.failure(Exception(serverError(resp) ?: "Could not load attendance records."))
                 }
             } catch (e: Exception) {
                 Result.failure(e)
@@ -205,7 +216,7 @@ class AttendanceRepository(
                 if (resp.isSuccessful && resp.body()?.ok == true) {
                     Result.success(resp.body()!!)
                 } else {
-                    Result.failure(Exception("Could not load gradebook."))
+                    Result.failure(Exception(serverError(resp) ?: "Could not load gradebook."))
                 }
             } catch (e: Exception) {
                 Result.failure(e)
@@ -225,4 +236,51 @@ class AttendanceRepository(
                 Result.failure(e)
             }
         }
+
+    /** Archive a subject. Returns null on success, otherwise the message to show. */
+    suspend fun archiveSubject(name: String, note: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val resp = apiService.archiveSubject(ArchiveRequest(name, note))
+            if (resp.isSuccessful && resp.body()?.ok == true) null
+            else serverError(resp) ?: "Could not archive '$name'."
+        } catch (e: Exception) {
+            e.message ?: "Could not reach the server."
+        }
+    }
+
+    /** Restore an archived subject. Returns null on success, otherwise the message to show. */
+    suspend fun unarchiveSubject(name: String): String? = withContext(Dispatchers.IO) {
+        try {
+            val resp = apiService.unarchiveSubject(ArchiveRequest(name))
+            if (resp.isSuccessful && resp.body()?.ok == true) null
+            else serverError(resp) ?: "Could not restore '$name'."
+        } catch (e: Exception) {
+            e.message ?: "Could not reach the server."
+        }
+    }
+
+    /**
+     * Save changed scores for one student, one item at a time (the server checks each against
+     * the item's maximum). Returns null when all were saved, otherwise the message to show.
+     */
+    suspend fun saveScores(
+        subject: String,
+        section: String?,
+        enrollmentId: Int,
+        changes: List<Pair<Int, Double?>>
+    ): String? = withContext(Dispatchers.IO) {
+        try {
+            for ((itemId, score) in changes) {
+                val resp = apiService.saveGradeScore(
+                    GradeScoreRequest(subject, section, itemId, enrollmentId, score)
+                )
+                if (!(resp.isSuccessful && resp.body()?.ok == true)) {
+                    return@withContext serverError(resp) ?: "Could not save the score."
+                }
+            }
+            null
+        } catch (e: Exception) {
+            e.message ?: "Could not reach the server."
+        }
+    }
 }
