@@ -100,28 +100,84 @@ def dashboard():
     data = load_data()
     today = date.today()
     cards = []
+    unique_students = set()
+    low_students = set()
+    total_sections = 0
+    completed_sessions_count = 0
+
     for name, sd in data.items():
-        stats = student_stats(sd)
-        rated = [s for s in stats if s["rate"] is not None]
-        avg = sum(s["rate"] for s in rated) / len(rated) if rated else None
-        today_counts, absent = None, []
-        tcol = next((d["col"] for d in sd["dates"] if d["date"] == today), None)
-        if tcol is not None:
-            today_counts = {"p": 0, "x": 0, "l": 0, "e": 0, "r": 0}
-            for s in sd["students"]:
-                code = sd["cells"].get((s["row"], tcol), "")
-                if code and code in today_counts:
-                    today_counts[code] += 1
-                if code == "x":
-                    absent.append(s["name"])
-        watch = sorted([s for s in rated if s["rate"] < LOW_RATE], key=lambda s: s["rate"])
-        cards.append({"name": name, "section": sd.get("section", ""), "n_students": len(stats), "held": len(sd["dates"]), "avg": avg,
-                      "today": today_counts, "absent_today": absent, "watch": watch,
-                      "image_url": subject_image_url(name),
-                      "term_label": sd["period"]["label"] if sd.get("period") else "",
-                      "term_locked": bool(sd["period"]["locked"]) if sd.get("period") else False})
-    return render_template("dashboard.html", page="dashboard", cards=cards, low=LOW_RATE, today_iso=today.isoformat(),
-                           today_label=today.strftime("%A, %B %d, %Y").replace(" 0", " "))
+        secs_map = sd.get("sections") or {sd.get("section", "BSCS-1A"): sd}
+        for sec_name, sec_sd in secs_map.items():
+            total_sections += 1
+            stats = student_stats(sec_sd)
+            for s in stats:
+                unique_students.add(s["name"].strip().lower())
+                if s["rate"] is not None and s["rate"] < LOW_RATE:
+                    low_students.add(s["name"].strip().lower())
+
+            completed_sessions_count += len(sec_sd.get("dates", []))
+            rated = [s for s in stats if s["rate"] is not None]
+            avg = sum(s["rate"] for s in rated) / len(rated) if rated else None
+            today_counts, absent = None, []
+            tcol = next((d["col"] for d in sec_sd.get("dates", []) if d["date"] == today), None)
+            if tcol is not None:
+                today_counts = {"p": 0, "x": 0, "l": 0, "e": 0, "r": 0}
+                for s in sec_sd.get("students", []):
+                    code = sec_sd.get("cells", {}).get((s["row"], tcol), "")
+                    if code and code in today_counts:
+                        today_counts[code] += 1
+                    if code == "x":
+                        absent.append(s["name"])
+            watch = sorted([s for s in rated if s["rate"] < LOW_RATE], key=lambda s: s["rate"])
+            period = sec_sd.get("period") or sd.get("period")
+            cards.append({
+                "name": name,
+                "section": sec_name,
+                "n_students": len(stats),
+                "held": len(sec_sd.get("dates", [])),
+                "avg": avg,
+                "today": today_counts,
+                "absent_today": absent,
+                "watch": watch,
+                "image_url": subject_image_url(name),
+                "term_label": period["label"] if period else "",
+                "term_locked": bool(period["locked"]) if period else False,
+            })
+
+    pending_rollcalls = sum(1 for c in cards if not c["today"])
+
+    shown, _ = read_log()
+    if getattr(g, "is_monitor", False):
+        m_sec = (getattr(g, "monitor_sec_name", "") or "").lower()
+        m_sub = (getattr(g, "monitor_sub_name", "") or "").lower()
+        m_who = (getattr(g, "teacher_name", "") or "").lower()
+        shown = [
+            e for e in shown
+            if (m_sec and f"({m_sec})" in (e.get("subject") or "").lower())
+            or (m_sub and m_sec and m_sub in (e.get("subject") or "").lower() and m_sec in (e.get("subject") or "").lower())
+            or (m_who and m_who in (e.get("who") or "").lower())
+        ]
+    recent_activity = shown[:6]
+
+    overview = {
+        "total_students": len(unique_students),
+        "total_subjects": len(data),
+        "total_sections": total_sections,
+        "completed_sessions": completed_sessions_count,
+        "pending_rollcalls": pending_rollcalls,
+        "low_attendance_count": len(low_students),
+    }
+
+    return render_template(
+        "dashboard.html",
+        page="dashboard",
+        cards=cards,
+        overview=overview,
+        recent_activity=recent_activity,
+        low=LOW_RATE,
+        today_iso=today.isoformat(),
+        today_label=today.strftime("%A, %B %d, %Y").replace(" 0", " "),
+    )
 
 
 @app.route("/mark")

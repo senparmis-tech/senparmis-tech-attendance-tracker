@@ -1,38 +1,60 @@
 {% extends "base.html" %}
-{% block title %}Changes log &amp; restore{% endblock %}
+{% block title %}Activity Log &amp; Database Restore · Eclaro Academy Attendance Tracker{% endblock %}
 {% block body %}
-<h1>Changes log &amp; restore</h1>
-<p class="muted">Every change made from this website: who, when, and what. You can also undo a mistake or restore a deleted subject below.</p>
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>Activity Log &amp; Snapshot Restore</h1>
+    <div class="sub">Institutional Audit Trail · Historical System Changes &amp; Point-in-Time Recovery</div>
+  </div>
+</div>
 
 {% if is_admin %}
-<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px;margin-bottom:8px">
-    <h2 style="margin:0">⏪ Restore / Undo from Snapshot</h2>
+<!-- Administrator Point-in-Time Snapshot Recovery -->
+<div class="card" style="margin-bottom:20px">
+  <div class="card-header" style="flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      <h2 style="font-size:16px">Point-in-Time Snapshot Recovery</h2>
+    </div>
     {% if has_xlsx %}
-    <form method="post" action="{{ url_for('backups_reimport_excel') }}" onsubmit="return confirm('Re-import any missing subjects from attendance_records.xlsx? Existing subjects will not be overwritten.')">
-      <button class="btn small primary" type="submit">📥 Restore missing subjects from Excel</button>
+    <form method="post" action="{{ url_for('backups_reimport_excel') }}" onsubmit="return confirm('Re-import any missing subjects from attendance_records.xlsx? Existing subjects and marks will not be overwritten.')" style="margin:0">
+      <button class="btn small secondary" type="submit">
+        <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Restore Missing Subjects from Excel</span>
+      </button>
     </form>
     {% endif %}
   </div>
-  <p class="muted" style="margin-top:0;font-size:13px">
-    The site automatically saves snapshots before changes and before deleting any subject, section, or date. Restoring a snapshot brings back your subjects and marks from that moment (and saves a backup of your current state first).
+
+  <p class="muted" style="margin-top:0;font-size:12.5px;line-height:1.5">
+    The application automatically creates database snapshots before subject deletions, session removals, and major updates. Restoring a snapshot rolls back subjects and attendance records to that exact point in time (and preserves an automatic backup of your current database first).
   </p>
+
   {% if backups %}
   <details {% if backups|length <= 5 %}open{% endif %}>
-    <summary style="cursor:pointer;font-weight:700;color:var(--brand);font-size:14px">Available snapshots ({{ backups|length }})</summary>
-    <div style="overflow:auto;margin-top:8px">
-      <table>
-        <thead><tr><th>Saved at</th><th>Reason</th><th>Subjects inside snapshot</th><th></th></tr></thead>
+    <summary style="cursor:pointer;font-weight:700;color:var(--brand-accent);font-size:13px">
+      Available Database Snapshots ({{ backups|length }})
+    </summary>
+    <div class="scroll" style="margin-top:10px">
+      <table class="grid">
+        <thead>
+          <tr>
+            <th>Snapshot Timestamp</th>
+            <th>Trigger Reason</th>
+            <th>Enclosed Subjects</th>
+            <th style="text-align:right">Action</th>
+          </tr>
+        </thead>
         <tbody>
           {% for b in backups %}
           <tr>
-            <td style="white-space:nowrap"><b>{{ b.when }}</b></td>
+            <td style="white-space:nowrap;font-weight:700">{{ b.when }}</td>
             <td style="white-space:nowrap"><span class="badge done">{{ b.kind }}</span></td>
             <td>{% if b.subjects %}{{ b.subjects|join(', ') }}{% else %}<span class="muted">None</span>{% endif %}</td>
             <td style="text-align:right;white-space:nowrap">
-              <form method="post" action="{{ url_for('backups_restore') }}" onsubmit="return confirm('Restore database to the snapshot from {{ b.when|e }} ({{ b.subjects|join(', ')|e }})?\n\nA backup of your current data will be saved first.')">
+              <form method="post" action="{{ url_for('backups_restore') }}" onsubmit="return confirm('Restore database to snapshot from {{ b.when|e }} ({{ b.subjects|join(', ')|e }})?\n\nA backup of the current database will be saved first.')" style="margin:0">
                 <input type="hidden" name="filename" value="{{ b.filename }}">
-                <button class="btn small primary" type="submit">↺ Restore this point</button>
+                <button class="btn small primary" type="submit" style="font-size:12px;padding:3px 10px">↺ Restore Snapshot</button>
               </form>
             </td>
           </tr>
@@ -42,25 +64,64 @@
     </div>
   </details>
   {% else %}
-  <p class="muted">No snapshots saved yet.</p>
+  <p class="muted" style="font-size:13px">No snapshots recorded yet.</p>
   {% endif %}
 </div>
 {% endif %}
 
+<!-- Activity Log Table -->
 {% if not shown %}
-<div class="card">Nothing in the log yet. Changes will appear here from now on.</div>
+<div class="card" style="padding:28px 20px;text-align:center">
+  <div style="color:var(--muted);margin-bottom:8px">
+    <svg class="lucide" viewBox="0 0 24 24" width="36" height="36" fill="none"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+  </div>
+  <h3 style="margin:0 0 6px">No Activity Logged Yet</h3>
+  <p class="muted" style="margin:0;font-size:13px">Audit entries will automatically populate as changes occur.</p>
+</div>
 {% else %}
-<div class="toolbar"><input type="text" id="q" class="grow" placeholder="Search the log (name, subject, date…)"></div>
-<div class="card" style="padding:6px 12px;overflow:auto">
-<table id="logt">
-<thead><tr><th>When</th><th>What</th><th>Subject</th><th>Details</th><th>From</th></tr></thead>
-<tbody>
-{% for e in shown %}<tr><td style="white-space:nowrap">{{ e.when }}</td><td style="white-space:nowrap"><b>{{ e.action }}</b></td><td>{{ e.subject }}</td><td>{{ e.detail }}</td><td style="white-space:nowrap">{{ e.who }}</td></tr>{% endfor %}
-</tbody></table></div>
+<div class="card" style="padding:16px 20px">
+  <div class="card-header" style="flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+      <h2 style="font-size:16px">Sequential Audit Trail ({{ total }} entries)</h2>
+    </div>
+    <div style="min-width:240px;flex:1;max-width:380px">
+      <input type="text" id="q" placeholder="Filter log by keyword, name, action, or date…" style="width:100%;font-size:13px">
+    </div>
+  </div>
+
+  <div class="scroll">
+    <table id="logt">
+      <thead>
+        <tr>
+          <th>Timestamp</th>
+          <th>Action Type</th>
+          <th>Target Subject</th>
+          <th>Detailed Description</th>
+          <th>Origin / Account</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for e in shown %}
+        <tr>
+          <td style="white-space:nowrap;font-size:12.5px;color:var(--muted)">{{ e.when }}</td>
+          <td style="white-space:nowrap"><b>{{ e.action }}</b></td>
+          <td style="white-space:nowrap">{{ e.subject or '—' }}</td>
+          <td style="font-size:13px">{{ e.detail }}</td>
+          <td style="white-space:nowrap;font-size:12.5px;color:var(--muted)">{{ e.who }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
 <script>
 document.getElementById('q').oninput = e => {
   const q = e.target.value.trim().toLowerCase();
-  document.querySelectorAll('#logt tbody tr').forEach(r => r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none');
+  document.querySelectorAll('#logt tbody tr').forEach(r => {
+    r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+  });
 };
 </script>
 {% endif %}

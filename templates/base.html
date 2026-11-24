@@ -1,286 +1,412 @@
 <!doctype html>
-<html lang="en"><head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<meta name="theme-color" content="#0a2d52">
-<meta name="apple-mobile-web-app-capable" content="yes">
-<meta name="apple-mobile-web-app-status-bar-style" content="default">
-<title>{% block title %}Eclaro Academy · Attendance &amp; Grading{% endblock %}</title>
-<script>
-(function() {
-  var saved = localStorage.getItem('theme');
-  var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-  if (saved === 'dark' || (!saved && prefersDark)) {
-    document.documentElement.setAttribute('data-theme', 'dark');
-  }
-})();
-</script>
-<link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}"></head><body class="{{ 'has-tabbar' if role == 'teacher' }}">
-<a class="skip-link" href="#main">Skip to content</a>
-<header class="top">
-  <div class="header-inner">
-    <a href="{{ url_for('dashboard') if role == 'teacher' else (url_for('records') if role == 'student' else url_for('login')) }}" class="brand">
-      <span class="brand-badge" aria-hidden="true">
-        <img src="{{ url_for('static', filename='img/eclaro_logo.jpg') }}" alt="Eclaro Logo">
-      </span>
-      <div class="brand-titles">
-        <span class="brand-title">Eclaro Academy</span>
-        <span class="brand-sub">Attendance &amp; Grading</span>
-      </div>
-    </a>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#0b1526">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <title>{% block title %}Eclaro Academy · Senparmis Tech Attendance Tracker{% endblock %}</title>
+  <script>
+    (function() {
+      var saved = localStorage.getItem('theme');
+      var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
+      if (saved === 'dark' || (!saved && prefersDark)) {
+        document.documentElement.setAttribute('data-theme', 'dark');
+      }
+    })();
+  </script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
+</head>
+<body class="{{ 'has-tabbar' if role in ('teacher', 'student') }}">
+  <a class="skip-link" href="#main">Skip to main academic content</a>
 
-    {% if role == 'teacher' %}
-    <nav class="desktop-nav" aria-label="Main navigation">
-      <div class="nav-pill-group">
-        <a href="{{ url_for('dashboard') }}" title="Dashboard" class="nav-item {{ 'on' if page=='dashboard' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
-          <span>Dashboard</span>
-        </a>
-        <a href="{{ url_for('mark') }}" title="Mark attendance" class="nav-item {{ 'on' if page=='mark' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
-          <span>Mark</span>
-        </a>
-        <a href="{{ url_for('scan') }}" title="Import" class="nav-item {{ 'on' if page=='scan' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Import</span>
-        </a>
-        <a href="{{ url_for('records') }}" title="Records" class="nav-item {{ 'on' if page=='records' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span>Records</span>
-        </a>
-        {% if not is_monitor %}
-        <a href="{{ url_for('grades_page') }}" title="Grades" class="nav-item {{ 'on' if page=='grades' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
-          <span>Grades</span>
-        </a>
-        {% endif %}
-        <a href="{{ url_for('students') }}" title="Students" class="nav-item {{ 'on' if page=='students' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-          <span>Students</span>
-        </a>
-        <a href="{{ url_for('lookup') }}" title="Student lookup" class="nav-item {{ 'on' if page=='lookup' }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-          <span>Lookup</span>
-        </a>
-      </div>
-    </nav>
-    {% elif role == 'student' %}
-    <nav class="desktop-nav" aria-label="Main navigation">
-      <div class="nav-pill-group">
-        <a href="{{ url_for('records') }}" title="Records" class="nav-item on">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
-          <span>Records</span>
-        </a>
-      </div>
-    </nav>
-    {% endif %}
-
-    <div class="header-actions">
-      {% if role == 'teacher' %}
-      <div class="desktop-tools">
-        {% if is_monitor %}
-        <span class="tool-link" style="cursor:default;opacity:0.8" title="Section Monitor — {{ monitor_section_name }}">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5Z"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-          <span style="color:#7c3aed">{{ teacher_name }}</span>
+  <header class="top">
+    <div class="header-inner">
+      <!-- Institutional Brand -->
+      <a href="{{ url_for('dashboard') if role == 'teacher' else (url_for('records') if role == 'student' else url_for('login')) }}" class="brand" aria-label="Eclaro Academy Attendance Portal">
+        <span class="brand-badge" aria-hidden="true">
+          <img src="{{ url_for('static', filename='img/eclaro_logo.jpg') }}" alt="Eclaro Academy Crest">
         </span>
-        {% else %}
-        <a href="{{ url_for('teachers_page') }}" class="tool-link {{ 'on' if page=='teachers' }}" title="{{ teacher_name if teacher_name and teacher_name != 'Admin' else 'Teachers' }} &amp; access" aria-label="Teachers &amp; access">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 12c2.7 0 5-2.3 5-5s-2.3-5-5-5-5 2.3-5 5 2.3 5 5 5Z"/><path d="M20 21a8 8 0 1 0-16 0"/></svg>
-          <span>{{ teacher_name if teacher_name and teacher_name != 'Admin' else 'Teachers' }}</span>
+        <div class="brand-titles">
+          <span class="brand-title">Eclaro Academy</span>
+          <span class="brand-sub">Senparmis Tech Attendance Tracker</span>
+        </div>
+      </a>
+
+      {% if role == 'teacher' %}
+      <!-- Desktop Primary Segmented Navigation -->
+      <nav class="desktop-nav" aria-label="Academic workspace navigation">
+        <div class="nav-pill-group">
+          <a href="{{ url_for('dashboard') }}" title="Overview Dashboard" class="nav-item {{ 'on' if page=='dashboard' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+            <span>Dashboard</span>
+          </a>
+          <a href="{{ url_for('mark') }}" title="Mark Daily Attendance" class="nav-item {{ 'on' if page=='mark' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+            <span>Mark</span>
+          </a>
+          <a href="{{ url_for('scan') }}" title="Import Attendance Records" class="nav-item {{ 'on' if page=='scan' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+            <span>Import</span>
+          </a>
+          <a href="{{ url_for('records') }}" title="Class Attendance Records" class="nav-item {{ 'on' if page=='records' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+            <span>Records</span>
+          </a>
+          {% if not is_monitor %}
+          <a href="{{ url_for('grades_page') }}" title="Gradebook & Philippine Scale" class="nav-item {{ 'on' if page=='grades' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+            <span>Gradebook</span>
+          </a>
+          {% endif %}
+          <a href="{{ url_for('students') }}" title="Manage Students & Subjects" class="nav-item {{ 'on' if page=='students' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <span>Students</span>
+          </a>
+          <a href="{{ url_for('lookup') }}" title="Student Profile & Attendance Lookup" class="nav-item {{ 'on' if page=='lookup' }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+            <span>Lookup</span>
+          </a>
+        </div>
+      </nav>
+      {% elif role == 'student' %}
+      <nav class="desktop-nav" aria-label="Student portal navigation">
+        <div class="nav-pill-group">
+          <a href="{{ url_for('records') }}" class="nav-item on">
+            <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+            <span>Attendance Records</span>
+          </a>
+        </div>
+      </nav>
+      {% endif %}
+
+      <div class="header-actions">
+        {% if role == 'teacher' %}
+        <!-- Desktop Administrative Tools -->
+        <div class="desktop-tools">
+          {% if is_monitor %}
+          <span class="user-role-badge monitor" title="Section Monitor: {{ monitor_section_name }}">
+            <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <span>Monitor: {{ monitor_sec_name or teacher_name }}</span>
+          </span>
+          {% else %}
+          <a href="{{ url_for('teachers_page') }}" class="tool-link {{ 'on' if page=='teachers' }}" title="Teachers & Access Management">
+            <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z"/><path d="m9 12 2 2 4-4"/></svg>
+            <span>{{ teacher_name if teacher_name and teacher_name != 'Admin' else 'Access' }}</span>
+          </a>
+          {% endif %}
+
+          <a href="{{ url_for('log_page') }}" class="tool-link {{ 'on' if page=='log' }}" title="Activity Audit Log">
+            <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/><path d="M12 7v5l4 2"/></svg>
+            <span>Audit</span>
+          </a>
+
+          {% if not is_monitor %}
+          <a href="{{ url_for('files_page') }}" class="tool-link {{ 'on' if page=='files' }}" title="Database File Information">
+            <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+            <span>Database</span>
+          </a>
+          <a href="{{ url_for('download') }}" class="tool-link" title="Export Current Terms to Excel (.xlsx)">
+            <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+            <span>Export</span>
+          </a>
+          {% endif %}
+          <span class="nav-divider" aria-hidden="true"></span>
+        </div>
+        {% elif role == 'student' %}
+        <span class="user-role-badge student">Student (Read-Only)</span>
+        {% endif %}
+
+        <!-- Theme Toggle (Moon/Sun) -->
+        <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle dark mode" title="Toggle theme">
+          <svg class="lucide icon-sun" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
+          <svg class="lucide icon-moon" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
+        </button>
+
+        {% if role in ('teacher', 'student') and auth_on %}
+        <a href="{{ url_for('logout') }}" class="signout-btn desktop-signout" title="Sign out" aria-label="Sign out">
+          <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign out</span>
         </a>
         {% endif %}
-        <a href="{{ url_for('log_page') }}" class="tool-link {{ 'on' if page=='log' }}" title="Changes log" aria-label="Changes log">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-          <span>Log</span>
+
+        {% if role in ('teacher', 'student') %}
+        <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle navigation menu" aria-expanded="false">
+          <svg class="lucide icon-menu" viewBox="0 0 24 24" width="17" height="17" fill="none"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
+          <svg class="lucide icon-close" viewBox="0 0 24 24" width="17" height="17" fill="none"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          <span>Menu</span>
+        </button>
+        {% endif %}
+      </div>
+    </div>
+
+    <!-- Mobile Slide-Down Drawer Panel -->
+    {% if role == 'teacher' %}
+    <div class="mobile-nav-panel" id="mobileNavPanel">
+      <div class="mnav-header">
+        <div class="mnav-user-info">
+          <div class="mnav-user-name">{{ teacher_name or 'Faculty Member' }}</div>
+          <div>
+            {% if is_admin %}<span class="user-role-badge admin">Administrator</span>
+            {% elif is_monitor %}<span class="user-role-badge monitor">Section Monitor · {{ monitor_section_name or 'Assigned' }}</span>
+            {% else %}<span class="user-role-badge teacher">Faculty Instructor</span>{% endif %}
+          </div>
+        </div>
+        <span class="brand-sub" style="font-size:10.5px">Senparmis Tech</span>
+      </div>
+
+      <div class="mnav-section-label">Academic Attendance &amp; Records</div>
+      <div class="mnav-grid">
+        <a href="{{ url_for('dashboard') }}" class="mnav-tile {{ 'on' if page=='dashboard' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+          <span><b>Dashboard</b><small>Overview &amp; statistics</small></span>
+        </a>
+        <a href="{{ url_for('mark') }}" class="mnav-tile {{ 'on' if page=='mark' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+          <span><b>Mark Attendance</b><small>Daily roll call</small></span>
+        </a>
+        <a href="{{ url_for('records') }}" class="mnav-tile {{ 'on' if page=='records' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+          <span><b>Records</b><small>Sheet &amp; print</small></span>
         </a>
         {% if not is_monitor %}
-        <a href="{{ url_for('files_page') }}" class="tool-link {{ 'on' if page=='files' }}" title="Excel file info" aria-label="Excel file info">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-          <span>File</span>
-        </a>
-        <a href="{{ url_for('download') }}" class="tool-link" title="Download Excel workbook" aria-label="Download Excel workbook">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
-          <span>Excel</span>
+        <a href="{{ url_for('grades_page') }}" class="mnav-tile {{ 'on' if page=='grades' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+          <span><b>Gradebook</b><small>Philippine grading scale</small></span>
         </a>
         {% endif %}
-        <span class="nav-divider" aria-hidden="true"></span>
+        <a href="{{ url_for('scan') }}" class="mnav-tile {{ 'on' if page=='scan' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M12 18v-6"/><path d="m9 15 3 3 3-3"/></svg>
+          <span><b>Import</b><small>Meet CSV &amp; photo scan</small></span>
+        </a>
+        <a href="{{ url_for('students') }}" class="mnav-tile {{ 'on' if page=='students' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+          <span><b>Students &amp; Subjects</b><small>Roster &amp; sections</small></span>
+        </a>
+        <a href="{{ url_for('lookup') }}" class="mnav-tile mnav-wide {{ 'on' if page=='lookup' }}">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+          <span><b>Student Lookup</b><small>Search student profile, attendance &amp; standing</small></span>
+        </a>
+      </div>
+
+      <div class="mnav-section-label">Management &amp; Tools</div>
+      <div class="mnav-tools-row">
+        {% if not is_monitor %}
+        <a href="{{ url_for('teachers_page') }}" class="mnav-chip {{ 'on' if page=='teachers' }}">Teachers &amp; Access</a>
+        {% endif %}
+        <a href="{{ url_for('log_page') }}" class="mnav-chip {{ 'on' if page=='log' }}">Activity Log</a>
+        {% if not is_monitor %}
+        <a href="{{ url_for('files_page') }}" class="mnav-chip {{ 'on' if page=='files' }}">Database Info</a>
+        <a href="{{ url_for('download') }}" class="mnav-chip">Export .xlsx</a>
+        {% endif %}
+      </div>
+
+      {% if auth_on %}
+      <div class="mnav-footer">
+        <a href="{{ url_for('logout') }}" class="mnav-signout">
+          <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+          <span>Sign Out</span>
+        </a>
       </div>
       {% endif %}
-
-      <button class="theme-toggle-btn" id="themeToggleBtn" type="button" aria-label="Toggle dark mode" title="Toggle theme">
-        <svg class="icon-sun" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"/><path d="M12 2v2"/><path d="M12 20v2"/><path d="m4.93 4.93 1.41 1.41"/><path d="m17.66 17.66 1.41 1.41"/><path d="M2 12h2"/><path d="M20 12h2"/><path d="m6.34 17.66-1.41 1.41"/><path d="m19.07 4.93-1.41 1.41"/></svg>
-        <svg class="icon-moon" viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z"/></svg>
-      </button>
-
-      {% if role in ('teacher', 'student') and auth_on %}
-      <a href="{{ url_for('logout') }}" class="signout-btn desktop-signout" title="Sign out" aria-label="Sign out">
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="2.1" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
-        <span>Sign out</span>
-      </a>
-      {% endif %}
-
-      {% if role in ('teacher', 'student') %}
-      <button class="nav-toggle-btn" id="navToggleBtn" type="button" aria-label="Toggle menu" aria-expanded="false">
-        <svg class="icon-menu" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="4" y1="7" x2="20" y2="7"/><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="17" x2="20" y2="17"/></svg>
-        <svg class="icon-close" viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-        <span>Menu</span>
-      </button>
+    </div>
+    {% elif role == 'student' %}
+    <div class="mobile-nav-panel" id="mobileNavPanel">
+      <div class="mnav-grid">
+        <a href="{{ url_for('records') }}" class="mnav-tile mnav-wide on">
+          <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+          <span><b>Attendance Records</b><small>View personal attendance history</small></span>
+        </a>
+      </div>
+      {% if auth_on %}
+      <div class="mnav-footer">
+        <a href="{{ url_for('logout') }}" class="mnav-signout">Sign Out</a>
+      </div>
       {% endif %}
     </div>
-  </div>
+    {% endif %}
+  </header>
 
+  <div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
+
+  <main id="main" tabindex="-1">
+    <!-- Flashed Alert Messages -->
+    {% with msgs = get_flashed_messages(with_categories=true) %}
+      {% for cat, m in msgs %}
+      <div class="flash {{ cat }}" role="{{ 'alert' if cat == 'err' else 'status' }}">
+        {% if cat == 'ok' %}
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M20 6 9 17l-5-5"/></svg>
+        {% else %}
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+        {% endif %}
+        <span>{{ m }}</span>
+      </div>
+      {% endfor %}
+    {% endwith %}
+
+    <!-- Admin Preview-As-Monitor Notice -->
+    {% if preview_section_id %}
+    <div class="card" role="status" style="background:#0f1c32;border-color:#1c3254;color:#ffffff;display:flex;justify-content:space-between;align-items:center;padding:10px 14px">
+      <span style="display:flex;align-items:center;gap:8px">
+        <span class="user-role-badge monitor">PREVIEW MODE</span>
+        <span>Viewing academic records as Section Monitor for <b>{{ monitor_section_name or 'a section' }}</b></span>
+      </span>
+      <form method="post" action="{{ url_for('preview_monitor') }}" style="margin:0">
+        <input type="hidden" name="section_id" value="">
+        <button type="submit" class="btn small" style="background:rgba(255,255,255,0.15);border-color:rgba(255,255,255,0.3);color:#fff">Exit Preview</button>
+      </form>
+    </div>
+    {% endif %}
+
+    <!-- Active Academic Term Strip -->
+    {% if term_label %}
+    <div class="term-chip {{ 'locked' if term_locked }}">
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span>Academic Term: <b>{{ term_label }}</b></span>
+      {% if term_locked %}
+      <span class="badge danger" style="margin-left:6px">Locked</span>
+      {% else %}
+      <span class="badge done" style="margin-left:6px">Active</span>
+      {% endif %}
+      {% if term_url %}
+      <a href="{{ term_url }}">Manage Terms ›</a>
+      {% endif %}
+    </div>
+    {% endif %}
+
+    <!-- Subject Tabs -->
+    {% if tabs %}
+    <div class="tabs">
+      {% for t in tabs %}
+      <a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <!-- Section Tabs -->
+    {% if section_tabs and section_tabs|length > 1 %}
+    <div class="tabs" style="margin-top:-6px;margin-bottom:14px;gap:6px">
+      <span class="muted" style="font-size:11px;font-weight:700;align-self:center;margin-right:4px;letter-spacing:0.04em">SECTION:</span>
+      {% for st in section_tabs %}
+      <a class="tab {{ 'on' if st.active }}" style="padding:4px 12px;font-size:12.5px" href="{{ st.url }}">{{ st.name }}</a>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    {% block body %}{% endblock %}
+
+    <!-- Institutional Academic Footer -->
+    <footer class="app-footer">
+      <div class="app-footer-brand">Eclaro Academy · College Department</div>
+      <div class="app-footer-tagline">Senparmis Tech Attendance Tracker — Academic Records. Organized and Accessible.</div>
+    </footer>
+  </main>
+
+  <!-- Mobile Bottom Tabbar Navigation -->
   {% if role == 'teacher' %}
-  <div class="mobile-nav-panel" id="mobileNavPanel">
-    <div class="mnav-section-label">Attendance</div>
-    <div class="mnav-grid">
-      <a href="{{ url_for('dashboard') }}" class="mnav-tile {{ 'on' if page=='dashboard' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>
-        <span><b>Dashboard</b><small>Overview &amp; alerts</small></span>
-      </a>
-      <a href="{{ url_for('mark') }}" class="mnav-tile {{ 'on' if page=='mark' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>
-        <span><b>Mark attendance</b><small>Daily roll call</small></span>
-      </a>
-      <a href="{{ url_for('records') }}" class="mnav-tile {{ 'on' if page=='records' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-        <span><b>Records</b><small>Full sheet &amp; print</small></span>
-      </a>
-      {% if not is_monitor %}
-      <a href="{{ url_for('grades_page') }}" class="mnav-tile {{ 'on' if page=='grades' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>
-        <span><b>Grades</b><small>Exam, quiz &amp; activity</small></span>
-      </a>
-      {% endif %}
-      <a href="{{ url_for('scan') }}" class="mnav-tile {{ 'on' if page=='scan' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg></span>
-        <span><b>Import</b><small>Meet CSV or photo</small></span>
-      </a>
-      <a href="{{ url_for('students') }}" class="mnav-tile mnav-wide {{ 'on' if page=='students' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
-        <span><b>Students &amp; subjects</b><small>Manage class rosters and sections</small></span>
-      </a>
-      <a href="{{ url_for('lookup') }}" class="mnav-tile mnav-wide {{ 'on' if page=='lookup' }}">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg></span>
-        <span><b>Student lookup</b><small>Search a student's attendance</small></span>
-      </a>
-    </div>
-    <div class="mnav-section-label">Tools &amp; data</div>
-    <div class="mnav-tools-row">
-      {% if not is_monitor %}
-      <a href="{{ url_for('teachers_page') }}" class="mnav-chip {{ 'on' if page=='teachers' }}">Teachers &amp; Access</a>
-      {% endif %}
-      <a href="{{ url_for('log_page') }}" class="mnav-chip {{ 'on' if page=='log' }}">Activity Log</a>
-      {% if not is_monitor %}
-      <a href="{{ url_for('files_page') }}" class="mnav-chip {{ 'on' if page=='files' }}">Workbook File</a>
-      <a href="{{ url_for('download') }}" class="mnav-chip">Export .xlsx</a>
-      {% endif %}
-    </div>
-    {% if auth_on %}
-    <div class="mnav-footer">
-      <a href="{{ url_for('logout') }}" class="mnav-signout">Sign out</a>
-    </div>
+  <nav class="tabbar" aria-label="Quick mobile navigation">
+    <a href="{{ url_for('dashboard') }}" class="{{ 'on' if page=='dashboard' }}">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><rect width="7" height="9" x="3" y="3" rx="1"/><rect width="7" height="5" x="14" y="3" rx="1"/><rect width="7" height="9" x="14" y="12" rx="1"/><rect width="7" height="5" x="3" y="16" rx="1"/></svg>
+      </span>
+      <span>Home</span>
+    </a>
+    <a href="{{ url_for('mark') }}" class="{{ 'on' if page=='mark' }}">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><rect width="8" height="4" x="8" y="2" rx="1" ry="1"/><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"/><path d="m9 14 2 2 4-4"/></svg>
+      </span>
+      <span>Attendance</span>
+    </a>
+    {% if not is_monitor %}
+    <a href="{{ url_for('grades_page') }}" class="{{ 'on' if page=='grades' }}">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+      </span>
+      <span>Grades</span>
+    </a>
+    {% else %}
+    <a href="{{ url_for('students') }}" class="{{ 'on' if page=='students' }}">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      </span>
+      <span>Students</span>
+    </a>
     {% endif %}
-  </div>
+    <a href="{{ url_for('records') }}" class="{{ 'on' if page in ('records',) }}">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+      </span>
+      <span>Records</span>
+    </a>
+    <button type="button" id="tabMoreBtn" aria-expanded="false" aria-controls="mobileNavPanel">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg>
+      </span>
+      <span>More</span>
+    </button>
+  </nav>
   {% elif role == 'student' %}
-  <div class="mobile-nav-panel" id="mobileNavPanel">
-    <div class="mnav-grid">
-      <a href="{{ url_for('records') }}" class="mnav-tile mnav-wide on">
-        <span class="mnav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
-        <span><b>Attendance records</b><small>View class attendance history</small></span>
-      </a>
-    </div>
-    {% if auth_on %}
-    <div class="mnav-footer">
-      <a href="{{ url_for('logout') }}" class="mnav-signout">Sign out</a>
-    </div>
-    {% endif %}
-  </div>
+  <nav class="tabbar" aria-label="Student mobile navigation">
+    <a href="{{ url_for('records') }}" class="on" style="grid-column: span 5">
+      <span class="ti" aria-hidden="true">
+        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M3 3h18v18H3z"/><path d="M21 9H3"/><path d="M21 15H3"/><path d="M12 3v18"/></svg>
+      </span>
+      <span>Records</span>
+    </a>
+  </nav>
   {% endif %}
-</header>
-<div class="mobile-nav-backdrop" id="mobileNavBackdrop"></div>
-<main id="main" tabindex="-1">
-{% with msgs = get_flashed_messages(with_categories=true) %}{% for cat, m in msgs %}<div class="flash {{ cat }}" role="{{ 'alert' if cat == 'err' else 'status' }}"><span>{{ m }}</span></div>{% endfor %}{% endwith %}
-{% if preview_section_id %}
-<div class="flash ok" role="status" style="background:#0a2d52;border-color:#16395b;color:#fff;display:flex;justify-content:space-between;align-items:center">
-  <span><span style="background:var(--brand-green);color:#0a2d52;padding:2px 6px;border-radius:4px;font-size:11px;font-weight:700;margin-right:6px">PREVIEW</span> Viewing as Section Monitor for <b>{{ monitor_section_name or 'a section' }}</b></span>
-  <form method="post" action="{{ url_for('preview_monitor') }}" style="margin:0">
-    <input type="hidden" name="section_id" value="">
-    <button type="submit" style="background:rgba(255,255,255,0.2);border:1px solid rgba(255,255,255,0.4);color:#fff;padding:4px 12px;border-radius:6px;cursor:pointer;font-size:12px;font-weight:600">Exit Preview</button>
-  </form>
-</div>
-{% endif %}
-{% if term_label %}<div class="term-chip {{ 'locked' if term_locked }}"><span>Term: <b>{{ term_label }}</b></span>{% if term_locked %}<span class="badge done">Locked</span>{% endif %}{% if term_url %}<a href="{{ term_url }}">Manage terms</a>{% endif %}</div>{% endif %}
-{% if tabs %}<div class="tabs">{% for t in tabs %}<a class="tab {{ 'on' if t.active }}" href="{{ t.url }}">{{ t.name }}</a>{% endfor %}</div>{% endif %}
-{% if section_tabs and section_tabs|length > 1 %}
-<div class="tabs" style="margin-top:-6px;margin-bottom:12px;gap:6px">
-  <span class="muted" style="font-size:12px;font-weight:700;align-self:center;margin-right:4px">SECTION:</span>
-  {% for st in section_tabs %}<a class="tab {{ 'on' if st.active }}" style="padding:5px 12px;font-size:13px" href="{{ st.url }}">{{ st.name }}</a>{% endfor %}
-</div>
-{% endif %}
-{% block body %}{% endblock %}
-</main>
-{% if role == 'teacher' %}
-<nav class="tabbar" aria-label="Quick navigation">
-  <a href="{{ url_for('dashboard') }}" class="{{ 'on' if page=='dashboard' }}">
-    <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m3 9 9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg></span>Home
-  </a>
-  <a href="{{ url_for('mark') }}" class="{{ 'on' if page=='mark' }}">
-    <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg></span>Attendance
-  </a>
-  {% if not is_monitor %}
-  <a href="{{ url_for('grades_page') }}" class="{{ 'on' if page=='grades' }}">
-    <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg></span>Grades
-  </a>
-  {% endif %}
-  <a href="{{ url_for('records') }}" class="{{ 'on' if page in ('records',) }}">
-    <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>Records
-  </a>
-  {% if is_monitor %}
-  <a href="{{ url_for('students') }}" class="{{ 'on' if page=='students' }}">
-    <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>Students
-  </a>
-  {% endif %}
-  <button type="button" id="tabMoreBtn" aria-expanded="false" aria-controls="mobileNavPanel">
-    <span class="ti" aria-hidden="true"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="4" y1="12" x2="20" y2="12"/><line x1="4" y1="6" x2="20" y2="6"/><line x1="4" y1="18" x2="20" y2="18"/></svg></span>More
-  </button>
-</nav>
-{% endif %}
-<script>
-const nBtn = document.getElementById('navToggleBtn');
-const nPan = document.getElementById('mobileNavPanel');
-const nBack = document.getElementById('mobileNavBackdrop');
-function setMenuOpen(open) {
-  if (!nBtn || !nPan) return;
-  nPan.classList.toggle('open', open);
-  nBtn.classList.toggle('open', open);
-  nBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
-  const mb = document.getElementById('tabMoreBtn'); if (mb) mb.setAttribute('aria-expanded', open ? 'true' : 'false');
-  if (nBack) nBack.classList.toggle('open', open);
-}
-if (nBtn && nPan) {
-  nBtn.onclick = () => setMenuOpen(!nPan.classList.contains('open'));
-  if (nBack) nBack.onclick = () => setMenuOpen(false);
-  const moreBtn = document.getElementById('tabMoreBtn');
-  if (moreBtn) moreBtn.onclick = () => setMenuOpen(!nPan.classList.contains('open'));
-  document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenuOpen(false); });
-  window.addEventListener('resize', () => { if (window.innerWidth > 960) setMenuOpen(false); });
-}
-document.querySelectorAll('.nav-item.on,.mnav-tile.on,.mnav-chip.on,.tool-link.on,.tabbar a.on').forEach(a => a.setAttribute('aria-current', 'page'));
-const tBtn = document.getElementById('themeToggleBtn');
-function syncThemeBtn() {
-  if (!tBtn) return;
-  const dark = document.documentElement.getAttribute('data-theme') === 'dark';
-  tBtn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
-}
-if (tBtn) {
-  syncThemeBtn();
-  tBtn.onclick = () => {
-    const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
-    if (next === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
-    else document.documentElement.removeAttribute('data-theme');
-    localStorage.setItem('theme', next);
-    syncThemeBtn();
-  };
-}
-</script>
-</body></html>
+
+  <script>
+    const nBtn = document.getElementById('navToggleBtn');
+    const nPan = document.getElementById('mobileNavPanel');
+    const nBack = document.getElementById('mobileNavBackdrop');
+    const tabMore = document.getElementById('tabMoreBtn');
+
+    function setMenuOpen(open) {
+      if (!nPan) return;
+      nPan.classList.toggle('open', open);
+      if (nBtn) {
+        nBtn.classList.toggle('open', open);
+        nBtn.setAttribute('aria-expanded', open ? 'true' : 'false');
+      }
+      if (tabMore) {
+        tabMore.setAttribute('aria-expanded', open ? 'true' : 'false');
+        tabMore.classList.toggle('on', open);
+      }
+      if (nBack) nBack.classList.toggle('open', open);
+    }
+
+    if (nBtn && nPan) {
+      nBtn.onclick = () => setMenuOpen(!nPan.classList.contains('open'));
+    }
+    if (tabMore && nPan) {
+      tabMore.onclick = () => setMenuOpen(!nPan.classList.contains('open'));
+    }
+    if (nBack) {
+      nBack.onclick = () => setMenuOpen(false);
+    }
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') setMenuOpen(false); });
+    window.addEventListener('resize', () => { if (window.innerWidth > 960) setMenuOpen(false); });
+
+    document.querySelectorAll('.nav-item.on,.mnav-tile.on,.mnav-chip.on,.tool-link.on,.tabbar a.on').forEach(a => a.setAttribute('aria-current', 'page'));
+
+    const tBtn = document.getElementById('themeToggleBtn');
+    function syncThemeBtn() {
+      if (!tBtn) return;
+      const dark = document.documentElement.getAttribute('data-theme') === 'dark';
+      tBtn.title = dark ? 'Switch to light mode' : 'Switch to dark mode';
+    }
+    if (tBtn) {
+      syncThemeBtn();
+      tBtn.onclick = () => {
+        const next = document.documentElement.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
+        if (next === 'dark') document.documentElement.setAttribute('data-theme', 'dark');
+        else document.documentElement.removeAttribute('data-theme');
+        localStorage.setItem('theme', next);
+        syncThemeBtn();
+      };
+    }
+  </script>
+</body>
+</html>

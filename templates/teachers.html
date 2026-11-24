@@ -1,122 +1,201 @@
 {% extends "base.html" %}
-{% block title %}Teachers &amp; access{% endblock %}
+{% block title %}Teachers &amp; Access · Eclaro Academy Attendance Tracker{% endblock %}
 {% block body %}
-<h1>Teachers &amp; access</h1>
-<p class="muted">
-  Signed in as <b>{{ teacher_name or 'Admin' }}</b>
-  {% if is_admin %}<span class="badge done">Admin</span>{% elif is_monitor %}<span class="badge" style="background:#7c3aed;color:#fff">Monitor</span>{% else %}<span class="badge todo">Teacher</span>{% endif %}
-</p>
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>Teachers &amp; Role-Based Access</h1>
+    <div class="sub">
+      Signed in as <b>{{ teacher_name or 'Admin' }}</b>
+      {% if is_admin %}<span class="user-role-badge admin" style="margin-left:6px">Administrator</span>
+      {% elif is_monitor %}<span class="user-role-badge monitor" style="margin-left:6px">Section Monitor</span>
+      {% else %}<span class="user-role-badge teacher" style="margin-left:6px">Faculty Instructor</span>{% endif %}
+    </div>
+  </div>
+</div>
 
 {% if is_admin %}
-<div class="grid2">
+<div class="grid2" style="margin-bottom:16px">
+  <!-- Add User Account Form -->
   <div class="card">
-    <h2>Add an account</h2>
-    <p class="muted" style="margin-top:0;font-size:13px">Teachers see only their assigned subjects. Section Monitors see only one section of a subject — great for sharing access with another section's monitor.</p>
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+        <h2 style="font-size:15px">Create Faculty or Monitor Account</h2>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:0;font-size:12.5px">
+      Instructors access only their assigned subjects. Section Monitors have section-specific access to take roll call for a designated section.
+    </p>
     <form method="post" action="{{ url_for('teachers_add') }}">
-      <p><input class="txt" type="text" name="username" placeholder="Username (e.g. m.santos)" required style="width:100%"></p>
-      <p><input class="txt" type="text" name="display_name" placeholder="Full / display name (e.g. Prof. Maria Santos)" style="width:100%"></p>
-      <p><input class="txt" type="password" name="password" placeholder="Password (at least 8 characters)" minlength="8" required style="width:100%"></p>
-      <p><label class="chk"><input type="checkbox" name="is_admin" value="1"> Admin (can see all subjects and manage teachers)</label></p>
-      <p><label class="chk"><input type="checkbox" name="is_monitor" value="1" id="chk-monitor" onchange="document.getElementById('monitor-sec-row').style.display=this.checked?'':'none'"> Section Monitor (access to one section only)</label></p>
-      <p id="monitor-sec-row" style="display:none">
-        <label style="font-size:13px;font-weight:600">Assign to section:</label><br>
-        <select name="monitor_section_id" class="txt" style="width:100%;margin-top:4px">
-          <option value="">— pick a section —</option>
+      <div style="margin-bottom:10px">
+        <label>Account Username</label>
+        <input class="txt" type="text" name="username" placeholder="e.g. m.santos" required style="width:100%">
+      </div>
+      <div style="margin-bottom:10px">
+        <label>Full Display Name</label>
+        <input class="txt" type="text" name="display_name" placeholder="e.g. Prof. Maria Santos" style="width:100%">
+      </div>
+      <div style="margin-bottom:12px">
+        <label>Temporary Password (Min 8 characters)</label>
+        <input class="txt" type="password" name="password" placeholder="••••••••" minlength="8" required style="width:100%">
+      </div>
+
+      <div style="margin-bottom:10px;display:flex;flex-direction:column;gap:8px">
+        <label class="chk" style="font-size:13px">
+          <input type="checkbox" name="is_admin" value="1">
+          <span>Administrator (Full access to all subjects, sections, and accounts)</span>
+        </label>
+        <label class="chk" style="font-size:13px">
+          <input type="checkbox" name="is_monitor" value="1" id="chk-monitor" onchange="document.getElementById('monitor-sec-row').style.display=this.checked?'block':'none'">
+          <span>Section Monitor (Restricted roll call for one class section only)</span>
+        </label>
+      </div>
+
+      <div id="monitor-sec-row" style="display:none;margin-bottom:12px;background:var(--surface);padding:10px;border-radius:var(--radius);border:1px solid var(--line)">
+        <label style="font-size:12px;font-weight:700">Assign Section to Monitor:</label>
+        <select name="monitor_section_id" style="width:100%;margin-top:4px">
+          <option value="">— Select a class section —</option>
           {% for sec in all_sections %}
-          <option value="{{ sec.id }}">{{ sec.subject_name }} · {{ sec.section_name }}</option>
+          <option value="{{ sec.id }}">{{ sec.subject_name }} · Section {{ sec.section_name }}</option>
           {% endfor %}
         </select>
-      </p>
-      <button class="btn primary" type="submit">Create account</button>
+      </div>
+
+      <button class="btn primary small" type="submit" style="min-height:38px">Create User Account</button>
     </form>
   </div>
 
+  <!-- Subject Ownership Delegation -->
   <div class="card">
-    <h2>Subject ownership</h2>
-    <p class="muted" style="margin-top:0;font-size:13px">Assign each subject to a specific teacher so only they (and admins) see it.</p>
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg>
+        <h2 style="font-size:15px">Subject Faculty Ownership</h2>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:0;font-size:12.5px">
+      Assign each academic subject to a specific faculty member so only they (and admins) can see and record it.
+    </p>
     {% if subjects %}
-    <table>
-      <tr><th>Subject</th><th>Assigned teacher</th></tr>
-      {% for s in subjects %}
-      <tr>
-        <td><b>{{ s.name }}</b></td>
-        <td>
-          <form method="post" action="{{ url_for('teachers_assign_subject') }}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
-            <input type="hidden" name="subject" value="{{ s.name }}">
-            <select name="teacher_id">
-              <option value="">— Admin / unassigned —</option>
-              {% for t in teachers %}
-              <option value="{{ t.id }}" {{ 'selected' if s.teacher_id == t.id }}>{{ t.display_name }} ({{ t.username }})</option>
-              {% endfor %}
-            </select>
-            <button class="btn small" type="submit">Save</button>
-          </form>
-        </td>
-      </tr>
-      {% endfor %}
-    </table>
+    <div class="scroll">
+      <table>
+        <thead>
+          <tr><th>Course Subject</th><th>Assigned Instructor</th></tr>
+        </thead>
+        <tbody>
+          {% for s in subjects %}
+          <tr>
+            <td><b>{{ s.name }}</b></td>
+            <td>
+              <form method="post" action="{{ url_for('teachers_assign_subject') }}" style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+                <input type="hidden" name="subject" value="{{ s.name }}">
+                <select name="teacher_id" style="min-height:32px;font-size:12.5px">
+                  <option value="">— Admin / Shared —</option>
+                  {% for t in teachers %}
+                  <option value="{{ t.id }}" {{ 'selected' if s.teacher_id == t.id }}>{{ t.display_name }} ({{ t.username }})</option>
+                  {% endfor %}
+                </select>
+                <button class="btn small" type="submit">Assign</button>
+              </form>
+            </td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
     {% else %}
-    <p class="muted">No subjects yet.</p>
+    <p class="muted" style="font-size:13px">No subjects created yet.</p>
     {% endif %}
   </div>
 </div>
 
+<!-- Configured User Accounts Table -->
 <div class="card">
-  <h2>Accounts ({{ teachers|length }})</h2>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+      <h2 style="font-size:16px">Configured Accounts ({{ teachers|length }})</h2>
+    </div>
+  </div>
+
   {% if teachers %}
-  <table>
-    <tr><th>Name</th><th>Username</th><th>Role</th><th>Scope</th><th>Reset password / remove</th></tr>
-    {% for t in teachers %}
-    <tr>
-      <td><b>{{ t.display_name }}</b></td>
-      <td><code>{{ t.username }}</code></td>
-      <td>{% if t.is_admin %}<span class="badge done">Admin</span>{% elif t.is_monitor %}<span class="badge" style="background:#7c3aed;color:#fff">Monitor</span>{% else %}Teacher{% endif %}</td>
-      <td style="font-size:13px;color:#555">
-        {% if t.is_monitor and t.monitor_section_name %}
-          {{ t.monitor_subject_name }} · <b>{{ t.monitor_section_name }}</b>
-        {% elif not t.is_monitor %}
-          {{ t.n_subjects }} subject(s)
-        {% endif %}
-      </td>
-      <td style="white-space:nowrap">
-        <form class="inline" method="post" action="{{ url_for('teachers_password') }}" style="display:inline-flex;gap:6px;align-items:center">
-          <input type="hidden" name="teacher_id" value="{{ t.id }}">
-          <input class="txt" type="password" name="password" placeholder="New password" minlength="8" required style="width:140px;padding:4px 8px;font-size:13px">
-          <button class="btn small" type="submit">Set</button>
-        </form>
-        {% if t.id != teacher_id %}
-        <form class="inline" method="post" action="{{ url_for('teachers_delete') }}" onsubmit="return confirm('Remove account {{ t.display_name|e }} ({{ t.username|e }})?')">
-          <input type="hidden" name="teacher_id" value="{{ t.id }}">
-          <button class="btn small danger" type="submit">Remove</button>
-        </form>
-        {% endif %}
-        {% if is_admin and t.is_monitor and t.monitor_section_id %}
-        <form class="inline" method="post" action="{{ url_for('preview_monitor') }}" style="display:inline">
-          <input type="hidden" name="section_id" value="{{ t.monitor_section_id }}">
-          <button class="btn small" type="submit" style="background:#7c3aed;color:#fff" title="Preview what this monitor sees">👁 Preview</button>
-        </form>
-        {% endif %}
-      </td>
-    </tr>
-    {% endfor %}
-  </table>
+  <div class="scroll">
+    <table>
+      <thead>
+        <tr>
+          <th>Name</th>
+          <th>Username</th>
+          <th>Role</th>
+          <th>Assigned Scope</th>
+          <th style="min-width:280px">Security / Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for t in teachers %}
+        <tr>
+          <td><b>{{ t.display_name }}</b></td>
+          <td><code style="font-size:12.5px">{{ t.username }}</code></td>
+          <td>
+            {% if t.is_admin %}<span class="user-role-badge admin">Admin</span>
+            {% elif t.is_monitor %}<span class="user-role-badge monitor">Monitor</span>
+            {% else %}<span class="user-role-badge teacher">Teacher</span>{% endif %}
+          </td>
+          <td style="font-size:12.5px;color:var(--muted)">
+            {% if t.is_monitor and t.monitor_section_name %}
+              {{ t.monitor_subject_name }} · <b>{{ t.monitor_section_name }}</b>
+            {% elif not t.is_monitor %}
+              {{ t.n_subjects }} subject(s)
+            {% endif %}
+          </td>
+          <td>
+            <div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap">
+              <form class="inline" method="post" action="{{ url_for('teachers_password') }}" style="display:inline-flex;gap:4px;align-items:center">
+                <input type="hidden" name="teacher_id" value="{{ t.id }}">
+                <input class="txt" type="password" name="password" placeholder="New Password" minlength="8" required style="width:120px;padding:3px 8px;font-size:12px;min-height:30px">
+                <button class="btn small" type="submit">Set</button>
+              </form>
+              {% if t.id != teacher_id %}
+              <form class="inline" method="post" action="{{ url_for('teachers_delete') }}" onsubmit="return confirm('Remove account {{ t.display_name|e }} ({{ t.username|e }})?')">
+                <input type="hidden" name="teacher_id" value="{{ t.id }}">
+                <button class="btn small danger" type="submit">Remove</button>
+              </form>
+              {% endif %}
+              {% if is_admin and t.is_monitor and t.monitor_section_id %}
+              <form class="inline" method="post" action="{{ url_for('preview_monitor') }}">
+                <input type="hidden" name="section_id" value="{{ t.monitor_section_id }}">
+                <button class="btn small secondary" type="submit" title="Preview monitor view">Preview</button>
+              </form>
+              {% endif %}
+            </div>
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
   {% else %}
-  <p class="muted">No database teacher accounts yet. You are currently signed in with the master password from <code>passwords.txt</code>.</p>
+  <p class="muted" style="font-size:13px">No individual database teacher accounts yet. Currently using environment or master credentials.</p>
   {% endif %}
 </div>
+
 {% else %}
-<div class="card" style="max-width:480px">
-  <h2>Change your password</h2>
+<!-- Non-Admin Account Settings -->
+<div class="card" style="max-width:500px">
+  <div class="card-header">
+    <h2 style="font-size:15px">Account Security Settings</h2>
+  </div>
   {% if teacher_id %}
   <form method="post" action="{{ url_for('teachers_password') }}">
     <input type="hidden" name="teacher_id" value="{{ teacher_id }}">
-    <p><input class="txt" type="password" name="password" placeholder="New password (at least 8 characters)" minlength="8" required style="width:100%"></p>
-    <button class="btn primary" type="submit">Update password</button>
+    <div style="margin-bottom:12px">
+      <label>Change Account Password</label>
+      <input class="txt" type="password" name="password" placeholder="Enter new password (min 8 characters)" minlength="8" required style="width:100%">
+    </div>
+    <button class="btn primary small" type="submit">Update Password</button>
   </form>
   {% else %}
-  <p class="muted">You are signed in with a shared password from <code>passwords.txt</code>.</p>
+  <p class="muted" style="font-size:13px">You are signed in with a shared system credential.</p>
   {% endif %}
 </div>
 {% endif %}
 {% endblock %}
-

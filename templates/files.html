@@ -1,50 +1,95 @@
 {% extends "base.html" %}
-{% block title %}Data file{% endblock %}
+{% block title %}Database Storage Information · Eclaro Academy Attendance Tracker{% endblock %}
 {% block body %}
-<h1>Where your data is saved</h1>
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>Database &amp; Storage Architecture</h1>
+    <div class="sub">SQLite Database Storage, PythonAnywhere Filesystem &amp; Snapshots</div>
+  </div>
+</div>
+
 <div class="card">
-  <h2>attendance.db</h2>
-  <p class="muted" style="margin:0 0 4px">Full location on the computer that runs this site:</p>
-  <p style="margin:0 0 10px"><code id="fpath" style="display:block;padding:10px 12px;background:var(--surface);border-radius:8px;word-break:break-all;font-size:14px">{{ xlsx_path }}</code></p>
-  <p class="muted" style="margin:0 0 4px">Folder:</p>
-  <p style="margin:0 0 12px"><code id="fdir" style="display:block;padding:10px 12px;background:var(--surface);border-radius:8px;word-break:break-all;font-size:14px">{{ folder }}</code></p>
-  <p style="margin:0 0 12px">
-    {% if exists %}<span class="badge done">Database exists</span> {{ size }} · last saved {{ modified }}
-    {% else %}<span class="badge todo">Not created yet</span> It is created when you first mark attendance or open the site.{% endif %}
-  </p>
-  <div class="toolbar">
-    <a class="btn primary" href="{{ url_for('download') }}">⬇ Download Excel copy</a>
-    <button class="btn" type="button" id="copyPath">Copy file path</button>
-    {% if is_local %}
-    <button class="btn" type="button" id="openFolder">Open folder on this PC</button>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/></svg>
+      <h2>Primary Storage: <b>attendance.db</b></h2>
+    </div>
+    {% if exists %}
+    <span class="badge done">Active Database · {{ size }}</span>
+    {% else %}
+    <span class="badge todo">Pending Initialization</span>
     {% endif %}
   </div>
-  <div id="msg" class="muted"></div>
+
+  <div style="margin-bottom:14px">
+    <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Database File Path</span>
+    <code id="fpath" style="display:block;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);word-break:break-all;font-size:13px;margin-top:4px">{{ xlsx_path }}</code>
+  </div>
+
+  <div style="margin-bottom:14px">
+    <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Workspace Directory</span>
+    <code id="fdir" style="display:block;padding:10px 12px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);word-break:break-all;font-size:13px;margin-top:4px">{{ folder }}</code>
+  </div>
+
+  <div class="muted" style="font-size:12.5px;margin-bottom:16px">
+    {% if exists %}
+    Last modified: <b>{{ modified }}</b> · File size: <b>{{ size }}</b>
+    {% else %}
+    Created automatically when the first attendance roll call is recorded.
+    {% endif %}
+  </div>
+
+  <div class="toolbar" style="margin-bottom:8px">
+    <a class="btn primary small" href="{{ url_for('download') }}">
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+      <span>Download Excel Copy (.xlsx)</span>
+    </a>
+    <button class="btn secondary small" type="button" id="copyPath">Copy Database Path</button>
+    {% if is_local %}
+    <button class="btn secondary small" type="button" id="openFolder">Open Folder in Explorer</button>
+    {% endif %}
+  </div>
+  <div id="msg" style="font-size:12.5px;font-weight:600;min-height:20px"></div>
 </div>
+
 <div class="card">
-  <h2>How saving works</h2>
-  <ul style="margin:0;padding-left:20px">
-    <li>Every time you press <b>Save</b> or confirm a scan, the change is written straight into the database file above.</li>
-    <li>The file always stays on the computer (or PythonAnywhere account) that runs the site, even when you use the site from your phone.</li>
-    <li><b>Download Excel copy</b> builds a fresh <code>.xlsx</code> from the current data and sends it to the device you are using. The copy does not update later, so download again for the latest.</li>
-    <li>Automatic backups of the database are kept in the <code>backups</code> folder next to it.</li>
-    <li>An older <code>attendance_records.xlsx</code> is imported once, the first time the site starts without a database. It is never changed afterwards.</li>
-    <li>The changes log is a separate file in the same folder: <code>{{ log_name }}</code>.</li>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+      <h2>Data Integrity &amp; Archival Protocol</h2>
+    </div>
+  </div>
+  <ul style="font-size:13px;line-height:1.6;color:var(--ink-secondary);padding-left:20px;margin:0">
+    <li>All daily roll calls, term scores, and student profiles commit directly to the ACID-compliant SQLite database file above.</li>
+    <li>Data remains securely on the server (local host or PythonAnywhere environment), with zero data leakage across network clients.</li>
+    <li><b>Excel Export (.xlsx)</b> dynamically compiles the current active terms into a spreadsheet download ready for institutional submission.</li>
+    <li>Automated rollback snapshots are generated in the <code>backups/</code> directory prior to structural edits, date deletions, and term locking.</li>
+    <li>Auditing is logged sequentially in <code>{{ log_name }}</code> for compliance and operational tracking.</li>
   </ul>
 </div>
+
 <script>
 const $ = id => document.getElementById(id);
-function say(t, bad) { $('msg').textContent = t; $('msg').style.color = bad ? 'var(--x)' : 'var(--p)'; }
+function say(t, bad) { $('msg').textContent = t; $('msg').style.color = bad ? 'var(--x-ink)' : 'var(--p-ink)'; }
 $('copyPath').onclick = async () => {
   const t = $('fpath').textContent;
-  try { await navigator.clipboard.writeText(t); say('Path copied.'); }
-  catch (e) { const r = document.createRange(); r.selectNodeContents($('fpath')); const s = getSelection(); s.removeAllRanges(); s.addRange(r); say('Press Ctrl+C to copy the selected path.'); }
+  try {
+    await navigator.clipboard.writeText(t);
+    say('Database path copied to clipboard.');
+  } catch (e) {
+    const r = document.createRange(); r.selectNodeContents($('fpath'));
+    const s = getSelection(); s.removeAllRanges(); s.addRange(r);
+    say('Press Ctrl+C to copy selected path.');
+  }
 };
 async function openIt(what) {
   try {
     const r = await fetch({{ open_url|tojson }}, {method: 'POST', headers: {'Content-Type': 'application/json'}, body: JSON.stringify({what})});
-    const j = await r.json(); say(j.ok ? j.message : (j.error || 'Could not open it.'), !j.ok);
-  } catch (e) { say('Could not reach the site. Is the black window still open?', true); }
+    const j = await r.json();
+    say(j.ok ? j.message : (j.error || 'Could not open folder.'), !j.ok);
+  } catch (e) {
+    say('Could not communicate with the server.', true);
+  }
 }
 if ($('openFolder')) { $('openFolder').onclick = () => openIt('folder'); }
 </script>

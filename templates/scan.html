@@ -1,129 +1,271 @@
 {% extends "base.html" %}
-{% block title %}Import attendance{% endblock %}
+{% block title %}Import Attendance · {{ subject }}{% if section %} ({{ section }}){% endif %}{% endblock %}
 {% block body %}
-<h1>Import attendance</h1>
-{% if not subject %}
-<div class="card">Add a subject first under <a href="{{ url_for('students') }}">Students &amp; subjects</a>.</div>
-{% elif not students %}
-<div class="card">No students in {{ subject }} yet. <a href="{{ url_for('students', subject=subject) }}">Add the class list</a> first so the sheet can be matched to names.</div>
-{% else %}
-<style>
-.seg { display: flex; gap: 8px; margin: 0 0 12px; flex-wrap: wrap; }
-.segbtn { padding: 10px 16px; border: 1px solid var(--line); background: var(--card); color: var(--ink); border-radius: 10px; font: inherit; cursor: pointer; }
-.segbtn.on { background: var(--brand); border-color: var(--brand); color: #fff; }
-</style>
-<p class="muted" style="margin-top:0">Where is today's attendance coming from? Pick one, check the result, then save. <b>Nothing is saved until you confirm.</b></p>
-<div class="seg">
-  <button type="button" class="segbtn" id="segCsv">&#128196; Google Meet CSV file</button>
-  <button type="button" class="segbtn" id="segPhoto">&#128247; Photo or screenshot</button>
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>Import Attendance</h1>
+    <div class="sub">Automated Google Meet CSV &amp; Document Photo Processing · {{ subject }}{% if section %} ({{ section }}){% endif %}</div>
+  </div>
 </div>
+
+{% if not subject %}
+<div class="card" style="padding:28px 20px;text-align:center">
+  <div style="color:var(--muted);margin-bottom:12px">
+    <svg class="lucide" viewBox="0 0 24 24" width="36" height="36" fill="none"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+  </div>
+  <h3 style="margin:0 0 6px">No Subject Selected</h3>
+  <p class="muted" style="margin:0 0 16px;font-size:13.5px">Add or select an academic subject first under Students &amp; Subjects.</p>
+  <a class="btn primary" href="{{ url_for('students') }}">Configure Subjects</a>
+</div>
+{% elif not students %}
+<div class="card" style="padding:28px 20px;text-align:center">
+  <div style="color:var(--muted);margin-bottom:12px">
+    <svg class="lucide" viewBox="0 0 24 24" width="36" height="36" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/></svg>
+  </div>
+  <h3 style="margin:0 0 6px">No Students in {{ subject }}{% if section %} ({{ section }}){% endif %}</h3>
+  <p class="muted" style="margin:0 0 16px;font-size:13.5px">Add the student roster first so incoming attendance names can be automatically matched.</p>
+  <a class="btn primary" href="{{ url_for('students', subject=subject, section=section) }}">Add Class Roster</a>
+</div>
+{% else %}
+
+<style>
+.import-seg { display: flex; gap: 8px; margin: 0 0 16px; flex-wrap: wrap; }
+.import-segbtn {
+  display: inline-flex; align-items: center; gap: 8px;
+  padding: 10px 16px; border: 1px solid var(--line);
+  background: var(--card); color: var(--muted); border-radius: var(--radius);
+  font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
+  transition: all 0.14s ease; min-height: 40px;
+}
+.import-segbtn:hover { background: var(--surface); color: var(--ink); }
+.import-segbtn.on { background: var(--navy-900); border-color: var(--navy-900); color: #fff; }
+[data-theme="dark"] .import-segbtn.on { background: var(--blue-600); border-color: var(--blue-600); }
+</style>
+
+<div class="card" style="margin-bottom:16px;background:var(--surface)">
+  <div style="font-size:13px;color:var(--ink-secondary)">
+    Select an ingestion method below. Attendance records are staged for your review and <b>nothing is saved into the database until you confirm</b>.
+  </div>
+</div>
+
+<div class="import-seg">
+  <button type="button" class="import-segbtn" id="segCsv">
+    <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+    <span>Google Meet CSV Export</span>
+  </button>
+  <button type="button" class="import-segbtn" id="segPhoto">
+    <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+    <span>Photo / Screenshot AI Scan</span>
+  </button>
+</div>
+
+<!-- ================= CSV IMPORT PANEL ================= -->
 <div class="card" id="csvPanel">
-  <p class="muted" style="margin-top:0">Upload the attendance <b>CSV</b> exported from your Google Meet extension. No AI key is needed. Present = in the call for at least <b>{{ pct }}%</b> of the meeting, and your recited (R) marks for that day are kept.</p>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/></svg>
+      <h2>Import Google Meet Attendance File</h2>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:0;font-size:13px">
+    Upload the attendance CSV exported from your Google Meet browser extension. Students present for at least <b>{{ pct }}%</b> of the call are marked Present, while any existing Recited (R) or Late (L) marks are preserved.
+  </p>
+
   <form method="post" enctype="multipart/form-data" action="{{ url_for('import_meet') }}">
     <input type="hidden" name="subject" value="{{ subject }}">
     <input type="hidden" name="section" value="{{ section or '' }}">
-    <p><input type="file" name="csv" accept=".csv,text/csv" required></p>
-    <div class="toolbar">
-      <input type="text" name="topic" class="grow" maxlength="120" placeholder="Topic for this day (optional)">
-      <label>Date <input type="date" name="date"></label>
+    
+    <div style="border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:24px;text-align:center;margin-bottom:14px;background:var(--surface)">
+      <div style="color:var(--muted);margin-bottom:8px">
+        <svg class="lucide" viewBox="0 0 24 24" width="32" height="32" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <label for="csvFileInput" style="cursor:pointer;display:inline-block">
+        <span class="btn secondary" style="pointer-events:none">Choose CSV File</span>
+        <input type="file" id="csvFileInput" name="csv" accept=".csv,text/csv" required style="display:block;margin:10px auto 0;font-size:12.5px">
+      </label>
+      <div class="muted" style="font-size:12px;margin-top:8px">Supports standard Google Meet extension attendance formats (.csv).</div>
     </div>
-    <p class="muted">Leave the date empty to use the date of the meeting.</p>
-    <button class="btn primary" type="submit">Read the file</button>
+
+    <div class="toolbar">
+      <div class="grow">
+        <label>Lesson Topic (Optional)</label>
+        <input type="text" name="topic" style="width:100%" maxlength="120" placeholder="e.g. Asynchronous Lecture · Unit 3">
+      </div>
+      <div>
+        <label>Session Date (Optional)</label>
+        <input type="date" name="date">
+      </div>
+    </div>
+    <div class="muted" style="font-size:12px;margin-bottom:14px">Leave the date empty to automatically use the timestamp from the Meet file.</div>
+    <button class="btn primary" type="submit" style="min-height:40px">
+      <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="m9 18 6-6-6-6"/></svg>
+      <span>Process Meet CSV</span>
+    </button>
   </form>
 </div>
-<div id="photoPanel">
+
+<!-- ================= AI PHOTO SCAN PANEL ================= -->
+<div id="photoPanel" style="display:none">
 {% if not has_key %}
 <div class="card" id="keyCard">
-  <h2>One-time setup</h2>
-  <p>Reading photos needs an API key from either service. Paste whichever you have; the site tells them apart automatically.</p>
-  <ul style="margin-top:0">
-    <li><b>Google Gemini</b> (key starts with <code>AQ.</code> or <code>AIza</code>): create a key in Google AI Studio. It has a free tier, but Google may use content sent on the free tier to improve its products.</li>
-    <li><b>Claude</b> (key starts with <code>sk-ant-</code>): create a key in the Claude Console (docs.claude.com explains how). The account needs a little credit.</li>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M21 2l-2 2m-1.5 1.5L14 9M3 21l6-6m1.5-1.5L14 9m7-7-9.5 9.5M21 2v6h-6"/></svg>
+      <h2>One-Time Vision AI Setup</h2>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:0;font-size:13px">
+    Scanning handwritten roll call sheets or screen captures requires a multimodal API key from Google Gemini or Anthropic Claude.
+  </p>
+  <ul style="font-size:13px;line-height:1.6;color:var(--ink-secondary);padding-left:20px;margin:0 0 14px">
+    <li><b>Google Gemini:</b> Key starts with <code>AIza</code> or <code>AQ.</code> (Free tier available via Google AI Studio).</li>
+    <li><b>Anthropic Claude:</b> Key starts with <code>sk-ant-</code> (Available via Claude Console).</li>
   </ul>
-  <p>The key is saved only on this computer, in <code>api_key.txt</code> next to <code>app.py</code>.</p>
-  <p><input class="txt" type="password" id="keyIn" placeholder="AIza… or sk-ant-…" style="width:100%;max-width:420px" autocomplete="off">
-  <button class="btn primary" id="keySave" type="button">Save key</button></p>
-  <div id="keyMsg" class="muted"></div>
+  <p class="muted" style="font-size:12px">The key is stored locally in <code>api_key.txt</code> and never transmitted to external third parties.</p>
+  <div style="display:flex;gap:8px;flex-wrap:wrap;max-width:540px">
+    <input class="txt" type="password" id="keyIn" placeholder="Paste API key here (AIza... or sk-ant-...)" style="flex:1;min-width:260px" autocomplete="off">
+    <button class="btn primary" id="keySave" type="button">Save Key</button>
+  </div>
+  <div id="keyMsg" class="flash err" style="display:none;margin-top:10px"></div>
 </div>
 {% endif %}
+
 <div class="card" id="step1">
-  <p class="muted" style="margin-top:0">Choose a photo of a paper list, or screenshots of an online-meeting attendance report (up to {{ max_images }}, for example when the report is long and you scroll). The AI reads the names and suggests who was present or absent for <b>{{ subject }}</b>. People who are not on this class list (other sections, teachers) are ignored. <b>Nothing is saved until you confirm.</b> The images, including the names on them, are sent to {{ 'Google' if provider == 'gemini' else 'Anthropic' if provider else 'the AI service you set up' }} to be read.{% if provider == 'gemini' %} On Google's free tier, Google may use it to improve its products; a paid Gemini account does not.{% endif %}</p>
-  <input type="file" id="file" accept="image/*" multiple>
-  <div id="previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-top:10px"></div>
-  <p><button class="btn primary" id="read" type="button" disabled>Read the sheet</button> <span id="busy" class="muted"></span></p>
-  <div id="err" class="flash err" style="display:none"></div>
+  <div class="card-header">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M14.5 4h-5L7 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2h-3l-2.5-3z"/><circle cx="12" cy="13" r="3"/></svg>
+      <h2>Upload Roll Call Sheets or Screen Captures</h2>
+    </div>
+  </div>
+  <p class="muted" style="margin-top:0;font-size:13px">
+    Choose photo(s) of physical attendance sheets or screenshots of online participant lists (up to {{ max_images }} images). The AI matches detected names against the active roster for <b>{{ subject }}</b>{% if section %} ({{ section }}){% endif %}.
+  </p>
+
+  <div style="border:1.5px dashed var(--line-strong);border-radius:var(--radius);padding:24px;text-align:center;margin-bottom:14px;background:var(--surface)">
+    <label for="file" style="cursor:pointer">
+      <div style="color:var(--muted);margin-bottom:8px">
+        <svg class="lucide" viewBox="0 0 24 24" width="32" height="32" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      </div>
+      <span class="btn secondary" style="pointer-events:none">Select or Capture Photos</span>
+      <input type="file" id="file" accept="image/*" capture="environment" multiple style="display:block;margin:10px auto 0;font-size:12.5px">
+    </label>
+    <div class="muted" style="font-size:12px;margin-top:8px">Camera capture supported on mobile devices. Accepts JPG, PNG, and WebP.</div>
+  </div>
+
+  <div id="previews" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+  <div style="display:flex;gap:12px;align-items:center;flex-wrap:wrap">
+    <button class="btn primary" id="read" type="button" disabled style="min-height:40px">
+      <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M2 12h20"/><path d="M20 12v6a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2v-6"/></svg>
+      <span>Read the Sheet</span>
+    </button>
+    <span id="busy" class="muted" style="font-size:13px"></span>
+  </div>
+  <div id="err" class="flash err" style="display:none;margin-top:14px"></div>
 </div>
 
+<!-- Staged Review Panel -->
 <div id="review" style="display:none">
   <div class="card">
-    <h2>Check and confirm</h2>
+    <div class="card-header">
+      <h2>Verify Detected Attendance</h2>
+    </div>
     <div class="toolbar">
-      <label>Date <input type="date" id="date"></label>
-      <input type="text" id="topic" class="grow" placeholder="Topic for this day (optional)" maxlength="120">
+      <div>
+        <label>Attendance Date</label>
+        <input type="date" id="date">
+      </div>
+      <div class="grow">
+        <label>Topic for this Session</label>
+        <input type="text" id="topic" class="grow" placeholder="e.g. Final Review Lecture" maxlength="120">
+      </div>
     </div>
-    <div id="dateNote" class="muted"></div>
-    <div class="toolbar" style="margin-top:10px">
-      <label>How should I read the sheet?
-        <select id="mode" class="slim">
-          <option value="list">Names on the sheet were present. Anyone missing is absent.</option>
-          <option value="marks">Whole class is listed. A signature or tick means present.</option>
-          <option value="percent">Online meeting report. Present if attended enough of the session.</option>
-        </select></label>
-      <span id="thrWrap" style="display:none">at least <input type="number" id="thr" value="75" min="1" max="100" style="width:70px;font:inherit;padding:8px;border:1px solid var(--line);border-radius:8px"> %</span>
+    <div id="dateNote" class="muted" style="font-size:12px;margin-bottom:10px"></div>
+    <div class="toolbar">
+      <div>
+        <label>Interpretation Mode</label>
+        <select id="mode">
+          <option value="list">Roster List: Names on sheet are Present. Missing students are Absent.</option>
+          <option value="marks">Tick/Signature: Roster present. Checked or signed marks mean Present.</option>
+          <option value="percent">Percentage Report: Meeting log with duration thresholds.</option>
+        </select>
+      </div>
+      <span id="thrWrap" style="display:none">
+        <label>Minimum Required %</label>
+        <input type="number" id="thr" value="75" min="1" max="100" style="width:70px">
+      </span>
     </div>
-    <div id="modeNote" class="muted"></div>
   </div>
-  <div class="card" style="padding:6px 12px"><div id="rows"></div></div>
+
+  <div class="card" style="padding:10px">
+    <div id="rows"></div>
+  </div>
+
   <div class="card" id="unmatchedCard" style="display:none">
     <details id="unDetails">
-      <summary id="unSummary" style="margin:0"></summary>
-      <p class="muted">These were ignored (other sections, teachers, or names I couldn't match). If one is really a student on your list, say who below, or add them as a new student.</p>
+      <summary id="unSummary" style="cursor:pointer;font-weight:700;color:var(--brand-accent)"></summary>
+      <p class="muted" style="font-size:12.5px;margin:8px 0">Unrecognized names can be assigned to an enrolled student or added as a new student.</p>
       <div id="unmatched"></div>
     </details>
   </div>
-  <div class="dock">
-    <div class="counts"><span class="s-p" id="cp">P 0</span><span class="s-x" id="cx">A 0</span><span class="s-l" id="cl">L 0</span><span class="s-e" id="ce">E 0</span></div>
-    <button class="btn" id="cancel" type="button">Cancel</button>
-    <button class="btn primary" id="confirm" type="button">Confirm &amp; save</button>
+
+  <div class="mobile-dock" style="position:sticky;bottom:0;margin-top:14px">
+    <div class="dock-counts">
+      <span class="dcount s-p" id="cp">P 0</span>
+      <span class="dcount s-x" id="cx">A 0</span>
+      <span class="dcount s-l" id="cl">L 0</span>
+      <span class="dcount s-e" id="ce">E 0</span>
+    </div>
+    <div style="display:flex;gap:8px">
+      <button class="btn secondary" id="cancel" type="button">Cancel</button>
+      <button class="btn primary" id="confirm" type="button">Confirm &amp; Save</button>
+    </div>
   </div>
 </div>
-<div class="card" id="done" style="display:none">
-  <h2>Saved ✓</h2>
-  <p id="doneMsg"></p>
-  <a class="btn primary" id="doneLink" href="#">View records</a>
-  <button class="btn" id="again" type="button">Scan another sheet</button>
+
+<!-- Saved Confirmation Panel -->
+<div class="card" id="done" style="display:none;text-align:center;padding:32px 20px">
+  <div style="color:var(--p);margin-bottom:8px">
+    <svg class="lucide" viewBox="0 0 24 24" width="40" height="40" fill="none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+  </div>
+  <h2 style="font-size:20px;margin:0 0 6px">Attendance Saved Successfully</h2>
+  <p id="doneMsg" class="muted" style="font-size:13.5px;margin:0 0 16px"></p>
+  <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap">
+    <a class="btn primary" id="doneLink" href="#">View Attendance Sheet</a>
+    <button class="btn secondary" id="again" type="button">Scan Another Sheet</button>
+  </div>
 </div>
+
 <div class="toast" id="toast"></div>
 </div>
+
 <script>
 (function () {
   var src = new URLSearchParams(location.search).get('source');
-  if (src !== 'photo' && src !== 'csv') { src = 'csv'; try { src = localStorage.getItem('importSource') || 'csv'; } catch (e) {} }
-  function show(s, remember) {
-    if (s !== 'photo') s = 'csv';
-    document.getElementById('csvPanel').style.display = s === 'csv' ? '' : 'none';
-    document.getElementById('photoPanel').style.display = s === 'photo' ? '' : 'none';
-    document.getElementById('segCsv').className = 'segbtn' + (s === 'csv' ? ' on' : '');
-    document.getElementById('segPhoto').className = 'segbtn' + (s === 'photo' ? ' on' : '');
-    if (remember) { try { localStorage.setItem('importSource', s); } catch (e) {} }
+  var bCsv = document.getElementById('segCsv');
+  var bPhoto = document.getElementById('segPhoto');
+  var pCsv = document.getElementById('csvPanel');
+  var pPhoto = document.getElementById('photoPanel');
+  function pick(mode) {
+    bCsv.classList.toggle('on', mode === 'csv');
+    bPhoto.classList.toggle('on', mode === 'photo');
+    pCsv.style.display = mode === 'csv' ? 'block' : 'none';
+    pPhoto.style.display = mode === 'photo' ? 'block' : 'none';
   }
-  document.getElementById('segCsv').onclick = function () { show('csv', true); };
-  document.getElementById('segPhoto').onclick = function () { show('photo', true); };
-  show(src, false);
+  bCsv.onclick = function () { pick('csv'); };
+  bPhoto.onclick = function () { pick('photo'); };
+  pick(src === 'photo' ? 'photo' : 'csv');
 })();
 </script>
-
 <script>
-const students = {{ students|tojson }};
 const subject = {{ subject|tojson }};
 const section = {{ section|tojson }};
+const students = {{ students|tojson }};
 const recorded = {{ recorded|tojson }};
-const today = {{ today|tojson }};
-const recordsUrl = {{ records_url|tojson }};
-const KEY_URL = {{ key_url|tojson }};
-const MAX_IMAGES_LIMIT = {{ max_images|tojson }};
 const SCAN_URL = {{ scan_url|tojson }};
 const SAVE_URL = {{ save_url|tojson }};
+const KEY_URL = {{ key_url|tojson }};
+const RECORDS_URL = {{ records_url|tojson }};
+const MAX_IMAGES_LIMIT = {{ max_images }};
 </script>
 <script src="{{ url_for('static', filename='js/scan.js') }}"></script>
 {% endif %}

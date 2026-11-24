@@ -1,160 +1,219 @@
 {% extends "base.html" %}
-{% block title %}Grades{% endblock %}
+{% block title %}Gradebook · {{ subject }}{% if section %} ({{ section }}){% endif %}{% endblock %}
 {% block body %}
-<h1>Grades &amp; class standing</h1>
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>Academic Gradebook</h1>
+    <div class="sub">Philippine Higher Education Grading System (1.00 – 5.00) · {{ subject }}{% if section %} · Section {{ section }}{% endif %}</div>
+  </div>
+  {% if periods and period and gb %}
+  <div class="page-actions">
+    <a class="btn secondary small" href="{{ url_for('periods_download', subject=subject, section=section, period=period.id) }}">
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="M15 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7Z"/><path d="M14 2v4a2 2 0 0 0 2 2h4"/><path d="M8 13h2"/><path d="M14 13h2"/><path d="M8 17h2"/><path d="M14 17h2"/></svg>
+      <span>Download .xlsx</span>
+    </a>
+  </div>
+  {% endif %}
+</div>
+
 {% set ro = gb and gb.period_locked %}
 
 {% if not subject %}
-<div class="card">No subjects yet. Add one under <a href="{{ url_for('students') }}">Students &amp; subjects</a>.</div>
+<div class="card" style="padding:28px 20px;text-align:center">
+  <h3 style="margin:0 0 6px">No Subject Configured</h3>
+  <p class="muted" style="margin:0 0 14px">Add or select an academic subject to manage grades.</p>
+  <a class="btn primary small" href="{{ url_for('students') }}">Configure Subjects</a>
+</div>
 {% elif not gb.rows %}
-<div class="card">No students in {{ subject }} ({{ section }}) yet. <a href="{{ url_for('students', subject=subject, section=section) }}">Add students</a> first.</div>
+<div class="card" style="padding:28px 20px;text-align:center">
+  <h3 style="margin:0 0 6px">No Students Enrolled in {{ subject }} ({{ section }})</h3>
+  <p class="muted" style="margin:0 0 14px">Add students to this section roster before setting up graded items.</p>
+  <a class="btn primary small" href="{{ url_for('students', subject=subject, section=section) }}">Add Students</a>
+</div>
 {% else %}
 
 {% if periods and periods|length > 1 %}
-<form method="get" action="{{ url_for('grades_page') }}" style="display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px">
-  <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}">
-  <label>Term <select name="period" onchange="this.form.submit()">
-    {% for p in periods %}<option value="{{ p.id }}" {{ 'selected' if period and p.id == period.id }}>{{ p.label }}{{ ' 🔒' if p.locked else ' (current)' }}</option>{% endfor %}
-  </select></label>
-  <noscript><button class="btn small" type="submit">Show</button></noscript>
-  {% if period %}<a class="btn small" href="{{ url_for('periods_download', subject=subject, section=section, period=period.id) }}">⬇ Download .xlsx</a>{% endif %}
+<form method="get" action="{{ url_for('grades_page') }}" style="display:flex;flex-wrap:wrap;gap:10px;align-items:center;margin-bottom:14px">
+  <input type="hidden" name="subject" value="{{ subject }}">
+  <input type="hidden" name="section" value="{{ section or '' }}">
+  <label style="display:inline-flex;align-items:center;gap:8px;font-size:13px;margin:0">
+    <span class="muted" style="font-weight:700">Academic Term:</span>
+    <select name="period" onchange="this.form.submit()" style="min-height:36px">
+      {% for p in periods %}
+      <option value="{{ p.id }}" {{ 'selected' if period and p.id == period.id }}>{{ p.label }}{{ ' [Locked 🔒]' if p.locked else ' (Current Term)' }}</option>
+      {% endfor %}
+    </select>
+  </label>
+  <noscript><button class="btn small" type="submit">Switch Term</button></noscript>
 </form>
 {% endif %}
 
 {% if ro %}
-<div class="card" style="padding:10px 14px;margin-bottom:14px">🔒 <b>{{ period.label }}</b> is locked, so this is a read-only copy.
-  Weights used for this term: Exam {{ gb.weights.exam|round(1) }}% · Quiz {{ gb.weights.quiz|round(1) }}% · Activity {{ gb.weights.activity|round(1) }}%.</div>
+<div class="card" style="padding:10px 14px;margin-bottom:14px;background:var(--lbg);color:var(--l-ink);border-color:var(--l-border);display:flex;align-items:center;gap:8px;font-size:13px">
+  <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+  <span><b>{{ period.label }}</b> is locked (read-only archive). Weights: Exam {{ gb.weights.exam|round(1) }}% · Quiz {{ gb.weights.quiz|round(1) }}% · Activity {{ gb.weights.activity|round(1) }}%.</span>
+</div>
 {% else %}
-<div class="grid2" style="margin-bottom:14px">
-  <!-- Category Weights + Lock -->
-  <div class="card">
-    <div style="display:flex;justify-content:space-between;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:8px">
-      <h2 style="margin:0;font-size:17px">⚖️ Category Weights ({{ subject }} · {{ section }})</h2>
+<div class="grid2" style="margin-bottom:16px">
+  <!-- Category Weights Form & Lock -->
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="m16 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="m2 16 3-8 3 8c-.87.65-1.92 1-3 1s-2.13-.35-3-1Z"/><path d="M7 21h10"/><path d="M12 3v18"/><path d="M3 7h2c2 0 5-1 7-2 2 1 5 2 7 2h2"/></svg>
+        <h2 style="font-size:15px">Category Weights ({{ subject }} · {{ section }})</h2>
+      </div>
       <form method="post" action="{{ url_for('grades_lock') }}" style="margin:0">
         <input type="hidden" name="subject" value="{{ subject }}">
         <input type="hidden" name="section" value="{{ section }}">
         <input type="hidden" name="locked" value="{{ '0' if gb.locked else '1' }}">
-        <button class="btn small {{ 'primary' if not gb.locked }}" type="submit" title="{{ 'Unlock weights so you can edit them' if gb.locked else 'Lock weights to prevent accidental changes' }}">
-          {{ '🔒 Locked (Click to Unlock)' if gb.locked else '🔓 Unlocked (Click to Lock)' }}
+        <button class="btn small {{ 'secondary' if gb.locked else 'primary' }}" type="submit" style="padding:4px 10px;font-size:12px">
+          {% if gb.locked %}
+          <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span>Locked (Unlock)</span>
+          {% else %}
+          <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><rect width="18" height="11" x="3" y="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 9.9-1"/></svg>
+          <span>Unlocked (Lock)</span>
+          {% endif %}
         </button>
       </form>
     </div>
-    <p class="muted" style="margin-top:0;font-size:13px">
-      Weights must total 100%. {% if gb.locked %}<b>Currently locked</b> — unlock above to edit percentages.{% else %}Adjust percentages below and press Save, then lock to prevent changes.{% endif %}
+    <p class="muted" style="margin-top:0;font-size:12.5px">
+      Weights must total 100%. {% if gb.locked %}<b>Weights are currently locked</b> to prevent accidental modification.{% else %}Set percentages and press Save, then lock.{% endif %}
     </p>
     <form method="post" action="{{ url_for('grades_weights') }}" style="display:flex;gap:10px;align-items:flex-end;flex-wrap:wrap">
       <input type="hidden" name="subject" value="{{ subject }}">
       <input type="hidden" name="section" value="{{ section }}">
-      <label style="font-size:13px">Exam %<br>
+      <label style="font-size:12px">Exam Weight %<br>
         <input class="txt" type="number" step="0.5" min="0" max="100" name="exam_weight" value="{{ gb.weights.exam|round(1) }}" {{ 'disabled' if gb.locked }} style="width:90px">
       </label>
-      <label style="font-size:13px">Quiz %<br>
+      <label style="font-size:12px">Quiz Weight %<br>
         <input class="txt" type="number" step="0.5" min="0" max="100" name="quiz_weight" value="{{ gb.weights.quiz|round(1) }}" {{ 'disabled' if gb.locked }} style="width:90px">
       </label>
-      <label style="font-size:13px">Activity %<br>
+      <label style="font-size:12px">Activity Weight %<br>
         <input class="txt" type="number" step="0.5" min="0" max="100" name="activity_weight" value="{{ gb.weights.activity|round(1) }}" {{ 'disabled' if gb.locked }} style="width:90px">
       </label>
       {% if not gb.locked %}
-      <button class="btn primary" type="submit">Save Weights</button>
+      <button class="btn primary small" type="submit" style="min-height:38px">Save Weights</button>
       {% endif %}
     </form>
   </div>
 
-  <!-- Add Exam / Quiz / Activity -->
-  <div class="card">
-    <h2 style="margin:0 0 8px;font-size:17px">➕ Add Exam, Quiz, or Activity</h2>
-    <p class="muted" style="margin-top:0;font-size:13px">Create a graded item, then use <b>🎯 Roll call</b> on it to enter scores one student at a time, or type them in the table below.</p>
+  <!-- Add Exam / Quiz / Activity Item -->
+  <div class="card" style="margin-bottom:0">
+    <div class="card-header">
+      <div style="display:flex;align-items:center;gap:8px">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M12 5v14"/><path d="M5 12h14"/></svg>
+        <h2 style="font-size:15px">Add Exam, Quiz, or Activity</h2>
+      </div>
+    </div>
+    <p class="muted" style="margin-top:0;font-size:12.5px">
+      Add a graded item to this section. You can enter scores individually in the table or use touch <b>Roll call</b> mode.
+    </p>
     <form method="post" action="{{ url_for('grades_item_add') }}" style="display:flex;gap:8px;flex-wrap:wrap;align-items:flex-end">
       <input type="hidden" name="subject" value="{{ subject }}">
       <input type="hidden" name="section" value="{{ section }}">
-      <label style="font-size:13px">Category<br>
-        <select name="category" style="padding:8px 10px">
+      <label style="font-size:12px">Category<br>
+        <select name="category" style="min-height:38px">
           <option value="exam">Exam</option>
           <option value="quiz">Quiz</option>
           <option value="activity">Activity</option>
         </select>
       </label>
-      <label style="font-size:13px;flex:1;min-width:140px">Title<br>
+      <label style="font-size:12px;flex:1;min-width:140px">Title / Assessment Name<br>
         <input class="txt" type="text" name="title" placeholder="e.g. Midterm Exam, Quiz 1" required style="width:100%">
       </label>
-      <label style="font-size:13px">Max Score<br>
+      <label style="font-size:12px">Max Points<br>
         <input class="txt" type="number" step="0.5" min="1" max="10000" name="max_score" value="100" required style="width:90px">
       </label>
-      <label style="font-size:13px">Date (optional)<br>
-        <input class="txt" type="date" name="date" style="width:140px">
+      <label style="font-size:12px">Date (Optional)<br>
+        <input class="txt" type="date" name="date" style="width:130px">
       </label>
-      <button class="btn primary" type="submit">Add Item</button>
+      <button class="btn primary small" type="submit" style="min-height:38px">Add Item</button>
     </form>
   </div>
 </div>
 {% endif %}
 
-<!-- Gradebook Grid -->
-<div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:10px">
-    <h2 style="margin:0;font-size:18px">{{ subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ section }}</span> Gradebook</h2>
-    <small class="muted">Scale: 96+ = 1.00 · 93+ = 1.25 · 90+ = 1.50 · 87+ = 1.75 · 84+ = 2.00 · 81+ = 2.25 · 78+ = 2.50 · 75+ = 2.75 · 70+ = 3.00 · &lt;70 = 5.00</small>
+<!-- Gradebook Grid Card -->
+<div class="card" style="padding:16px 20px">
+  <div class="card-header" style="flex-wrap:wrap">
+    <div style="display:flex;align-items:center;gap:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M21.42 10.922a1 1 0 0 0-.019-1.838L12.83 5.18a2 2 0 0 0-1.66 0L2.6 9.08a1 1 0 0 0 0 1.832l8.57 3.908a2 2 0 0 0 1.66 0z"/><path d="M22 10v6"/><path d="M6 12.5V16a6 3 0 0 0 12 0v-3.5"/></svg>
+      <h2 style="font-size:16px">{{ subject }} <span class="badge done" style="font-size:11.5px">{{ section }}</span> Gradebook</h2>
+    </div>
+    <div class="muted" style="font-size:11.5px;line-height:1.4">
+      Philippine Scale: 96+ = 1.00 · 93+ = 1.25 · 90+ = 1.50 · 87+ = 1.75 · 84+ = 2.00 · 81+ = 2.25 · 78+ = 2.50 · 75+ = 2.75 · 70+ = 3.00 · &lt;70 = 5.00
+    </div>
   </div>
 
   {% if gb['items'] %}
-  <div style="margin-bottom:12px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
-    <span class="muted" style="font-size:12px">Items:</span>
+  <!-- Graded Items Action Chips -->
+  <div style="margin-bottom:14px;display:flex;gap:8px;flex-wrap:wrap;align-items:center">
+    <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Configured Items:</span>
     {% for it in gb['items'] %}
-    {% if ro %}
-    <span style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9999px;padding:4px 12px;font-size:13px"><b>{{ it.label }}:</b> {{ it.title }} <span class="muted">({{ it.max_score|round(1) }})</span></span>
-    {% else %}
-    <form class="inline" method="post" action="{{ url_for('grades_item_delete') }}" onsubmit="return confirm('Delete {{ it.label|e }} {{ it.title|e }} and all scores recorded for it?')">
-      <input type="hidden" name="subject" value="{{ subject }}">
-      <input type="hidden" name="section" value="{{ section }}">
-      <input type="hidden" name="item_id" value="{{ it.id }}">
-      <span style="display:inline-flex;align-items:center;gap:8px;background:var(--surface);border:1px solid var(--line);border-radius:9999px;padding:4px 8px 4px 12px;font-size:13px">
-        <span><b>{{ it.label }}:</b> {{ it.title }} <span class="muted">({{ it.max_score|round(1) }})</span></span>
-        <a class="btn small primary" href="{{ url_for('grade_rollcall', subject=subject, section=section, item=it.id) }}" title="Enter scores one student at a time" style="padding:3px 10px;border-radius:9999px">🎯 Roll call</a>
-        <button type="submit" title="Delete item" aria-label="Delete {{ it.title }}" style="border:0;background:none;color:#c0392b;cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+      {% if ro %}
+      <span style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:4px 10px;font-size:12.5px">
+        <b>{{ it.label }}:</b> {{ it.title }} <span class="muted">(/ {{ it.max_score|round(1) }})</span>
       </span>
-    </form>
-    {% endif %}
+      {% else %}
+      <form class="inline" method="post" action="{{ url_for('grades_item_delete') }}" onsubmit="return confirm('Delete {{ it.label|e }} {{ it.title|e }} and all recorded scores?')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <input type="hidden" name="section" value="{{ section }}">
+        <input type="hidden" name="item_id" value="{{ it.id }}">
+        <span style="display:inline-flex;align-items:center;gap:6px;background:var(--surface);border:1px solid var(--line);border-radius:var(--radius);padding:4px 8px 4px 10px;font-size:12.5px">
+          <span><b>{{ it.label }}:</b> {{ it.title }} <span class="muted">(/ {{ it.max_score|round(1) }})</span></span>
+          <a class="btn small primary" href="{{ url_for('grade_rollcall', subject=subject, section=section, item=it.id) }}" title="Enter scores one student at a time" style="padding:2px 8px;font-size:11.5px;min-height:24px">
+            Roll Call
+          </a>
+          <button type="submit" title="Delete item" aria-label="Delete {{ it.title }}" style="border:0;background:none;color:#dc2626;cursor:pointer;font-size:13px;padding:2px 4px">✕</button>
+        </span>
+      </form>
+      {% endif %}
     {% endfor %}
   </div>
   {% endif %}
 
+  <!-- Student Gradebook Table -->
   <form method="post" action="{{ url_for('grades_scores') }}">
     <input type="hidden" name="subject" value="{{ subject }}">
     <input type="hidden" name="section" value="{{ section }}">
+    
     <div class="scroll">
       <table class="grid">
         <thead>
           <tr>
-            <th class="sticky">Student</th>
+            <th class="sticky" style="min-width:140px">Student Name</th>
             {% for it in gb['items'] %}
-            <th class="n" style="min-width:95px">
-              <div style="font-size:11px;color:var(--muted)">{{ it.label }}</div>
-              <div>{{ it.title }}</div>
-              <small class="muted">/ {{ it.max_score|round(1) }}</small>
+            <th class="n" style="min-width:105px">
+              <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">{{ it.label }}</div>
+              <div style="font-weight:700">{{ it.title }}</div>
+              <small class="muted">Max: {{ it.max_score|round(1) }}</small>
             </th>
             {% endfor %}
-            <th class="n">Exam<br><small class="muted">({{ gb.weights.exam|round(0)|int }}%)</small></th>
-            <th class="n">Quiz<br><small class="muted">({{ gb.weights.quiz|round(0)|int }}%)</small></th>
-            <th class="n">Activity<br><small class="muted">({{ gb.weights.activity|round(0)|int }}%)</small></th>
-            <th class="n">Final %</th>
-            <th class="n">Grade</th>
+            <th class="n" style="min-width:70px">Exam<br><small class="muted">({{ gb.weights.exam|round(0)|int }}%)</small></th>
+            <th class="n" style="min-width:70px">Quiz<br><small class="muted">({{ gb.weights.quiz|round(0)|int }}%)</small></th>
+            <th class="n" style="min-width:70px">Activity<br><small class="muted">({{ gb.weights.activity|round(0)|int }}%)</small></th>
+            <th class="n" style="min-width:85px">Final %</th>
+            <th class="n" style="min-width:75px">Ph Grade</th>
           </tr>
         </thead>
         <tbody>
           {% for r in gb.rows %}
           <tr>
             <td class="sticky">
-              <a href="{{ url_for('lookup', student=r.name) }}" style="color:inherit;text-decoration:none"><b>{{ r.name }}</b></a>
+              <a href="{{ url_for('lookup', student=r.name) }}" style="color:inherit;text-decoration:none;font-weight:700">{{ r.name }}</a>
               {% if r.student_no %}<br><small class="muted">{{ r.student_no }}</small>{% endif %}
             </td>
             {% for it in gb['items'] %}
             {% set sc = r.scores.get(it.id) %}
             <td class="n">
-              {% if ro %}{{ '–' if sc is none else ('%g' % sc) }}{% else %}
-              <input class="txt" type="number" step="0.25" min="0" max="{{ it.max_score }}"
-                     name="score_{{ r.enrollment_id }}_{{ it.id }}"
-                     value="{{ '' if sc is none else ('%g' % sc) }}"
-                     placeholder="–" style="width:74px;text-align:center;padding:5px 6px;font-size:13px">
+              {% if ro %}
+                <span style="font-weight:600">{{ '–' if sc is none else ('%g' % sc) }}</span>
+              {% else %}
+                <input class="txt" type="number" step="0.25" min="0" max="{{ it.max_score }}"
+                       name="score_{{ r.enrollment_id }}_{{ it.id }}"
+                       value="{{ '' if sc is none else ('%g' % sc) }}"
+                       placeholder="–" style="width:72px;text-align:center;padding:4px 6px;font-size:13px;min-height:32px">
               {% endif %}
             </td>
             {% endfor %}
@@ -162,24 +221,34 @@
             <td class="n">{{ '–' if r.cat_pct.quiz is none else ((r.cat_pct.quiz|round(1)) ~ '%') }}</td>
             <td class="n">{{ '–' if r.cat_pct.activity is none else ((r.cat_pct.activity|round(1)) ~ '%') }}</td>
             <td class="n">
-              {% if r.final_pct is none %}<span class="pill none">–</span>
-              {% else %}<span class="pill {{ 'low' if not r.passing }}">{{ r.final_pct|round(1) }}%</span>{% endif %}
+              {% if r.final_pct is none %}
+              <span class="pill none">–</span>
+              {% else %}
+              <span class="pill {{ 'low' if not r.passing }}">{{ r.final_pct|round(1) }}%</span>
+              {% endif %}
             </td>
             <td class="n">
-              {% if r.scale is none %}<span class="muted">–</span>
-              {% else %}<b style="{{ 'color:var(--x)' if not r.passing else 'color:var(--p)' }}">{{ r.scale }}</b>{% endif %}
+              {% if r.scale is none %}
+              <span class="muted">–</span>
+              {% else %}
+              <b style="font-size:13.5px;{{ 'color:var(--x-ink)' if not r.passing else 'color:var(--p-ink)' }}">{{ r.scale }}</b>
+              {% endif %}
             </td>
           </tr>
           {% endfor %}
         </tbody>
       </table>
     </div>
+
     {% if gb['items'] and not ro %}
-    <div style="margin-top:14px;display:flex;justify-content:flex-end">
-      <button class="btn primary" type="submit" style="padding:10px 22px;font-size:15px">💾 Save All Scores</button>
+    <div style="margin-top:16px;display:flex;justify-content:flex-end">
+      <button class="btn primary" type="submit" style="min-height:42px;padding:0 24px;font-size:14px;font-weight:700">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+        <span>Save All Scores</span>
+      </button>
     </div>
     {% elif not ro %}
-    <p class="muted" style="margin-top:12px">Add your first Exam, Quiz, or Activity above to start entering student scores.</p>
+    <p class="muted" style="margin-top:12px;font-size:13px">Add an Exam, Quiz, or Activity item above to begin recording scores.</p>
     {% endif %}
   </form>
 </div>

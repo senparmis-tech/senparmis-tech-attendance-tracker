@@ -1,74 +1,130 @@
 {% extends "base.html" %}
-{% block title %}Mark attendance{% endblock %}
+{% block title %}Mark Attendance · {{ subject }}{% if section %} ({{ section }}){% endif %}{% endblock %}
 {% block body %}
 {% if not subject %}
-<div class="card">No subjects yet. Add one under <a href="{{ url_for('students') }}">Students &amp; subjects</a>.</div>
+<div class="card" style="padding:28px 20px;text-align:center">
+  <div style="color:var(--muted);margin-bottom:12px">
+    <svg class="lucide" viewBox="0 0 24 24" width="36" height="36" fill="none"><rect width="18" height="18" x="3" y="3" rx="2" ry="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="9" y1="21" x2="9" y2="9"/></svg>
+  </div>
+  <h3 style="margin:0 0 6px">No Subjects Configured</h3>
+  <p class="muted" style="margin:0 0 16px;font-size:13.5px">Add a subject and class section first to begin taking attendance.</p>
+  <a class="btn primary" href="{{ url_for('students') }}">Set Up Students &amp; Subjects</a>
+</div>
 {% elif not students %}
-<div class="card">No students in {{ subject }} yet. <a href="{{ url_for('students', subject=subject) }}">Add students</a> first.</div>
+<div class="card" style="padding:28px 20px;text-align:center">
+  <div style="color:var(--muted);margin-bottom:12px">
+    <svg class="lucide" viewBox="0 0 24 24" width="36" height="36" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+  </div>
+  <h3 style="margin:0 0 6px">No Students Enrolled in {{ subject }}{% if section %} ({{ section }}){% endif %}</h3>
+  <p class="muted" style="margin:0 0 16px;font-size:13.5px">Add the student roster to this section to start marking attendance.</p>
+  <a class="btn primary" href="{{ url_for('students', subject=subject, section=section) }}">Add Students to Roster</a>
+</div>
 {% else %}
 
 <link rel="stylesheet" href="{{ url_for('static', filename='css/mark.css') }}">
 
-<!-- Date & Class Header Card -->
+<!-- Date & Academic Session Header Card -->
 <div class="mark-card">
   <div class="date-header-row">
     <div class="date-nav-group">
-      {% if date_iso %}<a class="btn date-arrow-btn" href="{{ prev_url }}" title="Previous day" aria-label="Previous day">‹</a>{% endif %}
+      {% if date_iso %}
+      <a class="btn date-arrow-btn" href="{{ prev_url }}" title="Previous date" aria-label="Previous date">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="m15 18-6-6 6-6"/></svg>
+      </a>
+      {% endif %}
       <div class="date-input-wrap">
-        <input type="date" id="dateIn" value="{{ date_iso }}">
+        <input type="date" id="dateIn" value="{{ date_iso }}" aria-label="Attendance Date">
       </div>
-      {% if date_iso %}<a class="btn date-arrow-btn" href="{{ next_url }}" title="Next day" aria-label="Next day">›</a>{% endif %}
-      {% if today_url %}<a class="btn small today-chip" href="{{ today_url }}">Today</a>{% endif %}
+      {% if date_iso %}
+      <a class="btn date-arrow-btn" href="{{ next_url }}" title="Next date" aria-label="Next date">
+        <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="m9 18 6-6-6-6"/></svg>
+      </a>
+      {% endif %}
+      {% if today_url %}
+      <a class="btn small today-chip" href="{{ today_url }}">Today</a>
+      {% endif %}
     </div>
+
     <div class="date-meta">
       {% if subject_img_url %}
-      <img src="{{ subject_img_url }}" alt="{{ subject }}" style="width:36px;height:36px;border-radius:9px;object-fit:cover;border:1.5px solid var(--line);box-shadow:0 1px 4px rgba(0,0,0,0.08)">
+      <img src="{{ subject_img_url }}" alt="{{ subject }}" style="width:34px;height:34px;border-radius:var(--radius);object-fit:cover;border:1px solid var(--line)">
       {% endif %}
       <span class="date-title-text">{{ date_label }}</span>
       <span class="date-badge-slot">
-        {% if recorded %}<span class="badge done">✓ Saved</span>{% else %}<span class="badge todo">⚪ Not saved yet</span>{% endif %}
+        {% if recorded %}
+        <span class="badge done">
+          <svg class="lucide" viewBox="0 0 24 24" width="12" height="12" fill="none"><path d="M20 6 9 17l-5-5"/></svg>
+          Saved
+        </span>
+        {% else %}
+        <span class="badge todo">
+          <svg class="lucide" viewBox="0 0 24 24" width="12" height="12" fill="none"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+          Not Saved Yet
+        </span>
+        {% endif %}
       </span>
     </div>
   </div>
+
   {% if date_iso %}
   <div class="topic-container">
-    <input type="text" id="topic" class="topic-field" placeholder="Topic for this lesson (optional)" value="{{ topic }}" maxlength="120">
+    <input type="text" id="topic" class="topic-field" placeholder="Lesson topic or lecture summary (optional)" value="{{ topic }}" maxlength="120">
   </div>
   {% endif %}
 </div>
 
 {% if not date_iso %}
-<div class="card" style="text-align:center;padding:28px 16px">
-  <div style="font-size:32px;margin-bottom:8px">📅</div>
-  <p>Pick a date above, or tap <b>Today</b>, to start marking attendance for <b>{{ subject }}</b>.</p>
+<div class="card" style="text-align:center;padding:32px 16px">
+  <div style="color:var(--muted);margin-bottom:10px">
+    <svg class="lucide" viewBox="0 0 24 24" width="36" height="36" fill="none"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+  </div>
+  <p style="margin:0 0 14px;font-size:14px;color:var(--ink)">Pick an attendance date above, or tap <b>Today</b> to record attendance for <b>{{ subject }}</b>{% if section %} ({{ section }}){% endif %}.</p>
+  <a class="btn primary" href="{{ today_url }}">Mark Today's Attendance</a>
 </div>
 <script>
 document.getElementById('dateIn').onchange = e => {
-  if (e.target.value) location.href = {{ base_url|tojson }} + ({{ base_url|tojson }}.includes('?') ? '&date=' : '?date=') + e.target.value;
+  if (e.target.value) {
+    location.href = {{ base_url|tojson }} + ({{ base_url|tojson }}.includes('?') ? '&date=' : '?date=') + e.target.value;
+  }
 };
 </script>
 {% else %}
 
-<!-- View Switcher (List vs Roll-Call) -->
+<!-- View Switcher (List vs Roll-Call Mode) -->
 <div class="mode-switch-wrap">
   <div class="mode-segmented">
-    <button type="button" id="btnModeList" class="mode-btn on">☰ List View</button>
-    <button type="button" id="btnModeRoll" class="mode-btn">🎯 Roll-Call Mode</button>
+    <button type="button" id="btnModeList" class="mode-btn on">
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
+      <span>List View</span>
+    </button>
+    <button type="button" id="btnModeRoll" class="mode-btn">
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="6"/><circle cx="12" cy="12" r="2"/></svg>
+      <span>Roll-Call Mode</span>
+    </button>
   </div>
 </div>
 
 <!-- ================= LIST VIEW ================= -->
 <div id="listViewArea">
-  <!-- Search & Fast Actions -->
+  <!-- Search & Fast Actions Toolbar -->
   <div class="list-toolbar">
     <div class="search-wrapper">
       <input type="text" id="search" placeholder="Search student name..." autocomplete="off">
-      <button type="button" id="clearSearch" class="search-clear-btn" style="display:none">✕</button>
+      <button type="button" id="clearSearch" class="search-clear-btn" style="display:none" aria-label="Clear search">✕</button>
     </div>
     <div class="fast-actions-wrap">
-      <button class="btn fast-btn pres" type="button" id="allP">⚡ All Present</button>
-      <button class="btn fast-btn" type="button" id="clearAll">↺ Reset</button>
-      <a class="btn fast-btn" href="{{ url_for('scan', subject=subject, section=section) }}">📥 Import</a>
+      <button class="btn fast-btn pres" type="button" id="allP">
+        <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M20 6 9 17l-5-5"/></svg>
+        <span>All Present</span>
+      </button>
+      <button class="btn fast-btn" type="button" id="clearAll">
+        <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+        <span>Reset</span>
+      </button>
+      <a class="btn fast-btn" href="{{ url_for('scan', subject=subject, section=section) }}">
+        <svg class="lucide" viewBox="0 0 24 24" width="13" height="13" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+        <span>Import</span>
+      </a>
     </div>
   </div>
 
@@ -92,7 +148,7 @@ document.getElementById('dateIn').onchange = e => {
 <div id="rollCallArea" style="display:none">
   <div class="card rc-progress-card">
     <div class="rc-progress-meta">
-      <span id="rollCounterText" style="font-weight:700">Student 1 of 28</span>
+      <span id="rollCounterText" style="font-weight:700">Student 1 of {{ students|length }}</span>
       <span id="rollPercentText" class="muted">0%</span>
     </div>
     <div class="rc-progress-track">
@@ -107,7 +163,7 @@ document.getElementById('dateIn').onchange = e => {
       <span class="rc-current-pill" id="rcCurrentPill">Currently: Present</span>
     </div>
 
-    <!-- Large Thumb Buttons with Auto-Advance -->
+    <!-- Large Touch Buttons with Auto-Advance -->
     <div class="rc-buttons-grid">
       <button type="button" class="rc-big-btn p" data-code="p">
         <span class="rc-code">✓ P</span>
@@ -132,20 +188,22 @@ document.getElementById('dateIn').onchange = e => {
     </div>
 
     <div class="rc-nav-row">
-      <button type="button" class="btn" id="rcBtnPrev">‹ Previous</button>
-      <button type="button" class="btn" id="rcBtnSkip">Skip ›</button>
-      <button type="button" class="btn" id="rcBtnSwitchList">Switch to List</button>
+      <button type="button" class="btn small" id="rcBtnPrev">‹ Previous</button>
+      <button type="button" class="btn small" id="rcBtnSkip">Skip ›</button>
+      <button type="button" class="btn small" id="rcBtnSwitchList">Switch to List</button>
     </div>
   </div>
 
   <!-- Roll Call Finished -->
   <div class="card rc-done-card" id="rollCardDone" style="display:none">
-    <div style="font-size:36px;margin-bottom:8px">🎉</div>
-    <h2 style="font-size:22px;margin:4px 0">Roll-Call Complete!</h2>
-    <p class="muted" style="margin-bottom:12px">All students have been reviewed for this date.</p>
+    <div style="color:var(--p);margin-bottom:8px">
+      <svg class="lucide" viewBox="0 0 24 24" width="40" height="40" fill="none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+    </div>
+    <h2 style="font-size:20px;margin:4px 0">Roll-Call Complete</h2>
+    <p class="muted" style="margin-bottom:12px;font-size:13.5px">All enrolled students have been verified for this date.</p>
     <div class="done-stats-summary" id="doneStatsSummary"></div>
     <div style="display:flex;gap:10px;justify-content:center;flex-wrap:wrap;margin-top:20px">
-      <button type="button" class="btn primary" id="doneSaveBtn" style="padding:12px 24px;font-size:16px">💾 Save</button>
+      <button type="button" class="btn primary" id="doneSaveBtn" style="padding:10px 22px;font-size:14.5px">Save Attendance</button>
       <button type="button" class="btn" id="doneReviewBtn">Review List</button>
     </div>
   </div>
@@ -177,6 +235,12 @@ const dateIso = {{ date_iso|tojson }};
 let wasRecorded = {{ recorded|tojson }};
 const baseUrl = {{ base_url|tojson }};
 const saveUrl = {{ save_url|tojson }};
+
+document.getElementById('dateIn').onchange = e => {
+  if (e.target.value) {
+    location.href = baseUrl + (baseUrl.includes('?') ? '&date=' : '?date=') + e.target.value;
+  }
+};
 </script>
 <script src="{{ url_for('static', filename='js/mark.js') }}"></script>
 {% endif %}

@@ -1,38 +1,48 @@
 {% extends "base.html" %}
-{% block title %}Score roll call{% endblock %}
+{% block title %}Score Roll Call · {{ item.title }} · {{ subject }}{% endblock %}
 {% block body %}
 <link rel="stylesheet" href="{{ url_for('static', filename='css/mark.css') }}">
 <link rel="stylesheet" href="{{ url_for('static', filename='css/score_rollcall.css') }}">
 
-<!-- Item header -->
+<!-- Assessment Item Header -->
 <div class="mark-card sc-head">
   <div class="sc-head-row">
-    <a class="btn small" href="{{ gradebook_url }}">‹ Gradebook</a>
+    <a class="btn small secondary" href="{{ gradebook_url }}">
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><path d="m15 18-6-6 6-6"/></svg>
+      <span>Back to Gradebook</span>
+    </a>
     <div class="sc-head-title">
       <span class="badge done">{{ item.label }}</span>
-      <b>{{ item.title }}</b>
-      <span class="muted">out of {{ max_text }}</span>
+      <b style="font-size:16px">{{ item.title }}</b>
+      <span class="muted" style="font-size:13px">(Max Points: {{ max_text }})</span>
     </div>
   </div>
-  <div class="muted sc-head-sub">{{ subject }} · {{ section }}</div>
+  <div class="muted sc-head-sub" style="font-size:12.5px;margin-top:6px">
+    Section: <b>{{ subject }} · {{ section }}</b>
+  </div>
 </div>
 
+<!-- Progress Tracker -->
 <div class="card rc-progress-card">
   <div class="rc-progress-meta">
     <span id="rcCounter" style="font-weight:700">Student 1 of 1</span>
     <span id="rcPercent" class="muted">0%</span>
   </div>
-  <div class="rc-progress-track"><div class="rc-progress-bar" id="rcProgressBar" style="width:0%"></div></div>
+  <div class="rc-progress-track">
+    <div class="rc-progress-bar" id="rcProgressBar" style="width:0%"></div>
+  </div>
 </div>
 
 <div class="sc-note" id="rcNote" style="display:none"></div>
 
-<!-- One student at a time -->
+<!-- Student Assessment Flashcard -->
 <div class="card rc-flashcard" id="rcMain">
   <div class="rc-flashcard-index" id="rcIndex">Student #1</div>
   <div class="rc-flashcard-name" id="rcName">Student Name</div>
   <div class="sc-meta" id="rcMeta"></div>
-  <div class="rc-current-badge-slot"><span class="rc-current-pill" id="rcCurrent">No score yet</span></div>
+  <div class="rc-current-badge-slot">
+    <span class="rc-current-pill" id="rcCurrent">No score yet</span>
+  </div>
 
   <div class="sc-entry">
     <input id="rcInput" class="sc-input" type="text" inputmode="decimal" autocomplete="off"
@@ -42,49 +52,55 @@
   </div>
   <div class="sc-error" id="rcError" role="alert" aria-live="polite"></div>
 
-  <button type="button" class="btn primary sc-next" id="rcNext">Save &amp; next ›</button>
+  <button type="button" class="btn primary sc-next" id="rcNext" style="font-weight:700">Save &amp; Next Student ›</button>
 
   <div class="sc-quick">
-    <button type="button" class="btn" id="rcPerfect">Perfect · {{ max_text }}</button>
-    <button type="button" class="btn" id="rcZero">Zero · 0</button>
-    <button type="button" class="btn" id="rcClear">Clear</button>
+    <button type="button" class="btn secondary small" id="rcPerfect">Perfect ({{ max_text }})</button>
+    <button type="button" class="btn secondary small" id="rcZero">Zero (0)</button>
+    <button type="button" class="btn secondary small" id="rcClear">Clear Score</button>
   </div>
 
-  <div class="rc-nav-row">
-    <button type="button" class="btn" id="rcPrev">‹ Previous</button>
-    <button type="button" class="btn" id="rcSkip">Skip ›</button>
+  <div class="rc-nav-row" style="margin-top:14px">
+    <button type="button" class="btn small" id="rcPrev">‹ Previous</button>
+    <button type="button" class="btn small" id="rcSkip">Skip ›</button>
   </div>
-  <div class="sc-hint muted">Enter = save &amp; next &nbsp;·&nbsp; ↑ previous &nbsp;·&nbsp; ↓ skip &nbsp;·&nbsp; blank = leave as is</div>
+  <div class="sc-hint muted" style="font-size:11.5px;margin-top:12px">
+    Keyboard: Enter = Save &amp; Next · Up = Previous · Down = Skip · Blank = Leave untouched
+  </div>
 </div>
 
-<!-- Finished -->
+<!-- Session Complete Summary Card -->
 <div class="card rc-done-card" id="rcDone" style="display:none">
-  <div style="font-size:36px;margin-bottom:8px">🎉</div>
-  <h2 style="font-size:22px;margin:4px 0">Scores recorded</h2>
-  <p class="muted" id="rcDoneSub" style="margin-bottom:12px"></p>
+  <div style="color:var(--p);margin-bottom:8px">
+    <svg class="lucide" viewBox="0 0 24 24" width="40" height="40" fill="none"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+  </div>
+  <h2 style="font-size:20px;margin:4px 0">All Scores Recorded</h2>
+  <p class="muted" id="rcDoneSub" style="margin-bottom:12px;font-size:13.5px"></p>
   <div class="sc-stats" id="rcStats"></div>
   <div id="rcMissing" class="sc-missing" style="display:none"></div>
-  <div class="sc-done-actions">
-    <a class="btn primary" href="{{ gradebook_url }}" style="padding:12px 22px;font-size:16px">Open gradebook</a>
-    <button type="button" class="btn" id="rcReview">Review from the start</button>
-    {% if cfg.nextUrl %}<a class="btn" href="{{ cfg.nextUrl }}">Next: {{ cfg.nextLabel }} ›</a>{% endif %}
+  <div class="sc-done-actions" style="margin-top:18px">
+    <a class="btn primary" href="{{ gradebook_url }}" style="padding:10px 22px;font-size:14px;font-weight:700">Open Gradebook</a>
+    <button type="button" class="btn secondary" id="rcReview">Review from Start</button>
+    {% if cfg.nextUrl %}
+    <a class="btn secondary" href="{{ cfg.nextUrl }}">Next Item: {{ cfg.nextLabel }} ›</a>
+    {% endif %}
   </div>
 </div>
 
-<!-- Jump to any student -->
-<details class="card sc-all" id="rcAll">
-  <summary>All students <span class="muted" id="rcAllCount"></span></summary>
+<!-- Quick Roster Jump List -->
+<details class="card sc-all" id="rcAll" style="margin-top:14px">
+  <summary style="font-weight:700;cursor:pointer">Class Roster Scores <span class="muted" id="rcAllCount"></span></summary>
   <div class="sc-jump" id="rcJump"></div>
 </details>
 
-<!-- Bottom dock -->
+<!-- Floating Mobile Bottom Status Dock -->
 <div class="mobile-dock" id="mobileDock">
   <div class="dock-counts">
     <span class="dcount s-p" id="dockEntered">0 / 0</span>
     <span class="dcount s-e" id="dockAvg">Avg –</span>
   </div>
-  <span class="sc-savestate" id="rcSaveState">All saved ✓</span>
-  <button class="btn" type="button" id="rcRetry" style="display:none">Retry</button>
+  <span class="sc-savestate" id="rcSaveState">All Saved ✓</span>
+  <button class="btn small" type="button" id="rcRetry" style="display:none">Retry</button>
 </div>
 
 <div class="toast" id="toast"></div>

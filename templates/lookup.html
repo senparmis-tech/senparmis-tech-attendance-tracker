@@ -1,133 +1,239 @@
 {% extends "base.html" %}
-{% block title %}Student lookup{% endblock %}
+{% block title %}Student Lookup · Eclaro Academy Attendance Tracker{% endblock %}
 {% block body %}
-<h1>Student lookup</h1>
-<div class="card no-print">
-  <form method="get" action="{{ url_for('lookup') }}" style="display:flex;gap:10px;flex-wrap:wrap">
-    <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search student name, ID, guardian, or section (e.g. BSCS-1A)" autofocus style="flex:1;min-width:220px">
-    <select name="subject">
-      <option value="">All subjects</option>
-      {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject }}>{{ s }}</option>{% endfor %}
-    </select>
+<div class="page-header no-print">
+  <div class="page-title-group">
+    <h1>Student Lookup &amp; Academic Profiles</h1>
+    <div class="sub">Comprehensive Attendance, Philippine Grading Scale, and Contact Record Search</div>
+  </div>
+</div>
+
+<!-- Search Query Form -->
+<div class="card no-print" style="margin-bottom:16px">
+  <form method="get" action="{{ url_for('lookup') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
+    <div style="flex:1;min-width:240px">
+      <label>Search Query</label>
+      <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search by student name, ID number, guardian, or section…" autofocus style="width:100%">
+    </div>
+    <div style="min-width:160px">
+      <label>Course Subject</label>
+      <select name="subject" style="width:100%">
+        <option value="">All Subjects</option>
+        {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject }}>{{ s }}</option>{% endfor %}
+      </select>
+    </div>
     {% if sections %}
-    <select name="section">
-      <option value="">All sections</option>
-      {% for sec in sections %}<option value="{{ sec }}" {{ 'selected' if sec==section }}>{{ sec }}</option>{% endfor %}
-    </select>
+    <div style="min-width:140px">
+      <label>Class Section</label>
+      <select name="section" style="width:100%">
+        <option value="">All Sections</option>
+        {% for sec in sections %}<option value="{{ sec }}" {{ 'selected' if sec==section }}>{{ sec }}</option>{% endfor %}
+      </select>
+    </div>
     {% endif %}
-    <button class="btn primary" type="submit">Search</button>
+    <div>
+      <button class="btn primary" type="submit" style="min-height:38px">
+        <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+        <span>Search</span>
+      </button>
+    </div>
   </form>
 </div>
 
+<!-- Search Results List -->
 {% if q or subject or section %}
-<p class="no-print">{{ total_matches }} student{{ '' if total_matches==1 else 's' }} found{{ ' (showing first 100)' if total_matches>100 }}.</p>
-<div class="card no-print">
+<div class="no-print" style="font-size:13px;color:var(--muted);margin-bottom:8px">
+  Found <b>{{ total_matches }}</b> matching student{{ '' if total_matches==1 else 's' }}{{ ' (displaying top 100)' if total_matches>100 }}:
+</div>
+
+<div class="card no-print" style="padding:10px 16px;margin-bottom:16px">
   {% for p in results %}
-  <p style="margin:6px 0"><a href="{{ url_for('lookup', q=q, subject=subject, section=section, student=p.name) }}"><b>{{ p.name }}</b></a>
-    {% if p.student_no %}<span class="badge done" style="font-size:11px;margin-left:4px">{{ p.student_no }}</span>{% endif %}
-    <small>
-      {% for s in p.subjects %}{{ s.subject }} ({{ s.section }}){% if s.grade and s.grade.final_pct is not none %} [{{ s.grade.final_pct|round(1) }}% / {{ s.grade.scale }}]{% endif %}{{ ', ' if not loop.last }}{% endfor %}
-      {% if p.avg is not none %} &middot; att. avg {{ (p.avg*100)|round|int }}%{% endif %}
-      {% if p.low %} &middot; <span style="color:var(--x)">low attendance</span>{% endif %}
-    </small></p>
-  {% else %}<p>No student matches that search.</p>{% endfor %}
+  <div style="padding:8px 0;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
+    <div>
+      <a href="{{ url_for('lookup', q=q, subject=subject, section=section, student=p.name) }}" style="color:inherit;text-decoration:none;font-weight:700;font-size:14px">
+        {{ p.name }}
+      </a>
+      {% if p.student_no %}
+      <span class="badge" style="background:var(--surface);border:1px solid var(--line);font-size:11px;margin-left:4px">{{ p.student_no }}</span>
+      {% endif %}
+      <div class="muted" style="font-size:12px;margin-top:2px">
+        {% for s in p.subjects %}{{ s.subject }} ({{ s.section }}){% if s.grade and s.grade.final_pct is not none %} [{{ s.grade.final_pct|round(1) }}% / {{ s.grade.scale }}]{% endif %}{{ ', ' if not loop.last }}{% endfor %}
+        {% if p.avg is not none %} · Overall Att: <b>{{ (p.avg*100)|round|int }}%</b>{% endif %}
+        {% if p.low %} · <span style="color:var(--x-ink);font-weight:700">Low Attendance</span>{% endif %}
+      </div>
+    </div>
+    <a class="btn small secondary" href="{{ url_for('lookup', q=q, subject=subject, section=section, student=p.name) }}">
+      View Profile ›
+    </a>
+  </div>
+  {% else %}
+  <p class="muted" style="margin:8px 0;font-size:13px">No student matches that search.</p>
+  {% endfor %}
 </div>
 {% else %}
-<p class="no-print">Type a name, student ID, or pick a section to view a student's attendance, grades, contact info, and printable slip.</p>
+<div class="card no-print" style="padding:20px;background:var(--surface);margin-bottom:16px">
+  <div style="font-size:13px;color:var(--muted)">
+    Type a student name, student ID number, or choose a section above to view the complete academic attendance history, Philippine grades breakdown, and generate a printable record slip.
+  </div>
+</div>
 {% endif %}
 
+<!-- Selected Student Detail Card -->
 {% if selected %}
 <div class="card">
-  <div style="display:flex;justify-content:space-between;align-items:flex-start;flex-wrap:wrap;gap:8px;padding-bottom:12px;border-bottom:1px solid var(--line)">
+  <div class="card-header" style="padding-bottom:12px;margin-bottom:14px">
     <div>
-      <h2 style="margin:0">{{ selected.name }}
-        {% if selected.student_no %}<span class="badge done" style="font-size:13px;vertical-align:middle;margin-left:6px">ID: {{ selected.student_no }}</span>{% endif %}
+      <h2 style="font-size:18px;margin:0 0 2px">
+        {{ selected.name }}
+        {% if selected.student_no %}
+        <span class="badge" style="background:var(--surface);border:1px solid var(--line);font-size:12px;font-weight:700;margin-left:6px">ID: {{ selected.student_no }}</span>
+        {% endif %}
       </h2>
-      {% if selected.sections %}<div class="muted" style="font-size:13px;margin-top:2px">Section: <b>{{ selected.sections|join(', ') }}</b></div>{% endif %}
+      {% if selected.sections %}
+      <div class="muted" style="font-size:12.5px">Enrolled Section{{ 's' if selected.sections|length > 1 else '' }}: <b>{{ selected.sections|join(', ') }}</b></div>
+      {% endif %}
     </div>
-    <button class="btn small primary no-print" type="button" onclick="window.print()">🖨️ Print slip</button>
+    <div class="no-print">
+      <button class="btn small primary" type="button" onclick="window.print()">
+        <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><polyline points="6 9 6 2 18 2 18 9"/><path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2"/><rect width="12" height="8" x="6" y="14"/></svg>
+        <span>Print slip</span>
+      </button>
+    </div>
   </div>
 
-  <!-- Contact & Guardian Info -->
-  <div style="margin:12px 0;display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px;background:var(--surface);padding:12px;border-radius:10px;border:1px solid var(--line)">
-    <div><small class="muted">Student ID / No.</small><div><b>{{ selected.student_no or '—' }}</b></div></div>
-    <div><small class="muted">Student Email</small><div><b>{{ selected.email or '—' }}</b></div></div>
-    <div><small class="muted">Guardian Name</small><div><b>{{ selected.guardian_name or '—' }}</b></div></div>
-    <div><small class="muted">Guardian Contact</small><div><b>{{ selected.guardian_phone or '—' }}</b></div></div>
-    <div style="grid-column:1 / -1"><small class="muted">Home Address</small><div><b>{{ selected.address or '—' }}</b></div></div>
+  <!-- Contact & Guardian Metadata Grid -->
+  <div style="margin-bottom:16px;display:grid;grid-template-columns:repeat(auto-fit,minmax(200px,1fr));gap:10px;background:var(--surface);padding:14px;border-radius:var(--radius);border:1px solid var(--line);font-size:12.5px">
+    <div><span class="muted" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase">Student ID</span><b>{{ selected.student_no or '—' }}</b></div>
+    <div><span class="muted" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase">Student Email</span><b>{{ selected.email or '—' }}</b></div>
+    <div><span class="muted" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase">Parent / Guardian</span><b>{{ selected.guardian_name or '—' }}</b></div>
+    <div><span class="muted" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase">Guardian Contact</span><b>{{ selected.guardian_phone or '—' }}</b></div>
+    <div style="grid-column:1 / -1"><span class="muted" style="display:block;font-size:11px;font-weight:700;text-transform:uppercase">Permanent Address</span><b>{{ selected.address or '—' }}</b></div>
   </div>
 
-  <details class="no-print" style="margin-bottom:14px">
-    <summary style="cursor:pointer;font-size:13px;color:var(--brand);font-weight:700">✏️ Edit student profile &amp; guardian contact</summary>
-    <form method="post" action="{{ url_for('students_profile') }}" style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:8px;background:var(--surface);padding:12px;border-radius:10px;border:1px solid var(--line)">
+  <!-- Edit Profile Accordion -->
+  <details class="no-print" style="margin-bottom:16px">
+    <summary style="cursor:pointer;font-size:12.5px;color:var(--brand-accent);font-weight:700">
+      Edit Student Profile &amp; Contact Information
+    </summary>
+    <form method="post" action="{{ url_for('students_profile') }}"
+          style="margin-top:10px;display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px;background:var(--surface);padding:14px;border-radius:var(--radius);border:1px solid var(--line)">
       <input type="hidden" name="old_name" value="{{ selected.name }}">
       <input type="hidden" name="next" value="lookup">
       <input type="hidden" name="q" value="{{ q }}">
       <input type="hidden" name="subject" value="{{ subject }}">
       <input type="hidden" name="section" value="{{ section }}">
-      <label style="font-size:12px">Full Name<input class="txt" type="text" name="name" value="{{ selected.name }}" required style="width:100%"></label>
-      <label style="font-size:12px">Student ID / No.<input class="txt" type="text" name="student_no" value="{{ selected.student_no }}" placeholder="e.g. 2026-00123" style="width:100%"></label>
-      <label style="font-size:12px">Guardian Name<input class="txt" type="text" name="guardian_name" value="{{ selected.guardian_name }}" placeholder="Parent / Guardian" style="width:100%"></label>
-      <label style="font-size:12px">Guardian Contact No.<input class="txt" type="text" name="guardian_phone" value="{{ selected.guardian_phone }}" placeholder="09xx-xxx-xxxx" style="width:100%"></label>
-      <label style="font-size:12px">Student Email<input class="txt" type="email" name="email" value="{{ selected.email }}" placeholder="student@example.com" style="width:100%"></label>
-      <label style="font-size:12px;grid-column:1 / -1">Home Address<input class="txt" type="text" name="address" value="{{ selected.address }}" placeholder="Street, Barangay, City" style="width:100%"></label>
-      <div style="grid-column:1 / -1"><button class="btn small primary" type="submit">Save Profile</button></div>
+      <div>
+        <label style="font-size:12px">Full Student Name</label>
+        <input class="txt" type="text" name="name" value="{{ selected.name }}" required style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12px">Student ID / Number</label>
+        <input class="txt" type="text" name="student_no" value="{{ selected.student_no }}" placeholder="e.g. 2026-00123" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12px">Parent / Guardian Name</label>
+        <input class="txt" type="text" name="guardian_name" value="{{ selected.guardian_name }}" placeholder="Parent Name" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12px">Guardian Contact Phone</label>
+        <input class="txt" type="text" name="guardian_phone" value="{{ selected.guardian_phone }}" placeholder="09xx-xxx-xxxx" style="width:100%">
+      </div>
+      <div>
+        <label style="font-size:12px">Student Email</label>
+        <input class="txt" type="email" name="email" value="{{ selected.email }}" placeholder="student@example.com" style="width:100%">
+      </div>
+      <div style="grid-column:1 / -1">
+        <label style="font-size:12px">Residential Address</label>
+        <input class="txt" type="text" name="address" value="{{ selected.address }}" placeholder="Street, Barangay, City" style="width:100%">
+      </div>
+      <div style="grid-column:1 / -1;margin-top:4px">
+        <button class="btn small primary" type="submit">Save Profile Changes</button>
+      </div>
     </form>
   </details>
 
   {% if selected.avg is not none %}
-  <p>Overall attendance: <b style="{{ 'color:var(--x)' if selected.low }}">{{ (selected.avg*100)|round|int }}%</b>
-    {% if selected.low %}(below {{ (low*100)|round|int }}% &ndash; needs attention){% endif %}</p>
+  <div style="padding:10px 14px;border-radius:var(--radius);background:var(--surface);margin-bottom:16px;font-size:13px">
+    Overall Cumulative Attendance: <b style="{{ 'color:var(--x-ink)' if selected.low else 'color:var(--p-ink)' }}">{{ (selected.avg*100)|round|int }}%</b>
+    {% if selected.low %}
+    <span style="color:var(--x-ink);font-weight:700;margin-left:6px">(Below {{ (low*100)|round|int }}% threshold — requires academic intervention)</span>
+    {% endif %}
+  </div>
   {% endif %}
 
+  <!-- Per Subject Records & Standing -->
   {% for s in selected.subjects %}
-  <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--line)">
-    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px">
-      <h3 style="margin:0">{{ s.subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ s.section }}</span></h3>
-      <a class="btn small no-print" href="{{ url_for('grades_page', subject=s.subject, section=s.section) }}">Open Gradebook</a>
+  <div style="margin-top:16px;padding-top:14px;border-top:1px solid var(--line)">
+    <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:8px;margin-bottom:8px">
+      <h3 style="margin:0;font-size:15px">
+        {{ s.subject }}
+        <span class="badge done" style="font-size:11.5px;margin-left:4px">{{ s.section }}</span>
+      </h3>
+      <a class="btn small secondary no-print" href="{{ url_for('grades_page', subject=s.subject, section=s.section) }}">
+        Open Gradebook ›
+      </a>
     </div>
 
-    <!-- Attendance summary -->
+    <!-- Attendance Breakdown -->
     {% if s.total %}
-    <p style="margin:6px 0"><b>Attendance:</b> Rate <b style="{{ 'color:var(--x)' if s.low }}">{{ (s.rate*100)|round|int }}%</b>
-      &middot; Present {{ s.p + s.r }} &middot; Absent {{ s.x }} &middot; Late {{ s.l }} &middot; Excused {{ s.e }}
-      &middot; {{ s.total }} class{{ '' if s.total==1 else 'es' }} recorded</p>
-    <details {{ 'open' if print_view }} style="margin-bottom:8px"><summary>Attendance date-by-date history</summary>
-      <table style="width:100%;border-collapse:collapse;margin-top:4px">
-        {% for h in s.history %}
-        <tr><td>{{ h.date.strftime('%b %d, %Y') }}</td><td>{{ h.label }}</td><td>{{ h.topic }}</td></tr>
-        {% endfor %}
-      </table>
+    <p style="margin:4px 0 8px;font-size:13px">
+      <b>Attendance:</b> Rate <b style="{{ 'color:var(--x-ink)' if s.low else 'color:var(--p-ink)' }}">{{ (s.rate*100)|round|int }}%</b>
+      · Present: {{ s.p + s.r }} · Absent: {{ s.x }} · Late: {{ s.l }} · Excused: {{ s.e }}
+      · Total: {{ s.total }} session{{ '' if s.total==1 else 's' }}
+    </p>
+    <details style="margin-bottom:12px">
+      <summary style="font-size:12.5px;cursor:pointer;color:var(--brand-accent);font-weight:600">Session date-by-date attendance log</summary>
+      <div class="scroll" style="margin-top:6px;max-height:220px">
+        <table>
+          <thead><tr><th>Date</th><th>Status</th><th>Topic</th></tr></thead>
+          <tbody>
+            {% for h in s.history %}
+            <tr>
+              <td style="white-space:nowrap">{{ h.date.strftime('%b %d, %Y') }}</td>
+              <td style="white-space:nowrap"><span class="pill {{ 'low' if h.code == 'x' }}">{{ h.label }}</span></td>
+              <td>{{ h.topic or '—' }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </details>
-    {% else %}<p style="margin:6px 0"><b>Attendance:</b> No attendance recorded yet.</p>{% endif %}
+    {% else %}
+    <p class="muted" style="font-size:13px;margin:4px 0 8px"><b>Attendance:</b> No sessions recorded yet.</p>
+    {% endif %}
 
-    <!-- Grades summary -->
+    <!-- Academic Grades Breakdown (Philippine Scale) -->
     {% if s.grade and s.grade.final_pct is not none %}
-    <p style="margin:6px 0">
-      <b>Grades:</b> Standing <b style="{{ 'color:var(--x)' if not s.grade.passing else 'color:var(--p)' }}">{{ s.grade.final_pct|round(1) }}% ({{ s.grade.scale }})</b>
-      &middot; Exam ({{ s.grade_weights.exam|round(0)|int }}%): {{ '–' if s.grade.cat_pct.exam is none else ((s.grade.cat_pct.exam|round(1)) ~ '%') }}
-      &middot; Quiz ({{ s.grade_weights.quiz|round(0)|int }}%): {{ '–' if s.grade.cat_pct.quiz is none else ((s.grade.cat_pct.quiz|round(1)) ~ '%') }}
-      &middot; Activity ({{ s.grade_weights.activity|round(0)|int }}%): {{ '–' if s.grade.cat_pct.activity is none else ((s.grade.cat_pct.activity|round(1)) ~ '%') }}
+    <p style="margin:6px 0 8px;font-size:13px">
+      <b>Grades:</b> Standing <b style="{{ 'color:var(--x-ink)' if not s.grade.passing else 'color:var(--p-ink)' }}">{{ s.grade.final_pct|round(1) }}% ({{ s.grade.scale }})</b>
+      · Exam ({{ s.grade_weights.exam|round(0)|int }}%): {{ '–' if s.grade.cat_pct.exam is none else ((s.grade.cat_pct.exam|round(1)) ~ '%') }}
+      · Quiz ({{ s.grade_weights.quiz|round(0)|int }}%): {{ '–' if s.grade.cat_pct.quiz is none else ((s.grade.cat_pct.quiz|round(1)) ~ '%') }}
+      · Activity ({{ s.grade_weights.activity|round(0)|int }}%): {{ '–' if s.grade.cat_pct.activity is none else ((s.grade.cat_pct.activity|round(1)) ~ '%') }}
     </p>
     {% if s.grade_items %}
-    <details open><summary>Exam, Quiz &amp; Activity breakdown</summary>
-      <table style="width:100%;border-collapse:collapse;margin-top:4px">
-        <thead><tr><th>Category</th><th>Title</th><th class="n">Score</th><th class="n">Max</th></tr></thead>
-        <tbody>
-          {% for gi in s.grade_items %}
-          <tr>
-            <td>{{ gi.label }}</td>
-            <td>{{ gi.title }}</td>
-            <td class="n"><b>{{ '–' if gi.score is none else ('%g' % gi.score) }}</b></td>
-            <td class="n">{{ '%g' % gi.max_score }}</td>
-          </tr>
-          {% endfor %}
-        </tbody>
-      </table>
+    <details open style="margin-bottom:8px">
+      <summary style="font-size:12.5px;cursor:pointer;color:var(--brand-accent);font-weight:600">Exam, Quiz &amp; Activity assessment scores</summary>
+      <div class="scroll" style="margin-top:6px">
+        <table>
+          <thead>
+            <tr><th>Category</th><th>Assessment Title</th><th class="n">Score Obtained</th><th class="n">Max Points</th></tr>
+          </thead>
+          <tbody>
+            {% for gi in s.grade_items %}
+            <tr>
+              <td><span class="badge" style="background:var(--surface);border:1px solid var(--line)">{{ gi.label }}</span></td>
+              <td><b>{{ gi.title }}</b></td>
+              <td class="n"><b>{{ '–' if gi.score is none else ('%g' % gi.score) }}</b></td>
+              <td class="n">{{ '%g' % gi.max_score }}</td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+      </div>
     </details>
     {% endif %}
     {% else %}
-    <p style="margin:6px 0"><b>Grades:</b> No grades recorded yet.</p>
+    <p class="muted" style="font-size:13px;margin:6px 0 8px"><b>Grades:</b> No graded items recorded yet.</p>
     {% endif %}
   </div>
   {% endfor %}

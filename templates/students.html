@@ -1,67 +1,82 @@
 {% extends "base.html" %}
-{% block title %}Students &amp; subjects{% endblock %}
+{% block title %}Students &amp; Subjects · {{ subject }}{% if section %} ({{ section }}){% endif %}{% endblock %}
 {% block body %}
+<div class="page-header">
+  <div class="page-title-group">
+    <h1>Students &amp; Class Sections</h1>
+    <div class="sub">Academic Roster Management · {{ subject }}{% if section %} · Section {{ section }}{% endif %}</div>
+  </div>
+</div>
+
 <style>
-/* ---- Students page custom styles ---- */
-.stu-action-bar{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;align-items:center}
-.stu-action-bar .btn{display:flex;align-items:center;gap:5px}
+.stu-action-bar { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; align-items: flex-start; }
+.stu-drawer { background: var(--card); border: 1px solid var(--line); border-radius: var(--radius); overflow: hidden; }
+.stu-drawer summary {
+  font-weight: 700; font-size: 13.5px; cursor: pointer; padding: 12px 16px;
+  color: var(--brand-accent); list-style: none; display: flex; align-items: center; gap: 8px;
+  user-select: none; background: var(--surface);
+}
+.stu-drawer summary::-webkit-details-marker { display: none; }
+.stu-drawer-body { padding: 14px 16px; border-top: 1px solid var(--line); }
 
-/* drawer cards that toggle open/closed */
-.stu-drawer{background:var(--surface);border:1px solid var(--line);border-radius:12px;overflow:hidden;margin-bottom:12px}
-.stu-drawer summary{font-weight:700;font-size:14px;cursor:pointer;padding:12px 14px;color:var(--brand);list-style:none;display:flex;align-items:center;gap:8px;user-select:none}
-.stu-drawer summary::before{content:'▸';font-size:11px;transition:transform .2s;display:inline-block}
-.stu-drawer[open]>summary::before{transform:rotate(90deg)}
-.stu-drawer summary::-webkit-details-marker{display:none}
-.stu-drawer-body{padding:12px 14px 14px}
+.subj-hero {
+  display: flex; justify-content: space-between; align-items: flex-start;
+  gap: 14px; flex-wrap: wrap; margin-bottom: 16px; padding-bottom: 16px; border-bottom: 1px solid var(--line);
+}
+.subj-hero-left { display: flex; align-items: center; gap: 14px; }
+.subj-hero-info h2 { margin: 0 0 4px; font-size: 18px; font-weight: 800; }
+.subj-hero-meta { display: flex; align-items: center; gap: 6px; flex-wrap: wrap; font-size: 12.5px; }
 
-/* hero card */
-.subj-hero{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;flex-wrap:wrap;margin-bottom:14px;padding-bottom:14px;border-bottom:1px solid var(--line)}
-.subj-hero-left{display:flex;align-items:center;gap:14px}
-.subj-hero-info h2{margin:0 0 2px;font-size:19px}
-.subj-hero-meta{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:4px}
+.sec-pills { display: flex; gap: 6px; flex-wrap: wrap; margin-bottom: 16px; align-items: center; }
+.sec-pill {
+  padding: 5px 12px; border-radius: var(--radius-sm); border: 1px solid var(--line);
+  font-size: 12.5px; font-weight: 700; text-decoration: none; color: var(--ink);
+  background: var(--surface); transition: all 0.15s ease;
+}
+.sec-pill.on { background: var(--navy-900); border-color: var(--navy-900); color: #fff; }
+[data-theme="dark"] .sec-pill.on { background: var(--blue-600); border-color: var(--blue-600); }
 
-/* term edit inline form */
-.term-edit-row{display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:8px;padding:10px 12px;background:var(--ebg);border-radius:8px;border:1px solid var(--line)}
-.term-edit-row label{font-size:12px;color:var(--muted)}
-.term-edit-row input.txt{width:130px;padding:5px 8px;font-size:13px}
-.term-edit-row select{padding:5px 8px;font-size:13px}
-
-/* section pills */
-.sec-pills{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:16px}
-.sec-pill{padding:5px 12px;border-radius:999px;border:1.5px solid var(--line);font-size:13px;font-weight:600;text-decoration:none;color:var(--fg);background:var(--surface);transition:background .15s,border-color .15s}
-.sec-pill.on{background:var(--brand);border-color:var(--brand);color:#fff}
-.sec-pill:hover:not(.on){background:var(--ebg);border-color:var(--brand-mid,var(--brand))}
-
-/* student search */
-.stu-search-wrap{position:relative;margin-bottom:12px}
-.stu-search-wrap input{width:100%;box-sizing:border-box;padding:8px 12px 8px 34px;border-radius:8px;border:1.5px solid var(--line);background:var(--surface);color:var(--fg);font-size:14px}
-.stu-search-wrap .search-icon{position:absolute;left:10px;top:50%;transform:translateY(-50%);opacity:.5;pointer-events:none}
-.stu-noresult{text-align:center;padding:24px;color:var(--muted);display:none}
-
-/* student table row hover */
-table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
+.stu-search-wrap { position: relative; margin-bottom: 14px; }
+.stu-search-wrap input {
+  width: 100%; padding: 9px 12px 9px 36px; border-radius: var(--radius);
+  border: 1px solid var(--line-strong); background: var(--card); color: var(--ink); font-size: 13.5px;
+}
+.stu-search-wrap .search-icon {
+  position: absolute; left: 12px; top: 50%; transform: translateY(-50%);
+  color: var(--muted); pointer-events: none;
+}
+.stu-noresult { text-align: center; padding: 24px; color: var(--muted); display: none; font-size: 13px; }
+table.stu-table tr:hover td { background: var(--hover); }
 </style>
 
-<h1>Students &amp; subjects</h1>
-
-<!-- ===== TOP ACTION BAR ===== -->
+<!-- Top Action Drawers -->
 <div class="stu-action-bar">
   {% if subjects %}
-  <details class="stu-drawer" style="flex:1 1 320px" {% if is_monitor %}open{% endif %}>
-    <summary>➕ Add Students</summary>
+  <details class="stu-drawer" style="flex:1 1 340px" {% if is_monitor %}open{% endif %}>
+    <summary>
+      <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><line x1="19" y1="8" x2="19" y2="14"/><line x1="22" y1="11" x2="16" y2="11"/></svg>
+      <span>Enroll Students to Roster</span>
+    </summary>
     <div class="stu-drawer-body">
       <form method="post" action="{{ url_for('students_add') }}">
         <input type="hidden" name="section" value="{{ section or '' }}">
-        <textarea name="names" rows="4" style="width:100%;box-sizing:border-box" placeholder="One name per line" required></textarea>
+        <label>Student Names (One per line)</label>
+        <textarea name="names" rows="4" style="width:100%;box-sizing:border-box;margin-bottom:8px" placeholder="e.g. Dela Cruz, Juan M.&#10;Santos, Maria Clara" required></textarea>
         {% if is_monitor %}
         <input type="hidden" name="subjects" value="{{ subject }}">
-        <p class="muted" style="font-size:12px;margin:8px 0">Adding to <b>{{ subject }}</b> (Section: <b>{{ section }}</b>).</p>
+        <p class="muted" style="font-size:12px;margin:4px 0 8px">Enrolling into: <b>{{ subject }}</b> (Section: <b>{{ section }}</b>)</p>
         {% else %}
-        <p style="margin:8px 0 4px;font-size:13px;font-weight:600">Add to subjects:</p>
-        <p style="margin:0 0 8px">{% for s in subjects %}<label class="chk"><input type="checkbox" name="subjects" value="{{ s }}" {{ 'checked' if s==subject or not subject }}> {{ s }}</label>{% endfor %}</p>
-        {% if section %}<p class="muted" style="font-size:12px;margin:0 0 8px">Adding to section <b>{{ section }}</b>.</p>{% endif %}
+        <p style="margin:4px 0 6px;font-size:12.5px;font-weight:600">Assign to Subjects:</p>
+        <div style="display:flex;gap:12px;flex-wrap:wrap;margin-bottom:10px">
+          {% for s in subjects %}
+          <label class="chk" style="font-size:12.5px">
+            <input type="checkbox" name="subjects" value="{{ s }}" {{ 'checked' if s==subject or not subject }}> {{ s }}
+          </label>
+          {% endfor %}
+        </div>
+        {% if section %}<div class="muted" style="font-size:12px;margin-bottom:8px">Target Section: <b>{{ section }}</b></div>{% endif %}
         {% endif %}
-        <button class="btn primary" type="submit">Add students</button>
+        <button class="btn primary small" type="submit">Add Students</button>
       </form>
     </div>
   </details>
@@ -69,153 +84,176 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
 
   {% if not is_monitor %}
   <details class="stu-drawer" style="flex:1 1 280px">
-    <summary>➕ New Subject</summary>
+    <summary>
+      <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+      <span>Create New Academic Subject</span>
+    </summary>
     <div class="stu-drawer-body">
-      {% if subjects %}
       <form method="post" action="{{ url_for('subjects_add') }}">
-        <p><input class="txt" type="text" name="name" placeholder="Subject name" maxlength="31" required style="width:100%;box-sizing:border-box"></p>
-        <p><input class="txt" type="text" name="section_name" placeholder="First section (default: BSCS-1A)" maxlength="31" style="width:100%;box-sizing:border-box"></p>
-        <p><select name="copy_from" style="width:100%;box-sizing:border-box"><option value="">Start with an empty class list</option>
-          {% for s in subjects %}<option value="{{ s }}">Copy students from {{ s }}</option>{% endfor %}</select></p>
-        <button class="btn primary" type="submit">Create subject</button>
+        <div style="margin-bottom:8px">
+          <label>Subject Course Name</label>
+          <input class="txt" type="text" name="name" placeholder="e.g. Data Structures" maxlength="31" required style="width:100%">
+        </div>
+        <div style="margin-bottom:8px">
+          <label>Initial Section Name</label>
+          <input class="txt" type="text" name="section_name" placeholder="Default: BSCS-1A" maxlength="31" style="width:100%">
+        </div>
+        {% if subjects %}
+        <div style="margin-bottom:10px">
+          <label>Roster Template</label>
+          <select name="copy_from" style="width:100%">
+            <option value="">Start with an empty roster</option>
+            {% for s in subjects %}<option value="{{ s }}">Copy students from {{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        {% endif %}
+        <button class="btn primary small" type="submit">Create Subject</button>
       </form>
-      {% else %}
-      <form method="post" action="{{ url_for('subjects_add') }}">
-        <p><input class="txt" type="text" name="name" placeholder="Subject name" maxlength="31" required style="width:100%;box-sizing:border-box"></p>
-        <button class="btn primary" type="submit">Create subject</button>
-      </form>
-      {% endif %}
     </div>
   </details>
   {% endif %}
 </div>
 
 {% if not subjects %}
-<div class="card">No subjects yet — use the <b>➕ New Subject</b> panel above to create your first one.</div>
+<div class="card" style="padding:28px 20px;text-align:center">
+  <h3 style="margin:0 0 6px">No Subjects Configured</h3>
+  <p class="muted" style="margin:0 0 14px">Use the panel above to create your first academic subject.</p>
+</div>
 {% endif %}
 
 {% if subject %}
-<div class="card" style="padding:18px">
-
-  <!-- ===== SUBJECT HERO ===== -->
+<div class="card">
+  <!-- Subject Hero Card -->
   <div class="subj-hero">
     <div class="subj-hero-left">
       {% if subject_img_url %}
-      <img src="{{ subject_img_url }}" alt="{{ subject }}" style="width:56px;height:56px;border-radius:12px;object-fit:cover;border:1.5px solid var(--line);box-shadow:0 2px 6px rgba(0,0,0,.08)">
+      <img src="{{ subject_img_url }}" alt="{{ subject }}" style="width:52px;height:52px;border-radius:var(--radius);object-fit:cover;border:1px solid var(--line)">
       {% else %}
-      <div style="width:56px;height:56px;border-radius:12px;background:var(--ebg);color:var(--brand);display:flex;align-items:center;justify-content:center;font-size:26px;border:1.5px solid var(--line)">📖</div>
+      <div style="width:52px;height:52px;border-radius:var(--radius);background:var(--surface);color:var(--brand-accent);display:flex;align-items:center;justify-content:center;border:1px solid var(--line)">
+        <svg class="lucide" viewBox="0 0 24 24" width="24" height="24" fill="none"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/></svg>
+      </div>
       {% endif %}
+
       <div class="subj-hero-info">
-        <h2>{{ subject }} <span class="badge done" style="font-size:12px;vertical-align:middle">{{ section }}</span></h2>
+        <h2>{{ subject }} <span class="badge done" style="font-size:12px">{{ section }}</span></h2>
         <div class="subj-hero-meta">
-          <span class="muted" style="font-size:13px">{{ rows|length }} student{{ '' if rows|length == 1 else 's' }} enrolled</span>
+          <span class="muted">{{ rows|length }} student{{ '' if rows|length == 1 else 's' }} enrolled</span>
           {% if period %}
-          <span style="font-size:12px;color:var(--muted)">·</span>
-          <span style="font-size:12px;background:var(--ebg);border:1px solid var(--line);border-radius:6px;padding:2px 8px;font-weight:600">
-            📌 {{ period.label }}{% if period.locked %} 🔒{% endif %}
+          <span class="muted">·</span>
+          <span class="badge" style="background:var(--surface);border:1px solid var(--line);font-size:11.5px">
+            Term: <b>{{ period.label }}</b>{% if period.locked %} 🔒{% endif %}
           </span>
           {% endif %}
         </div>
+
         {% if period and not period.locked and not is_monitor %}
-        <!-- Inline term rename -->
+        <!-- Inline Term Rename -->
         <details style="margin-top:6px">
-          <summary style="font-size:12px;color:var(--brand);cursor:pointer;list-style:none;display:inline-flex;align-items:center;gap:4px"><span style="font-size:10px">▸</span> ✏️ Edit term name</summary>
-          <form method="post" action="{{ url_for('periods_edit') }}" class="term-edit-row" style="margin-top:8px">
+          <summary style="font-size:12px;color:var(--brand-accent);cursor:pointer;list-style:none">
+            Edit active term label
+          </summary>
+          <form method="post" action="{{ url_for('periods_edit') }}" class="term-edit-row" style="margin-top:8px;display:flex;gap:8px;align-items:flex-end;flex-wrap:wrap">
             <input type="hidden" name="subject" value="{{ subject }}">
             <input type="hidden" name="section" value="{{ section or '' }}">
             <input type="hidden" name="period_id" value="{{ period.id }}">
             <input type="hidden" name="next" value="students">
-            <label>Semester<br>
-              <input class="txt" name="semester" list="stuSemList" value="{{ period.semester }}" maxlength="40" required>
+            <label style="font-size:11.5px">Semester<br>
+              <input class="txt" name="semester" list="stuSemList" value="{{ period.semester }}" maxlength="40" required style="width:140px">
             </label>
-            <label>Term<br>
-              <input class="txt" name="term" list="stuTermList" value="{{ period.term }}" maxlength="40" required>
+            <label style="font-size:11.5px">Term<br>
+              <input class="txt" name="term" list="stuTermList" value="{{ period.term }}" maxlength="40" required style="width:140px">
             </label>
             <datalist id="stuSemList">{% for s in semesters %}<option value="{{ s }}">{% endfor %}</datalist>
             <datalist id="stuTermList">{% for t in terms %}<option value="{{ t }}">{% endfor %}</datalist>
-            <button class="btn small primary" type="submit" style="margin-top:14px">Save</button>
+            <button class="btn small primary" type="submit">Save</button>
           </form>
         </details>
         {% endif %}
       </div>
     </div>
 
-    <!-- danger actions -->
+    <!-- Danger Subject Actions -->
     {% if not is_monitor %}
-    <div style="display:flex;gap:8px;align-items:flex-start;flex-wrap:wrap">
+    <div>
       <form class="inline" method="post" action="{{ url_for('subjects_delete') }}"
-            onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently delete this subject, all its sections, and all its attendance records. Are you sure?')">
+            onsubmit="return confirm('⚠️ DELETE {{ subject|e }}?\n\nThis will permanently remove this subject, all sections, and attendance records. Continue?')">
         <input type="hidden" name="subject" value="{{ subject }}">
-        <button class="btn small danger" type="submit">🗑 Delete Subject</button>
+        <button class="btn small danger" type="submit">Delete Subject</button>
       </form>
     </div>
     {% endif %}
   </div>
 
-  <!-- ===== SECTION PILLS ===== -->
+  <!-- Section Switcher Pills -->
   {% if section_names and section_names|length > 1 %}
   <div class="sec-pills">
-    <span class="muted" style="font-size:12px;font-weight:700;align-self:center;margin-right:2px">SECTION:</span>
+    <span class="muted" style="font-size:11.5px;font-weight:700;letter-spacing:0.04em">SECTION:</span>
     {% for sn in section_names %}
     <a class="sec-pill {{ 'on' if sn == section }}" href="{{ url_for('students', subject=subject, section=sn) }}">{{ sn }}</a>
     {% endfor %}
   </div>
   {% endif %}
 
-  <!-- ===== SECTION & PICTURE MANAGEMENT ===== -->
+  <!-- Section & Subject Visual Settings -->
   {% if not is_monitor %}
-  <details class="stu-drawer" style="margin-bottom:14px">
-    <summary>🏷️ Manage Sections &amp; Picture</summary>
+  <details class="stu-drawer" style="margin-bottom:16px">
+    <summary>
+      <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none"><rect width="7" height="7" x="3" y="3" rx="1"/><rect width="7" height="7" x="14" y="3" rx="1"/><rect width="7" height="7" x="14" y="14" rx="1"/><rect width="7" height="7" x="3" y="14" rx="1"/></svg>
+      <span>Manage Sections &amp; Subject Picture</span>
+    </summary>
     <div class="stu-drawer-body" style="display:flex;flex-direction:column;gap:14px">
-      <!-- Section rename -->
+      <!-- Rename section -->
       <div>
-        <p style="font-size:13px;font-weight:600;margin:0 0 6px">Rename section</p>
+        <p style="font-size:12.5px;font-weight:700;margin:0 0 6px">Rename Section</p>
         <form method="post" action="{{ url_for('sections_rename') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="hidden" name="subject" value="{{ subject }}">
           <input type="hidden" name="old_section" value="{{ section }}">
-          <label style="font-size:13px">Rename <b>{{ section }}</b> to:</label>
-          <input class="txt" type="text" name="new_section" value="{{ section }}" maxlength="31" required style="width:160px;padding:6px 10px;font-size:13px">
+          <span style="font-size:12.5px">Rename <b>{{ section }}</b> to:</span>
+          <input class="txt" type="text" name="new_section" value="{{ section }}" maxlength="31" required style="width:150px">
           <button class="btn small" type="submit">Rename</button>
         </form>
       </div>
-      <!-- Add section -->
+
+      <!-- Add new section -->
       <div>
-        <p style="font-size:13px;font-weight:600;margin:0 0 6px">Add another section</p>
+        <p style="font-size:12.5px;font-weight:700;margin:0 0 6px">Add Another Section</p>
         <form method="post" action="{{ url_for('sections_add') }}" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
           <input type="hidden" name="subject" value="{{ subject }}">
-          <input class="txt" type="text" name="section" placeholder="e.g. BSCS-1B" maxlength="31" required style="width:150px;padding:6px 10px;font-size:13px">
-          <select name="copy_from_section" style="padding:6px 10px;font-size:13px">
-            <option value="">Empty student list</option>
-            {% for sec_n in section_names %}<option value="{{ sec_n }}">Copy from {{ sec_n }}</option>{% endfor %}
+          <input class="txt" type="text" name="section" placeholder="e.g. BSCS-1B" maxlength="31" required style="width:150px">
+          <select name="copy_from_section">
+            <option value="">Empty student roster</option>
+            {% for sec_n in section_names %}<option value="{{ sec_n }}">Copy students from {{ sec_n }}</option>{% endfor %}
           </select>
           <button class="btn small primary" type="submit">+ Add Section</button>
         </form>
       </div>
+
       <!-- Delete section -->
       {% if section_names and section_names|length > 1 %}
       <div>
         <form method="post" action="{{ url_for('sections_delete') }}"
-              onsubmit="return confirm('Delete section {{ section|e }} from {{ subject|e }}? All marks for this section will be removed.')">
+              onsubmit="return confirm('Delete section {{ section|e }} from {{ subject|e }}? All attendance records for this section will be removed.')">
           <input type="hidden" name="subject" value="{{ subject }}">
           <input type="hidden" name="section" value="{{ section }}">
-          <button class="btn small danger" type="submit">🗑 Delete Section {{ section }}</button>
+          <button class="btn small danger" type="submit">Delete Section {{ section }}</button>
         </form>
       </div>
       {% endif %}
-      <!-- Custom picture -->
+
+      <!-- Custom Picture Upload -->
       <div>
-        <p style="font-size:13px;font-weight:600;margin:0 0 6px">📷 Subject picture</p>
+        <p style="font-size:12.5px;font-weight:700;margin:0 0 6px">Subject Header Picture</p>
         <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
           <form method="post" action="{{ url_for('subjects_upload_image') }}" enctype="multipart/form-data" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap">
             <input type="hidden" name="subject" value="{{ subject }}">
-            <input type="file" name="image" accept="image/*" required style="font-size:13px">
-            <button class="btn small primary" type="submit">Upload</button>
+            <input type="file" name="image" accept="image/*" required style="font-size:12.5px">
+            <button class="btn small primary" type="submit">Upload Image</button>
           </form>
           {% if subject_img_url %}
           <form class="inline" method="post" action="{{ url_for('subjects_delete_image') }}"
-                onsubmit="return confirm('Remove custom picture for {{ subject|e }}?')">
+                onsubmit="return confirm('Reset to default header picture for {{ subject|e }}?')">
             <input type="hidden" name="subject" value="{{ subject }}">
-            <button class="btn small danger" type="submit">Remove Picture</button>
+            <button class="btn small danger" type="submit">Reset to Default</button>
           </form>
           {% endif %}
         </div>
@@ -224,75 +262,113 @@ table.stu-table tr:hover td{background:var(--hover,rgba(37,99,235,.04))}
   </details>
   {% endif %}
 
-  <!-- ===== STUDENT ROSTER ===== -->
+  <!-- Student Search Bar -->
   {% if rows %}
   <div class="stu-search-wrap">
-    <span class="search-icon">🔍</span>
-    <input type="text" id="stuSearch" placeholder="Filter students by name or ID…" autocomplete="off" oninput="filterStudents(this.value)">
+    <span class="search-icon">
+      <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
+    </span>
+    <input type="text" id="stuSearch" placeholder="Search student by name, student ID, or guardian…" autocomplete="off" oninput="filterStudents(this.value)">
   </div>
   {% endif %}
 
   {% if not rows %}
-  <p class="muted">No students yet. Use the <b>Add Students</b> panel above to enrol students.</p>
+  <p class="muted">No students enrolled yet. Use the <b>Enroll Students</b> panel above.</p>
   {% endif %}
 
+  <!-- Student Roster Table -->
   <table class="stu-table" style="width:100%">
   {% for s in rows %}
-  <tr data-stu="{{ s.name|lower }} {{ s.student_no|lower if s.student_no else '' }}">
-    <td class="n" style="width:36px;vertical-align:top;padding-top:14px;color:var(--muted);font-size:13px">{{ loop.index }}</td>
-    <td style="vertical-align:top;padding:10px 6px">
+  <tr data-stu="{{ s.name|lower }} {{ s.student_no|lower if s.student_no else '' }} {{ s.guardian_name|lower if s.guardian_name else '' }}">
+    <td class="n" style="width:36px;vertical-align:top;padding-top:12px;color:var(--muted);font-size:12.5px">{{ loop.index }}</td>
+    <td style="vertical-align:top;padding:10px 8px">
       <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
-        <a href="{{ url_for('lookup', student=s.name) }}" style="color:inherit;text-decoration:none;font-weight:700">{{ s.name }}</a>
-        {% if s.student_no %}<span class="badge done" style="font-size:11px">{{ s.student_no }}</span>{% endif %}
-        <span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}" style="margin-left:auto">{{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}</span>
+        <a href="{{ url_for('lookup', student=s.name) }}" style="color:inherit;text-decoration:none;font-weight:700;font-size:14px">{{ s.name }}</a>
+        {% if s.student_no %}
+        <span class="badge" style="background:var(--surface);border:1px solid var(--line);font-size:11px">{{ s.student_no }}</span>
+        {% endif %}
+        <span class="pill {{ 'none' if s.rate is none else ('low' if s.rate < low) }}" style="margin-left:auto">
+          {{ '–' if s.rate is none else ((s.rate*100)|round|int ~ '%') }}
+        </span>
       </div>
+
       {% if s.guardian_name or s.guardian_phone or s.email or s.address %}
-      <div class="muted" style="font-size:12px;margin-top:2px">
-        {% if s.guardian_name %}Guardian: {{ s.guardian_name }}{% endif %}
-        {% if s.guardian_phone %} · 📞 {{ s.guardian_phone }}{% endif %}
-        {% if s.email %} · ✉️ {{ s.email }}{% endif %}
-        {% if s.address %} · 📍 {{ s.address }}{% endif %}
+      <div class="muted" style="font-size:12px;margin-top:3px;line-height:1.4">
+        {% if s.guardian_name %}Guardian: <b>{{ s.guardian_name }}</b>{% endif %}
+        {% if s.guardian_phone %} · {{ s.guardian_phone }}{% endif %}
+        {% if s.email %} · {{ s.email }}{% endif %}
+        {% if s.address %} · {{ s.address }}{% endif %}
       </div>
       {% endif %}
+
+      <!-- Edit Profile Accordion -->
       <details style="margin-top:6px">
-        <summary style="cursor:pointer;font-size:12px;color:var(--brand);list-style:none;display:inline-flex;align-items:center;gap:3px"><span style="font-size:10px">▸</span> ✏️ Edit info</summary>
+        <summary style="cursor:pointer;font-size:12px;color:var(--brand-accent);font-weight:600">
+          Edit Profile &amp; Contact Info
+        </summary>
         <form method="post" action="{{ url_for('students_profile') }}"
-              style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(170px,1fr));gap:8px;background:var(--surface);padding:10px;border-radius:8px;border:1px solid var(--line)">
+              style="margin-top:8px;display:grid;grid-template-columns:repeat(auto-fill,minmax(180px,1fr));gap:8px;background:var(--surface);padding:12px;border-radius:var(--radius);border:1px solid var(--line)">
           <input type="hidden" name="old_name" value="{{ s.name }}">
           <input type="hidden" name="subject" value="{{ subject }}">
           <input type="hidden" name="section" value="{{ section or '' }}">
-          <input class="txt" type="text" name="name" value="{{ s.name }}" placeholder="Full name" required style="font-size:13px;padding:6px 8px">
-          <input class="txt" type="text" name="student_no" value="{{ s.student_no or '' }}" placeholder="Student ID / No." style="font-size:13px;padding:6px 8px">
-          <input class="txt" type="text" name="guardian_name" value="{{ s.guardian_name or '' }}" placeholder="Guardian name" style="font-size:13px;padding:6px 8px">
-          <input class="txt" type="text" name="guardian_phone" value="{{ s.guardian_phone or '' }}" placeholder="Guardian phone" style="font-size:13px;padding:6px 8px">
-          <input class="txt" type="email" name="email" value="{{ s.email or '' }}" placeholder="Student email" style="font-size:13px;padding:6px 8px">
-          <input class="txt" type="text" name="address" value="{{ s.address or '' }}" placeholder="Home address" style="font-size:13px;padding:6px 8px;grid-column:1 / -1">
-          <div style="grid-column:1 / -1"><button class="btn small primary" type="submit">Save Profile</button></div>
+          <div>
+            <label style="font-size:11.5px">Full Student Name</label>
+            <input class="txt" type="text" name="name" value="{{ s.name }}" required style="width:100%;font-size:12.5px">
+          </div>
+          <div>
+            <label style="font-size:11.5px">Student ID / Number</label>
+            <input class="txt" type="text" name="student_no" value="{{ s.student_no or '' }}" placeholder="e.g. 2026-00123" style="width:100%;font-size:12.5px">
+          </div>
+          <div>
+            <label style="font-size:11.5px">Guardian Name</label>
+            <input class="txt" type="text" name="guardian_name" value="{{ s.guardian_name or '' }}" placeholder="Parent / Guardian" style="width:100%;font-size:12.5px">
+          </div>
+          <div>
+            <label style="font-size:11.5px">Guardian Phone</label>
+            <input class="txt" type="text" name="guardian_phone" value="{{ s.guardian_phone or '' }}" placeholder="09xx-xxx-xxxx" style="width:100%;font-size:12.5px">
+          </div>
+          <div>
+            <label style="font-size:11.5px">Student Email</label>
+            <input class="txt" type="email" name="email" value="{{ s.email or '' }}" placeholder="student@example.com" style="width:100%;font-size:12.5px">
+          </div>
+          <div style="grid-column:1 / -1">
+            <label style="font-size:11.5px">Home Address</label>
+            <input class="txt" type="text" name="address" value="{{ s.address or '' }}" placeholder="Street, Barangay, City" style="width:100%;font-size:12.5px">
+          </div>
+          <div style="grid-column:1 / -1;margin-top:4px">
+            <button class="btn small primary" type="submit">Save Student Profile</button>
+          </div>
         </form>
       </details>
     </td>
-    <td style="text-align:right;white-space:nowrap;vertical-align:top;padding:10px 0 10px 6px">
+    <td style="text-align:right;white-space:nowrap;vertical-align:top;padding:10px 0 10px 8px">
       <form class="inline" method="post" action="{{ url_for('students_remove') }}"
-            onsubmit="return confirm('Remove {{ s.name|e }} from {{ subject|e }} ({{ section|e }})? Their marks for this section are deleted.')">
-        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="row" value="{{ s.row }}"><input type="hidden" name="name" value="{{ s.name }}">
+            onsubmit="return confirm('Remove {{ s.name|e }} from {{ subject|e }} ({{ section|e }})? Attendance marks for this section will be deleted.')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <input type="hidden" name="section" value="{{ section or '' }}">
+        <input type="hidden" name="row" value="{{ s.row }}">
+        <input type="hidden" name="name" value="{{ s.name }}">
         <button class="btn small danger" type="submit">Remove</button>
       </form>
       {% if not is_monitor %}
       <form class="inline" method="post" action="{{ url_for('students_remove') }}"
-            onsubmit="return confirm('Remove {{ s.name|e }} from ALL subjects? Their marks are deleted everywhere.')">
-        <input type="hidden" name="subject" value="{{ subject }}"><input type="hidden" name="section" value="{{ section or '' }}"><input type="hidden" name="name" value="{{ s.name }}"><input type="hidden" name="everywhere" value="1">
-        <button class="btn small danger" type="submit" style="margin-top:4px">Remove from all</button>
+            onsubmit="return confirm('Remove {{ s.name|e }} from ALL subjects and sections?')">
+        <input type="hidden" name="subject" value="{{ subject }}">
+        <input type="hidden" name="section" value="{{ section or '' }}">
+        <input type="hidden" name="name" value="{{ s.name }}">
+        <input type="hidden" name="everywhere" value="1">
+        <button class="btn small danger" type="submit" style="margin-left:4px">Remove Everywhere</button>
       </form>
       {% endif %}
     </td>
   </tr>
   {% endfor %}
   </table>
-  {% if rows %}
-  <div class="stu-noresult" id="stuNoResult">No students match this filter.</div>
-  {% endif %}
 
-</div><!-- .card -->
+  {% if rows %}
+  <div class="stu-noresult" id="stuNoResult">No students match this search filter.</div>
+  {% endif %}
+</div>
 {% endif %}
 
 <script>
