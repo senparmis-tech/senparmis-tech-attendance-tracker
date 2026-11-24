@@ -138,13 +138,6 @@ MIGRATIONS = [
     ALTER TABLE teachers ADD COLUMN monitor_section_id INTEGER REFERENCES sections(id) ON DELETE SET NULL;
     CREATE INDEX idx_teachers_monitor_section ON teachers(monitor_section_id);
     """,
-    # 8: Archive subjects. Completed subjects are marked archived (read-only, preserved records).
-    """
-    ALTER TABLE subjects ADD COLUMN archived INTEGER NOT NULL DEFAULT 0;
-    ALTER TABLE subjects ADD COLUMN archived_at TEXT;
-    ALTER TABLE subjects ADD COLUMN archive_note TEXT;
-    CREATE INDEX idx_subjects_archived ON subjects(archived);
-    """,
 ]
 
 
