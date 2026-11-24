@@ -177,72 +177,127 @@
   <form method="post" action="{{ url_for('grades_scores') }}">
     <input type="hidden" name="subject" value="{{ subject }}">
     <input type="hidden" name="section" value="{{ section }}">
-    
-    <div class="scroll">
-      <table class="grid">
-        <thead>
-          <tr>
-            <th class="sticky" style="min-width:140px">Student Name</th>
-            {% for it in gb['items'] %}
-            <th class="n" style="min-width:105px">
-              <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">{{ it.label }}</div>
-              <div style="font-weight:700">{{ it.title }}</div>
-              <small class="muted">Max: {{ it.max_score|round(1) }}</small>
-            </th>
+
+    <!-- DESKTOP TABLE VIEW (hidden on mobile via CSS) -->
+    <div class="gb-desktop-scroll">
+      <div class="scroll">
+        <table class="grid">
+          <thead>
+            <tr>
+              <th class="sticky" style="min-width:140px">Student Name</th>
+              {% for it in gb['items'] %}
+              <th class="n" style="min-width:105px">
+                <div style="font-size:10.5px;color:var(--muted);text-transform:uppercase;letter-spacing:0.04em">{{ it.label }}</div>
+                <div style="font-weight:700">{{ it.title }}</div>
+                <small class="muted">Max: {{ it.max_score|round(1) }}</small>
+              </th>
+              {% endfor %}
+              <th class="n" style="min-width:70px">Exam<br><small class="muted">({{ gb.weights.exam|round(0)|int }}%)</small></th>
+              <th class="n" style="min-width:70px">Quiz<br><small class="muted">({{ gb.weights.quiz|round(0)|int }}%)</small></th>
+              <th class="n" style="min-width:70px">Activity<br><small class="muted">({{ gb.weights.activity|round(0)|int }}%)</small></th>
+              <th class="n" style="min-width:85px">Final %</th>
+              <th class="n" style="min-width:75px">Ph Grade</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for r in gb.rows %}
+            <tr>
+              <td class="sticky">
+                <a href="{{ url_for('lookup', student=r.name) }}" style="color:inherit;text-decoration:none;font-weight:700">{{ r.name }}</a>
+                {% if r.student_no %}<br><small class="muted">{{ r.student_no }}</small>{% endif %}
+              </td>
+              {% for it in gb['items'] %}
+              {% set sc = r.scores.get(it.id) %}
+              <td class="n">
+                {% if ro %}
+                  <span style="font-weight:600">{{ '–' if sc is none else ('%g' % sc) }}</span>
+                {% else %}
+                  <input class="txt" type="number" step="0.25" min="0" max="{{ it.max_score }}"
+                         name="score_{{ r.enrollment_id }}_{{ it.id }}"
+                         value="{{ '' if sc is none else ('%g' % sc) }}"
+                         placeholder="–" style="width:72px;text-align:center;padding:4px 6px;font-size:13px;min-height:32px">
+                {% endif %}
+              </td>
+              {% endfor %}
+              <td class="n">{{ '–' if r.cat_pct.exam is none else ((r.cat_pct.exam|round(1)) ~ '%') }}</td>
+              <td class="n">{{ '–' if r.cat_pct.quiz is none else ((r.cat_pct.quiz|round(1)) ~ '%') }}</td>
+              <td class="n">{{ '–' if r.cat_pct.activity is none else ((r.cat_pct.activity|round(1)) ~ '%') }}</td>
+              <td class="n">
+                {% if r.final_pct is none %}
+                <span class="pill none">–</span>
+                {% else %}
+                <span class="pill {{ 'low' if not r.passing }}">{{ r.final_pct|round(1) }}%</span>
+                {% endif %}
+              </td>
+              <td class="n">
+                {% if r.scale is none %}
+                <span class="muted">–</span>
+                {% else %}
+                <b style="font-size:13.5px;{{ 'color:var(--x-ink)' if not r.passing else 'color:var(--p-ink)' }}">{{ r.scale }}</b>
+                {% endif %}
+              </td>
+            </tr>
             {% endfor %}
-            <th class="n" style="min-width:70px">Exam<br><small class="muted">({{ gb.weights.exam|round(0)|int }}%)</small></th>
-            <th class="n" style="min-width:70px">Quiz<br><small class="muted">({{ gb.weights.quiz|round(0)|int }}%)</small></th>
-            <th class="n" style="min-width:70px">Activity<br><small class="muted">({{ gb.weights.activity|round(0)|int }}%)</small></th>
-            <th class="n" style="min-width:85px">Final %</th>
-            <th class="n" style="min-width:75px">Ph Grade</th>
-          </tr>
-        </thead>
-        <tbody>
-          {% for r in gb.rows %}
-          <tr>
-            <td class="sticky">
-              <a href="{{ url_for('lookup', student=r.name) }}" style="color:inherit;text-decoration:none;font-weight:700">{{ r.name }}</a>
-              {% if r.student_no %}<br><small class="muted">{{ r.student_no }}</small>{% endif %}
-            </td>
-            {% for it in gb['items'] %}
-            {% set sc = r.scores.get(it.id) %}
-            <td class="n">
-              {% if ro %}
-                <span style="font-weight:600">{{ '–' if sc is none else ('%g' % sc) }}</span>
-              {% else %}
-                <input class="txt" type="number" step="0.25" min="0" max="{{ it.max_score }}"
-                       name="score_{{ r.enrollment_id }}_{{ it.id }}"
-                       value="{{ '' if sc is none else ('%g' % sc) }}"
-                       placeholder="–" style="width:72px;text-align:center;padding:4px 6px;font-size:13px;min-height:32px">
-              {% endif %}
-            </td>
-            {% endfor %}
-            <td class="n">{{ '–' if r.cat_pct.exam is none else ((r.cat_pct.exam|round(1)) ~ '%') }}</td>
-            <td class="n">{{ '–' if r.cat_pct.quiz is none else ((r.cat_pct.quiz|round(1)) ~ '%') }}</td>
-            <td class="n">{{ '–' if r.cat_pct.activity is none else ((r.cat_pct.activity|round(1)) ~ '%') }}</td>
-            <td class="n">
-              {% if r.final_pct is none %}
-              <span class="pill none">–</span>
-              {% else %}
-              <span class="pill {{ 'low' if not r.passing }}">{{ r.final_pct|round(1) }}%</span>
-              {% endif %}
-            </td>
-            <td class="n">
-              {% if r.scale is none %}
-              <span class="muted">–</span>
-              {% else %}
-              <b style="font-size:13.5px;{{ 'color:var(--x-ink)' if not r.passing else 'color:var(--p-ink)' }}">{{ r.scale }}</b>
-              {% endif %}
-            </td>
-          </tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <!-- MOBILE CARD VIEW (shown on screens < 768px) -->
+    <div class="gb-mobile-cards">
+      {% for r in gb.rows %}
+      <details class="gb-student-card">
+        <summary>
+          <div>
+            <div class="gb-student-name">{{ r.name }}</div>
+            {% if r.student_no %}<div class="gb-student-no">{{ r.student_no }}</div>{% endif %}
+          </div>
+          <div class="gb-grade-preview">
+            {% if r.final_pct is not none %}
+            <span class="pill {{ 'low' if not r.passing }}" style="font-size:12px">{{ r.final_pct|round(1) }}%</span>
+            {% endif %}
+            {% if r.scale is not none %}
+            <b style="font-size:14px;{{ 'color:var(--x-ink)' if not r.passing else 'color:var(--p-ink)' }}">{{ r.scale }}</b>
+            {% endif %}
+            <svg class="lucide" viewBox="0 0 24 24" width="14" height="14" fill="none" style="color:var(--muted)"><path d="m9 18 6-6-6-6"/></svg>
+          </div>
+        </summary>
+        <div class="gb-scores-grid">
+          {% for it in gb['items'] %}
+          {% set sc = r.scores.get(it.id) %}
+          <div class="gb-score-cell">
+            <div class="gb-score-label">{{ it.label }}: {{ it.title }} <span class="muted" style="font-weight:400">(/ {{ it.max_score|round(1) }})</span></div>
+            {% if ro %}
+            <div class="gb-score-ro">{{ '–' if sc is none else ('%g' % sc) }}</div>
+            {% else %}
+            <input class="gb-score-input" type="number" step="0.25" min="0" max="{{ it.max_score }}"
+                   name="score_{{ r.enrollment_id }}_{{ it.id }}"
+                   value="{{ '' if sc is none else ('%g' % sc) }}"
+                   placeholder="–">
+            {% endif %}
+          </div>
           {% endfor %}
-        </tbody>
-      </table>
+          <!-- Category summaries -->
+          <div class="gb-score-cell">
+            <div class="gb-score-label">Exam ({{ gb.weights.exam|round(0)|int }}%)</div>
+            <div class="gb-score-ro">{{ '–' if r.cat_pct.exam is none else ((r.cat_pct.exam|round(1)) ~ '%') }}</div>
+          </div>
+          <div class="gb-score-cell">
+            <div class="gb-score-label">Quiz ({{ gb.weights.quiz|round(0)|int }}%)</div>
+            <div class="gb-score-ro">{{ '–' if r.cat_pct.quiz is none else ((r.cat_pct.quiz|round(1)) ~ '%') }}</div>
+          </div>
+          <div class="gb-score-cell">
+            <div class="gb-score-label">Activity ({{ gb.weights.activity|round(0)|int }}%)</div>
+            <div class="gb-score-ro">{{ '–' if r.cat_pct.activity is none else ((r.cat_pct.activity|round(1)) ~ '%') }}</div>
+          </div>
+        </div>
+      </details>
+      {% endfor %}
     </div>
 
     {% if gb['items'] and not ro %}
     <div style="margin-top:16px;display:flex;justify-content:flex-end">
-      <button class="btn primary" type="submit" style="min-height:42px;padding:0 24px;font-size:14px;font-weight:700">
+      <button class="btn primary" type="submit" style="min-height:44px;padding:0 24px;font-size:14px;font-weight:700;width:100%;max-width:280px;justify-content:center">
         <svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
         <span>Save All Scores</span>
       </button>

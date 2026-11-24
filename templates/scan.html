@@ -35,11 +35,18 @@
   padding: 10px 16px; border: 1px solid var(--line);
   background: var(--card); color: var(--muted); border-radius: var(--radius);
   font-family: inherit; font-size: 13.5px; font-weight: 600; cursor: pointer;
-  transition: all 0.14s ease; min-height: 40px;
+  transition: all 0.14s ease; min-height: 44px;
 }
 .import-segbtn:hover { background: var(--surface); color: var(--ink); }
 .import-segbtn.on { background: var(--navy-900); border-color: var(--navy-900); color: #fff; }
 [data-theme="dark"] .import-segbtn.on { background: var(--blue-600); border-color: var(--blue-600); }
+/* Mobile: buttons fill full width */
+@media (max-width: 540px) {
+  .import-seg { flex-direction: column; gap: 6px; }
+  .import-segbtn { width: 100%; justify-content: center; min-height: 48px; font-size: 14px; }
+}
+/* File input touch-friendly */
+input[type=file] { min-height: 44px; font-size: 13.5px; padding: 8px 0; cursor: pointer; width: 100%; }
 </style>
 
 <div class="card" style="margin-bottom:16px;background:var(--surface)">

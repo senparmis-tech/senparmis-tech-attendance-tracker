@@ -22,75 +22,65 @@
 </div>
 
 <!-- Overview Academic Statistics (Computed from Actual Database Records) -->
-<div style="display:grid;grid-template-columns:repeat(auto-fit, minmax(170px, 1fr));gap:12px;margin-bottom:20px">
+<div class="stats-overview-grid">
   <!-- Total Students -->
-  <div class="card" style="padding:14px 16px;margin:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Total Students</span>
-      <span style="color:var(--brand-accent)"><svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
+  <div class="stat-metric-card">
+    <div class="stat-metric-label">
+      <span>Total Students</span>
+      <span style="color:var(--brand-accent)"><svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg></span>
     </div>
-    <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:var(--ink)">{{ overview.total_students }}</div>
-    <div class="muted" style="font-size:11.5px;margin-top:2px">Distinct active enrollments</div>
+    <div class="stat-metric-value">{{ overview.total_students }}</div>
+    <div class="stat-metric-sub">Active enrollments</div>
   </div>
 
   <!-- Total Subjects -->
-  <div class="card" style="padding:14px 16px;margin:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Total Subjects</span>
-      <span style="color:var(--brand-accent)"><svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg></span>
+  <div class="stat-metric-card">
+    <div class="stat-metric-label">
+      <span>Total Subjects</span>
+      <span style="color:var(--brand-accent)"><svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><path d="M4 19.5v-15A2.5 2.5 0 0 1 6.5 2H20v20H6.5a2.5 2.5 0 0 1-2.5-2.5Z"/><path d="M6 6h10"/><path d="M6 10h10"/></svg></span>
     </div>
-    <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:var(--ink)">{{ overview.total_subjects }}</div>
-    <div class="muted" style="font-size:11.5px;margin-top:2px">Assigned curriculum courses</div>
+    <div class="stat-metric-value">{{ overview.total_subjects }}</div>
+    <div class="stat-metric-sub">Curriculum courses</div>
   </div>
 
   <!-- Total Class Sections -->
-  <div class="card" style="padding:14px 16px;margin:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Class Sections</span>
-      <span style="color:var(--brand-accent)"><svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
+  <div class="stat-metric-card">
+    <div class="stat-metric-label">
+      <span>Class Sections</span>
+      <span style="color:var(--brand-accent)"><svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><polygon points="12 2 2 7 12 12 22 7 12 2"/><polyline points="2 17 12 22 22 17"/><polyline points="2 12 12 17 22 12"/></svg></span>
     </div>
-    <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:var(--ink)">{{ overview.total_sections }}</div>
-    <div class="muted" style="font-size:11.5px;margin-top:2px">Monitored academic sections</div>
+    <div class="stat-metric-value">{{ overview.total_sections }}</div>
+    <div class="stat-metric-sub">Monitored sections</div>
   </div>
 
   <!-- Completed Sessions -->
-  <div class="card" style="padding:14px 16px;margin:0">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Completed Sessions</span>
-      <span style="color:var(--p)"><svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg></span>
+  <div class="stat-metric-card">
+    <div class="stat-metric-label">
+      <span>Completed Sessions</span>
+      <span style="color:var(--p)"><svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><rect width="18" height="18" x="3" y="4" rx="2" ry="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/><path d="m9 16 2 2 4-4"/></svg></span>
     </div>
-    <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:var(--ink)">{{ overview.completed_sessions }}</div>
-    <div class="muted" style="font-size:11.5px;margin-top:2px">Attendance dates recorded</div>
+    <div class="stat-metric-value">{{ overview.completed_sessions }}</div>
+    <div class="stat-metric-sub">Attendance dates recorded</div>
   </div>
 
   <!-- Pending Roll Calls -->
-  <div class="card" style="padding:14px 16px;margin:0;border-left:3px solid {% if overview.pending_rollcalls > 0 %}#f59e0b{% else %}var(--p){% endif %}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Pending Today</span>
-      <span style="color:{% if overview.pending_rollcalls > 0 %}#f59e0b{% else %}var(--p){% endif %}">
-        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
-      </span>
+  <div class="stat-metric-card" style="border-left:3px solid {% if overview.pending_rollcalls > 0 %}#f59e0b{% else %}var(--p){% endif %}">
+    <div class="stat-metric-label">
+      <span>Pending Today</span>
+      <span style="color:{% if overview.pending_rollcalls > 0 %}#f59e0b{% else %}var(--p){% endif %}"><svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></span>
     </div>
-    <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:{% if overview.pending_rollcalls > 0 %}var(--l-ink){% else %}var(--p-ink){% endif %}">
-      {{ overview.pending_rollcalls }}
-    </div>
-    <div class="muted" style="font-size:11.5px;margin-top:2px">
-      {% if overview.pending_rollcalls > 0 %}Roll calls needed today{% else %}All sections recorded ✓{% endif %}
-    </div>
+    <div class="stat-metric-value" style="color:{% if overview.pending_rollcalls > 0 %}var(--l-ink){% else %}var(--p-ink){% endif %}">{{ overview.pending_rollcalls }}</div>
+    <div class="stat-metric-sub">{% if overview.pending_rollcalls > 0 %}Roll calls needed today{% else %}All sections recorded{% endif %}</div>
   </div>
 
   <!-- Students Below 80% -->
-  <div class="card" style="padding:14px 16px;margin:0;border-left:3px solid {% if overview.low_attendance_count > 0 %}#ef4444{% else %}var(--line){% endif %}">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px">
-      <span class="muted" style="font-size:11.5px;font-weight:700;text-transform:uppercase;letter-spacing:0.04em">Below 80% Attendance</span>
-      <span style="color:{% if overview.low_attendance_count > 0 %}#ef4444{% else %}var(--muted){% endif %}">
-        <svg class="lucide" viewBox="0 0 24 24" width="18" height="18" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      </span>
+  <div class="stat-metric-card" style="border-left:3px solid {% if overview.low_attendance_count > 0 %}#ef4444{% else %}var(--line){% endif %}">
+    <div class="stat-metric-label">
+      <span>Below 80%</span>
+      <span style="color:{% if overview.low_attendance_count > 0 %}#ef4444{% else %}var(--muted){% endif %}"><svg class="lucide" viewBox="0 0 24 24" width="16" height="16" fill="none"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg></span>
     </div>
-    <div style="font-size:24px;font-weight:800;letter-spacing:-0.02em;color:{% if overview.low_attendance_count > 0 %}var(--x-ink){% else %}var(--ink){% endif %}">
-      {{ overview.low_attendance_count }}
-    </div>
-    <div class="muted" style="font-size:11.5px;margin-top:2px">Students needing intervention</div>
+    <div class="stat-metric-value" style="color:{% if overview.low_attendance_count > 0 %}var(--x-ink){% else %}var(--ink){% endif %}">{{ overview.low_attendance_count }}</div>
+    <div class="stat-metric-sub">Students needing intervention</div>
   </div>
 </div>
 
@@ -246,7 +236,7 @@
     <a href="{{ url_for('log_page') }}" style="font-size:12.5px;font-weight:600;color:var(--brand-accent);text-decoration:none">View Full Log ›</a>
   </div>
 
-  <div class="scroll" style="box-shadow:none">
+  <div class="activity-table-wrap">
     <table>
       <thead>
         <tr>

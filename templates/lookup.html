@@ -11,28 +11,28 @@
 <!-- Search Query Form -->
 <div class="card no-print" style="margin-bottom:16px">
   <form method="get" action="{{ url_for('lookup') }}" style="display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end">
-    <div style="flex:1;min-width:240px">
+    <div style="flex:1;min-width:200px">
       <label>Search Query</label>
-      <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Search by student name, ID number, guardian, or section…" autofocus style="width:100%">
+      <input class="txt" type="search" name="q" value="{{ q }}" placeholder="Name, ID, guardian, or section…" autofocus style="width:100%;min-height:44px;font-size:14px">
     </div>
-    <div style="min-width:160px">
-      <label>Course Subject</label>
-      <select name="subject" style="width:100%">
+    <div style="min-width:140px;flex:0 1 160px">
+      <label>Subject</label>
+      <select name="subject" style="width:100%;min-height:44px">
         <option value="">All Subjects</option>
         {% for s in subjects %}<option value="{{ s }}" {{ 'selected' if s==subject }}>{{ s }}</option>{% endfor %}
       </select>
     </div>
     {% if sections %}
-    <div style="min-width:140px">
-      <label>Class Section</label>
-      <select name="section" style="width:100%">
+    <div style="min-width:120px;flex:0 1 140px">
+      <label>Section</label>
+      <select name="section" style="width:100%;min-height:44px">
         <option value="">All Sections</option>
         {% for sec in sections %}<option value="{{ sec }}" {{ 'selected' if sec==section }}>{{ sec }}</option>{% endfor %}
       </select>
     </div>
     {% endif %}
-    <div>
-      <button class="btn primary" type="submit" style="min-height:38px">
+    <div style="flex:0 0 auto">
+      <button class="btn primary" type="submit" style="min-height:44px;padding:0 18px">
         <svg class="lucide" viewBox="0 0 24 24" width="15" height="15" fill="none"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.3-4.3"/></svg>
         <span>Search</span>
       </button>

@@ -1160,20 +1160,287 @@ td.c.r { background: var(--rbg); color: var(--r-ink); }
   .header-inner { height: 56px; }
 }
 
-/* Responsive adjustments across breakpoints */
+/* =====================================================================
+   RESPONSIVE BREAKPOINTS — MOBILE-FIRST IMPROVEMENTS (Pass 2)
+   ===================================================================== */
+
+/* 1024px – small laptop / tablet landscape */
+@media (max-width: 1024px) {
+  .grid2 { grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); }
+  .grid3 { grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); }
+}
+
+/* 768px – tablets */
+@media (max-width: 768px) {
+  main { padding: 16px 14px 100px; }
+  .grid2 { grid-template-columns: 1fr; }
+  .grid3 { grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); }
+  .grid4 { grid-template-columns: repeat(2, 1fr); }
+  .page-header { gap: 10px; margin-bottom: 14px; }
+  .page-title-group h1 { font-size: 18px; }
+  .academic-meta-bar { gap: 8px; }
+}
+
+/* 640px – large smartphones */
 @media (max-width: 640px) {
-  main { padding: 14px 12px 90px; }
+  main { padding: 12px 12px 90px; }
   .grid2 { grid-template-columns: 1fr; }
   .grid3 { grid-template-columns: 1fr; }
   .grid4 { grid-template-columns: repeat(2, 1fr); }
   .toolbar { flex-direction: column; align-items: stretch; }
   .toolbar .grow { min-width: 0; }
   .card { padding: 14px; }
+  /* Page header actions wrap below title on small screens */
+  .page-header { flex-direction: column; align-items: stretch; gap: 8px; }
+  .page-actions { flex-wrap: wrap; gap: 6px; }
+  .page-actions .btn { flex: 1 1 auto; justify-content: center; }
 }
 
-@media (max-width: 380px) {
+/* 430px – large smartphones */
+@media (max-width: 430px) {
+  main { padding: 10px 10px 88px; }
+  .card { padding: 12px; }
+  .page-title-group h1 { font-size: 16px; }
+  .page-title-group .sub { font-size: 12px; }
+  h1 { font-size: 18px; }
+  h2 { font-size: 14.5px; }
+  .grid4 { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+  /* Stat row: 2 per row max on small phones */
+  .stats { gap: 6px; }
+  .stat { flex: 1 1 calc(50% - 3px); }
+  .stat b { font-size: 16px; }
+  /* Tabs & filter pills scroll */
+  .tabs { gap: 4px; }
+  .tab { padding: 5px 10px; font-size: 12px; }
+}
+
+/* 390px – iPhone 14/15 */
+@media (max-width: 390px) {
+  main { padding: 8px 8px 86px; }
+  .card { padding: 10px 12px; }
+}
+
+/* 375px – standard smartphones */
+@media (max-width: 375px) {
   .brand-sub { display: none; }
+  .grid4 { grid-template-columns: repeat(2, 1fr); }
+}
+
+/* 320px – very small phones */
+@media (max-width: 320px) {
+  .brand-sub { display: none; }
+  .brand-title { font-size: 13px; }
   .grid4 { grid-template-columns: 1fr; }
+  .card { padding: 8px 10px; }
+  main { padding: 6px 6px 84px; }
+  .btn { font-size: 12.5px; padding: 7px 10px; }
+}
+
+/* =====================================================================
+   MOBILE DOCK — z-index clearance from tabbar
+   ===================================================================== */
+@media (max-width: 960px) {
+  .mobile-dock {
+    bottom: calc(var(--tabbar-h) + env(safe-area-inset-bottom, 0px));
+  }
+}
+
+/* =====================================================================
+   GRADEBOOK MOBILE — EXPANDABLE STUDENT CARDS
+   For screens narrower than 768px, the dense table becomes unwieldy.
+   The .gb-mobile-cards block is shown and .gb-desktop-scroll hidden.
+   ===================================================================== */
+.gb-mobile-cards { display: none; }
+.gb-desktop-scroll { display: block; }
+
+@media (max-width: 767px) {
+  .gb-mobile-cards { display: flex; flex-direction: column; gap: 10px; }
+  .gb-desktop-scroll { display: none; }
+}
+
+/* Gradebook student card (mobile) */
+.gb-student-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+.gb-student-card summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 12px 14px;
+  cursor: pointer;
+  list-style: none;
+  user-select: none;
+  background: var(--surface);
+}
+.gb-student-card summary::-webkit-details-marker { display: none; }
+.gb-student-card[open] summary { border-bottom: 1px solid var(--line); background: var(--card); }
+.gb-student-name { font-weight: 700; font-size: 14px; color: var(--ink); }
+.gb-student-no { font-size: 11px; color: var(--muted); margin-top: 2px; }
+.gb-grade-preview {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+.gb-scores-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 8px;
+  padding: 12px 14px;
+}
+.gb-score-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.gb-score-label {
+  font-size: 10.5px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--muted);
+}
+.gb-score-input {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--radius-sm);
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--ink);
+  background: var(--card);
+  min-height: 40px;
+  text-align: center;
+  touch-action: manipulation;
+}
+.gb-score-input:focus { border-color: var(--focus); box-shadow: 0 0 0 2px rgba(37,99,235,0.1); }
+.gb-score-ro {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+/* =====================================================================
+   RECORDS TABLE — MOBILE HELPER
+   ===================================================================== */
+@media (max-width: 767px) {
+  .records-summary-bar {
+    display: flex;
+    gap: 6px;
+    flex-wrap: wrap;
+    padding: 10px 0;
+    margin-bottom: 10px;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .records-summary-bar::-webkit-scrollbar { display: none; }
+  .records-summary-bar .stat { flex: 0 0 auto; min-width: 54px; }
+}
+
+/* =====================================================================
+   STUDENTS PAGE — MOBILE IMPROVEMENTS
+   ===================================================================== */
+@media (max-width: 640px) {
+  .stu-action-bar { flex-direction: column; gap: 8px; }
+  .stu-action-bar > details { flex: 1 1 100%; }
+}
+
+/* =====================================================================
+   IMPORT/SCAN PAGE — MOBILE IMPROVEMENTS
+   ===================================================================== */
+@media (max-width: 640px) {
+  .import-seg { flex-direction: column; gap: 6px; }
+  .import-segbtn { width: 100%; justify-content: center; }
+}
+
+/* =====================================================================
+   GENERAL TYPOGRAPHY & SPACING IMPROVEMENTS (Pass 2)
+   ===================================================================== */
+
+/* Muted helper class used throughout */
+.muted { color: var(--muted); }
+
+/* Dense stat summary row improvement */
+.stats-overview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 10px;
+  margin-bottom: 20px;
+}
+@media (max-width: 540px) {
+  .stats-overview-grid { grid-template-columns: repeat(2, 1fr); gap: 8px; }
+}
+@media (max-width: 320px) {
+  .stats-overview-grid { grid-template-columns: 1fr; }
+}
+
+/* Stat metric card */
+.stat-metric-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  padding: 12px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  box-shadow: var(--shadow-xs);
+}
+.stat-metric-label {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: var(--muted);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.stat-metric-value {
+  font-size: 26px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+  color: var(--ink);
+  line-height: 1.1;
+}
+.stat-metric-sub {
+  font-size: 11px;
+  color: var(--muted);
+  font-weight: 500;
+  margin-top: 2px;
+}
+@media (max-width: 540px) {
+  .stat-metric-value { font-size: 22px; }
+  .stat-metric-card { padding: 10px 12px; }
+}
+
+/* Recent activity table — mobile-friendly */
+@media (max-width: 640px) {
+  .activity-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+  .activity-table-wrap table { min-width: 480px; }
+}
+
+/* Flash messages — better mobile */
+@media (max-width: 430px) {
+  .flash { font-size: 13px; padding: 8px 12px; }
+}
+
+/* Term chip — wrap gracefully */
+@media (max-width: 430px) {
+  .term-chip { flex-wrap: wrap; gap: 6px; font-size: 12px; }
+}
+
+/* Tabs — always scroll, never wrap on small screens */
+@media (max-width: 640px) {
+  .tabs { flex-wrap: nowrap; overflow-x: auto; }
+}
+
+/* Button group improvements on mobile */
+@media (max-width: 430px) {
+  .btn.small { padding: 5px 10px; font-size: 12px; min-height: 34px; }
 }
 
 /* =====================================================================

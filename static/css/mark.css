@@ -530,5 +530,74 @@
   white-space: nowrap;
   max-width: 90vw;
 }
-.toast.err { background: #dc2626; }
-.toast.ok { background: #059669; }
+/* =====================================================================
+   MARK ATTENDANCE — MOBILE-FIRST IMPROVEMENTS (Pass 2)
+   ===================================================================== */
+
+/* Date header on small screens — stack elements */
+@media (max-width: 540px) {
+  .date-header-row {
+    flex-direction: column;
+    align-items: stretch;
+    gap: 8px;
+  }
+  .date-nav-group {
+    justify-content: space-between;
+  }
+  .date-meta {
+    justify-content: flex-start;
+  }
+  .date-title-text { font-size: 13.5px; }
+  .mark-card { padding: 10px 12px; }
+}
+
+/* Search input larger touch target on phones */
+@media (max-width: 540px) {
+  .search-wrapper input { min-height: 44px; font-size: 15px; padding: 10px 36px 10px 12px; }
+  .fast-btn { min-height: 44px; padding: 8px 12px; font-size: 13px; }
+}
+
+/* Filter pills - ensure scrolling never cuts content */
+@media (max-width: 540px) {
+  .filter-pills-bar { padding: 2px 0 12px; margin-bottom: 8px; }
+  .fpill { min-height: 36px; padding: 6px 12px; font-size: 13px; }
+}
+
+/* Student card buttons — larger on mobile */
+@media (max-width: 540px) {
+  .thumb-buttons-grid { gap: 5px; }
+  .cb { height: 48px; font-size: 14px; }
+  .cb small { font-size: 8.5px; }
+  .student-name-text { font-size: 15px; }
+  .student-card { padding: 10px 12px; }
+}
+
+/* Roll-call flashcard — better on tiny screens */
+@media (max-width: 430px) {
+  .rc-flashcard { padding: 20px 12px; }
+  .rc-flashcard-name { font-size: 20px; }
+  .rc-buttons-grid { max-width: 100%; gap: 8px; }
+  .rc-big-btn { height: 56px; }
+  .rc-big-btn .rc-code { font-size: 18px; }
+  .rc-big-btn .rc-label { font-size: 11.5px; }
+  .rc-nav-row { gap: 6px; }
+  .rc-nav-row .btn { flex: 1; justify-content: center; }
+}
+
+/* Mobile dock — ensure dcount text doesn't overflow */
+@media (max-width: 430px) {
+  .mobile-dock { padding: 8px 10px; gap: 6px; }
+  .dcount { font-size: 11px; padding: 2px 5px; }
+  .save-btn { min-width: 90px; height: 40px; font-size: 13px; padding: 0 12px; }
+  .dock-counts { gap: 3px; }
+}
+
+@media (max-width: 320px) {
+  .dcount { font-size: 10px; padding: 2px 4px; }
+  .save-btn { min-width: 76px; height: 38px; font-size: 12px; padding: 0 8px; }
+}
+
+/* Toast position adjustment on has-tabbar */
+body.has-tabbar .toast {
+  bottom: calc(var(--tabbar-h) + 70px + env(safe-area-inset-bottom, 0px));
+}
