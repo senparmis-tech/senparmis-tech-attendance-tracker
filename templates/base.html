@@ -16,13 +16,14 @@
     (function() {
       var saved = localStorage.getItem('theme');
       var prefersDark = window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches;
-      if (saved === 'dark' || (!saved && prefersDark)) {
+      if (saved === 'dark' || !saved) {
         document.documentElement.setAttribute('data-theme', 'dark');
       }
     })();
   </script>
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.css') }}">
   <link rel="stylesheet" href="{{ url_for('static', filename='css/app.mobile.css') }}">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/eclaro-system.css') }}">
   {% block extra_css %}{% endblock %}
 </head>
 <body class="{{ 'has-tabbar' if role in ('teacher', 'student') }}">
@@ -33,7 +34,7 @@
       <!-- Institutional Brand -->
       <a href="{{ url_for('dashboard') if role == 'teacher' else (url_for('records') if role == 'student' else url_for('login')) }}" class="brand" aria-label="Eclaro Academy Attendance Portal">
         <span class="brand-badge" aria-hidden="true">
-          <img src="{{ url_for('static', filename='img/eclaro_logo.jpg') }}" alt="Eclaro Academy Crest">
+          <img src="{{ url_for('static', filename='img/eclaro_eagle.jpg') }}" alt="Eclaro Academy Crest">
         </span>
         <div class="brand-titles">
           <span class="brand-title">Eclaro Academy</span>

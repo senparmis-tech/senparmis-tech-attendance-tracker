@@ -1,0 +1,295 @@
+/* ECLARO ACADEMIC SYSTEM — one restrained visual language.
+   Runtime token owner: app.css. This file is the dark-theme refinement layer. */
+
+@import url('https://fonts.googleapis.com/css2?family=Manrope:wght@500;600;700;800&display=swap');
+
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg: #08111f;
+  --card: #101d30;
+  --surface: #15263b;
+  --surface-alt: #1b3049;
+  --header-bg: #07101d;
+  --header-text: #f5f8fc;
+  --header-border: #1d3046;
+  --ink: #f1f5f9;
+  --ink-secondary: #c3cfdd;
+  --muted: #91a2b8;
+  --line: #23364d;
+  --line-strong: #344a63;
+  --brand: #0b1b30;
+  --brand-accent: #a5cf45;
+  --brand-accent-hover: #b8df5b;
+  --brand-tint: rgba(165, 207, 69, .10);
+  --hover: #1a2c43;
+  --blue-600: #2858c7;
+  --blue-500: #356bdc;
+  --blue-400: #6e9af0;
+  --focus: #b2dc58;
+  --radius-sm: 7px;
+  --radius: 10px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --shadow-xs: 0 1px 2px rgba(0,0,0,.18);
+  --shadow-sm: 0 5px 16px rgba(0,0,0,.16);
+  --shadow-md: 0 12px 28px rgba(0,0,0,.20);
+  --shadow-lg: 0 18px 42px rgba(0,0,0,.24);
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background:
+    radial-gradient(900px 420px at 92% -10%, rgba(54, 91, 135, .13), transparent 65%),
+    var(--bg);
+  color: var(--ink);
+}
+h1, h2, h3, .brand-title, .portal-title, .portal-card-title {
+  font-family: Manrope, Inter, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  letter-spacing: -.025em;
+}
+main {
+  width: min(100%, 1320px);
+  padding-top: 28px;
+}
+.page-header {
+  align-items: center;
+  margin-bottom: 22px;
+}
+.page-title-group h1 {
+  font-size: clamp(22px, 2vw, 27px);
+  line-height: 1.2;
+  font-weight: 800;
+}
+.page-title-group .sub {
+  margin-top: 5px;
+  line-height: 1.55;
+  color: var(--muted);
+}
+
+/* Institutional header: quiet, consistent, and easy to scan. */
+header.top {
+  background: rgba(7, 16, 29, .96);
+  border-bottom: 1px solid var(--header-border);
+  box-shadow: 0 5px 20px rgba(0,0,0,.12);
+  backdrop-filter: blur(14px);
+}
+.header-inner { min-height: 64px; height: auto; gap: 14px; }
+.brand { gap: 11px; }
+.brand-badge {
+  width: 42px; height: 42px; padding: 2px;
+  border-radius: 11px;
+  background: #fff;
+  border: 1px solid rgba(255,255,255,.34);
+}
+.brand-title { font-size: 14px; letter-spacing: -.02em; }
+.brand-sub { font-size: 10px; letter-spacing: .015em; }
+.nav-pill-group {
+  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.075);
+  border-radius: 12px;
+  padding: 4px;
+  gap: 3px;
+}
+.nav-item {
+  min-height: 38px;
+  padding: 7px 11px;
+  border-radius: 8px;
+  font-size: 12px;
+}
+.nav-item.on {
+  background: #2858c7;
+  box-shadow: inset 0 0 0 1px rgba(255,255,255,.08);
+}
+.tool-link { min-height: 36px; border-radius: 8px; }
+.tool-link:hover, .nav-item:hover { background: rgba(255,255,255,.085); }
+.header-actions { gap: 8px; }
+
+/* One shared surface language across every page. */
+.card, .portal-card, .portal-banner, .mark-card, .stu-drawer,
+.stat-metric-card, .activity-panel, .subject-card, .section-card {
+  border-radius: 14px;
+}
+.card, .mark-card, .stu-drawer, .stat-metric-card {
+  border-color: var(--line);
+  box-shadow: var(--shadow-xs);
+}
+.card {
+  padding: 20px;
+  background: var(--card);
+}
+.card-header {
+  border-bottom-color: var(--line);
+  padding-bottom: 12px;
+  margin-bottom: 16px;
+}
+.academic-meta-bar, .term-chip, .tabs {
+  border-radius: 10px;
+}
+.tabs {
+  gap: 6px;
+  padding-bottom: 2px;
+}
+.tab {
+  border-radius: 9px;
+  padding: 8px 13px;
+  font-weight: 650;
+}
+.tab.on {
+  background: var(--surface-alt);
+  border-color: var(--line-strong);
+  color: var(--ink);
+  box-shadow: inset 0 -2px 0 var(--brand-accent);
+}
+
+/* A single action hierarchy: blue primary, quiet neutral, semantic danger. */
+.btn {
+  min-height: 40px;
+  border-radius: 9px;
+  font-weight: 650;
+  letter-spacing: -.005em;
+  transition: background .16s ease, border-color .16s ease, transform .16s ease, box-shadow .16s ease;
+}
+.btn.primary {
+  background: #2858c7;
+  border-color: #356bdc;
+  box-shadow: 0 4px 12px rgba(40,88,199,.18);
+}
+.btn.primary:hover {
+  background: #356bdc;
+  border-color: #4b7be4;
+  box-shadow: 0 6px 16px rgba(40,88,199,.24);
+}
+.btn.secondary {
+  background: var(--surface);
+  border-color: var(--line);
+}
+.btn:focus-visible, button:focus-visible, a:focus-visible,
+input:focus-visible, select:focus-visible, textarea:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+}
+
+/* Fields and data surfaces use the same contrast and radius. */
+input:not([type="checkbox"]):not([type="radio"]),
+select, textarea {
+  border-radius: 9px;
+}
+[data-theme="dark"] input:not([type="checkbox"]):not([type="radio"]),
+[data-theme="dark"] select,
+[data-theme="dark"] textarea {
+  background-color: #0d192a;
+  border-color: #344a63;
+  color: var(--ink);
+}
+[data-theme="dark"] input::placeholder,
+[data-theme="dark"] textarea::placeholder { color: #71849d; }
+[data-theme="dark"] input:focus,
+[data-theme="dark"] select:focus,
+[data-theme="dark"] textarea:focus {
+  border-color: #a5cf45;
+  box-shadow: 0 0 0 3px rgba(165,207,69,.12);
+}
+
+/* Dashboard: metrics read as one family, not six unrelated widgets. */
+.stats-overview-grid { gap: 12px; }
+.stat-metric-card {
+  padding: 15px 16px;
+  background: linear-gradient(155deg, rgba(255,255,255,.025), transparent 58%), var(--card);
+  border: 1px solid var(--line);
+  border-top: 2px solid rgba(165,207,69,.55);
+}
+.stat-metric-label {
+  font-size: 10px;
+  letter-spacing: .075em;
+}
+.stat-metric-value {
+  font-family: Manrope, Inter, sans-serif;
+  font-size: 29px;
+  font-weight: 800;
+  letter-spacing: -.045em;
+}
+.stat-metric-sub { font-size: 11px; line-height: 1.45; }
+table {
+  border-color: var(--line);
+  border-collapse: separate;
+  border-spacing: 0;
+}
+th {
+  font-size: 10px;
+  letter-spacing: .055em;
+  text-transform: uppercase;
+}
+td, th { border-color: var(--line); }
+tbody tr:hover td { background: rgba(255,255,255,.025); }
+.table-wrap, .activity-table-wrap { border-radius: 10px; }
+
+/* Login stays expressive; authenticated workspaces stay calm. */
+.portal-wrap { width: min(1120px, calc(100% - 36px)); }
+.portal-grid { gap: 22px; align-items: stretch; }
+.portal-banner {
+  background: linear-gradient(145deg, #10233b 0%, #0b192b 75%);
+  border: 1px solid #29435e;
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+}
+.portal-logo-img {
+  width: 72px; height: 72px; max-height: 72px;
+  object-fit: contain;
+  padding: 3px;
+  border-radius: 13px;
+  background: #fff;
+}
+.portal-card {
+  background: var(--card);
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  box-shadow: var(--shadow-md);
+}
+.portal-card-title { font-size: 23px; }
+.portal-field input { min-height: 46px; }
+.portal-guide-item {
+  border-radius: 10px;
+  border-left-width: 3px;
+}
+
+/* Mobile: preserve hierarchy, reduce chrome, keep actions reachable. */
+@media (max-width: 960px) {
+  .header-inner { min-height: 60px; }
+  main { padding: 22px 16px calc(var(--tabbar-h) + 34px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (max-width: 760px) {
+  .page-header { align-items: flex-start; gap: 14px; }
+  .page-actions { width: 100%; }
+  .page-actions .btn { flex: 1 1 auto; }
+  .stats-overview-grid { grid-template-columns: repeat(2, minmax(0,1fr)); }
+  .card { padding: 16px; }
+  .portal-wrap { width: min(100% - 24px, 520px); margin: 16px auto 32px; }
+  .portal-grid { grid-template-columns: minmax(0,1fr); gap: 12px; }
+  .portal-banner { padding: 18px; }
+  .portal-logo-wrap { margin-bottom: 12px; }
+  .portal-logo-img { width: 58px; height: 58px; }
+  .portal-title { font-size: 21px; }
+  .portal-guide-list { display: grid; grid-template-columns: 1fr; gap: 8px; }
+  .portal-meta { margin-top: 14px; }
+  .portal-card { padding: 20px; }
+}
+@media (max-width: 430px) {
+  main { padding-left: 12px; padding-right: 12px; }
+  .stats-overview-grid { gap: 8px; }
+  .stat-metric-card { padding: 12px; }
+  .stat-metric-value { font-size: 24px; }
+  .page-title-group h1 { font-size: 21px; }
+  .page-actions .btn { width: 100%; }
+  .portal-wrap { width: calc(100% - 20px); }
+  .portal-card { padding: 17px; }
+}
+/* Respect user motion preferences. */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: .01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .01ms !important;
+  }
+}
