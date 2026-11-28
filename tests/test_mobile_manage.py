@@ -1,4 +1,7 @@
-"""Tests for the JSON endpoints the Android app uses to manage students, grades, terms and accounts."""
+"""
+Tests for the JSON endpoints the Android app uses to manage students, grades, terms and accounts.
+Runs against an isolated temporary folder so the real database is never touched.
+"""
 import os
 import sys
 import tempfile

@@ -248,6 +248,49 @@ def test_delete_subject_and_restore_from_log():
     c.post("/subjects/delete", data={"subject": "RestoreMe"})
 
 
+def test_anonymous_and_wrong_role_access():
+    """Test that anonymous users and wrong roles are correctly blocked from endpoints."""
+    # 1. Anonymous user attempting restricted page and API routes
+    anon = app.test_client()
+    assert anon.get("/").status_code == 302
+    assert anon.get("/students").status_code == 302
+    assert anon.post("/api/teacher_add", json={"username": "hacker", "password": "123"}).status_code == 401
+    assert anon.post("/api/save", json={}).status_code == 401
+
+    # 2. Student attempting admin/teacher endpoints
+    stu = app.test_client()
+    assert stu.post("/login", data={"password": "studentpass1"}).status_code == 302
+    assert stu.get("/records").status_code == 200
+    assert stu.get("/teachers").status_code == 302  # redirected or blocked
+    assert stu.post("/api/teacher_add", json={"username": "hacker", "password": "123"}).status_code == 403
+    assert stu.post("/api/save", json={}).status_code == 403
+
+
+def test_password_change_invalidates_sessions():
+    """Test that changing a teacher's password immediately invalidates their existing session tokens."""
+    c = _teacher_client("teacherpass1")
+    # Verify access works before password change
+    assert c.get("/").status_code == 200
+
+    # Change password
+    store.update_teacher_password(1, "newteacherpass2")
+
+    # Existing session cookie should now be invalid because pw_version changed
+    res = c.get("/")
+    assert res.status_code == 302
+    assert "/login" in res.headers["Location"]
+
+    # Re-login with new password works
+    c2 = app.test_client()
+    auth._fails.clear()
+    assert c2.post("/login", data={"username": "admin", "password": "newteacherpass2"}).status_code == 302
+    assert c2.get("/").status_code == 200
+
+    # Restore default password for other tests
+    store.update_teacher_password(1, "teacherpass1")
+
+
+
 def test_student_profile_and_guardian_contact():
     c = _teacher_client()
     r = c.post("/students/profile", data={

@@ -24,8 +24,7 @@ from web import app
 
 # Section monitors may use these too (the same things they can do on the website).
 auth.MONITOR_ALLOWED_ENDPOINTS.update({
-    "api_students", "api_students_add", "api_students_remove", "api_student_profile",
-    "api_date_delete", "api_log",
+    "api_students", "api_log",
 })
 
 
