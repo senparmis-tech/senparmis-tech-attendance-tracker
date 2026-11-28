@@ -145,6 +145,12 @@ MIGRATIONS = [
     ALTER TABLE subjects ADD COLUMN archive_note TEXT;
     CREATE INDEX idx_subjects_archived ON subjects(archived);
     """,
+    # 9: hashed student access key table.
+    """
+    CREATE TABLE student_auth (
+        hash TEXT PRIMARY KEY
+    );
+    """,
 ]
 
 

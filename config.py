@@ -24,7 +24,6 @@ SUBJECT_IMG_DIR = os.path.join(DATA_DIR, "subject_images")
 AI_MODEL = os.environ.get("ATTENDANCE_MODEL", "claude-sonnet-5-5")          # used with Claude keys
 GEMINI_MODEL = os.environ.get("GEMINI_MODEL", "gemini-flash-latest")         # used with Gemini keys
 GEMINI_FALLBACKS = [m.strip() for m in os.environ.get("GEMINI_FALLBACK_MODEL", "gemini-flash-lite-latest").split(",") if m.strip()]
-PASSWORD_FILE = os.path.join(DATA_DIR, "passwords.txt")    # lines: teacher=...  and (optional) student=...
 SECRET_FILE = os.path.join(DATA_DIR, "secret_key.txt")      # made automatically; keeps sign-ins private
 MIN_PASSWORD = 8
 OPEN_MODE = False        # On PythonAnywhere, always False to require password sign-in

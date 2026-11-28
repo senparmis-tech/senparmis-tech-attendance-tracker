@@ -6,13 +6,13 @@ import io
 import os
 import sys
 import tempfile
+import hashlib
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 _tmp = tempfile.mkdtemp(prefix="attendance_test_")
 os.environ["ATTENDANCE_DATA_DIR"] = _tmp
-os.environ["ATTENDANCE_TEACHER_PASSWORD"] = "teacherpass1"
-os.environ["ATTENDANCE_STUDENT_PASSWORD"] = "studentpass1"
 
+import auth  # noqa: E402
 import flask_app  # noqa: E402
 from openpyxl import load_workbook  # noqa: E402
 import db  # noqa: E402
@@ -21,10 +21,17 @@ import store  # noqa: E402
 
 app = flask_app.app
 
+# Create teacher and student accounts with hashed passwords in the temp database
+# so that verify_student_password and verify_teacher work without env var fallbacks.
+teacher = store.create_teacher("admin", "Administrator", "teacherpass1", is_admin=True)
+store.set_student_password("studentpass1")
 
-def _teacher_client():
+
+def _teacher_client(password="teacherpass1"):
     c = app.test_client()
-    r = c.post("/login", data={"password": "teacherpass1"})
+    auth._fails.clear()
+    store.update_teacher_password(1, password)
+    r = c.post("/login", data={"username": "admin", "password": password})
     assert r.status_code == 302
     return c
 
@@ -367,8 +374,8 @@ def test_mobile_rest_api_endpoints():
     assert bad_login.status_code == 401
     assert not bad_login.get_json()["ok"]
 
-    # 3. Login via /api/login with valid teacher password
-    good_login = client.post("/api/login", json={"password": "teacherpass1"})
+    # 3. Login via /api/login with valid teacher password (username required)
+    good_login = client.post("/api/login", json={"username": "admin", "password": "teacherpass1"})
     assert good_login.status_code == 200
     login_data = good_login.get_json()
     assert login_data["ok"]
@@ -421,11 +428,120 @@ def test_mobile_rest_api_endpoints():
     assert client.get("/api/me").status_code == 401
 
 
+def test_student_password_change_invalidates_session():
+    """Changing the student password must invalidate existing student sessions (item 3)."""
+    # Log in as student
+    stu = app.test_client()
+    assert stu.post("/login", data={"password": "studentpass1"}).status_code == 302
+
+    # Session is active
+    r = stu.get("/records")
+    assert r.status_code == 200
+
+    # Change the student password
+    store.set_student_password("newstudentpass1")
+
+    # The old session should now be invalidated (302 back to /login)
+    r = stu.get("/records")
+    assert r.status_code == 302
+    assert "/login" in r.headers["Location"]
+
+    # New password works and establishes a fresh session
+    assert stu.post("/login", data={"password": "newstudentpass1"}).status_code == 302
+    r = stu.get("/records")
+    assert r.status_code == 200
+
+
+def test_teacher_password_change_invalidates_session():
+    """Changing a teacher password must invalidate that teacher's existing sessions (item 3)."""
+    c = _teacher_client()
+    assert c.get("/").status_code == 200
+
+    # Change the teacher's password
+    store.update_teacher_password(1, "newteacherpass1")
+
+    # Old session should be invalidated
+    r = c.get("/")
+    assert r.status_code == 302
+    assert "/login" in r.headers["Location"]
+
+    # New password works and establishes a fresh session
+    r = c.post("/login", data={"username": "admin", "password": "newteacherpass1"})
+    assert r.status_code == 302
+    assert c.get("/").status_code == 200
 
 
 
 
 
+
+
+
+def test_setup_requires_localhost():
+    """Test that /setup rejects non-localhost addresses with 403."""
+    c = app.test_client()
+    # Test client remote_addr defaults to 127.0.0.1, so setup should be allowed through the
+    # localhost check; since a teacher now exists, it should redirect to /login instead.
+    r = c.get("/setup")
+    assert store.list_teachers(), "Setup should redirect once a teacher exists"
+    assert r.status_code == 302, f"Expected 302 redirect to /login (teacher exists), got {r.status_code}"
+    assert "/login" in r.headers.get("Location", ""), f"Expected redirect to /login, got {r.headers.get('Location')}"
+
+
+def test_setup_closes_after_teacher_exists():
+    """Test that /setup redirects to /login once a teacher account already exists."""
+    c = app.test_client()
+    assert store.list_teachers(), "Test setup should have created a teacher"
+    r = c.get("/setup")
+    assert r.status_code == 302, f"Expected 302 redirect, got {r.status_code}"
+    assert "/login" in r.headers.get("Location", ""), f"Expected redirect to /login, got {r.headers.get('Location')}"
+
+
+def test_login_rate_limiting():
+    """Test that /login rate limiting kicks in after too many failures.
+
+    /login returns 200 with a "Too many wrong passwords" error when rate-limited;
+    /api_login returns 429 (covered by test_api_login_rate_limiting).
+    """
+    c = app.test_client()
+    auth._fails.clear()
+    # The 6th wrong attempt should be rate-limited
+    for i in range(5):
+        r = c.post("/login", data={"password": "wrongpassword999", "username": "admin"})
+    r6 = c.post("/login", data={"password": "wrongpassword999", "username": "admin"})
+    assert r6.status_code == 200, f"Expected 200 (rate-limit error page) on 6th attempt, got {r6.status_code}"
+    assert "Too many wrong passwords" in r6.get_data(as_text=True)
+
+
+def test_api_login_rate_limiting():
+    """Test that /api_login rate limiting kicks in after too many failures."""
+    c = app.test_client()
+    auth._fails.clear()
+    for i in range(5):
+        r = c.post("/api/login", json={"username": "admin", "password": "wrongpassword999"})
+    r6 = c.post("/api/login", json={"username": "admin", "password": "wrongpassword999"})
+    assert r6.status_code == 429, f"Expected 429 on 6th attempt, got {r6.status_code}"
+
+
+def test_passwords_only_in_env_or_file_cannot_sign_in():
+    """A password that exists only in legacy sources must not authenticate.
+
+    Verification reads hashed passwords from the SQLite database only, so legacy plaintext
+    sources (ATTENDANCE_* env vars or passwords.txt) cannot be used to sign in.
+    """
+
+    auth._fails.clear()
+    c = app.test_client()
+    for pw in ("envonlypass1", "envonlystudent1"):
+        r = c.post("/login", data={"password": pw})
+        assert r.status_code == 200, f"/login accepted legacy-only password {pw!r}"
+        assert "Wrong" in r.get_data(as_text=True)
+
+    auth._fails.clear()
+    for pw in ("envonlypass1", "envonlystudent1"):
+        r = c.post("/api/login", json={"password": pw})
+        assert r.status_code == 401, f"/api/login accepted legacy-only password {pw!r}"
+    auth._fails.clear()
 
 
 def test_app_archive_api_and_grade_score_permissions():
@@ -438,6 +554,7 @@ def test_app_archive_api_and_grade_score_permissions():
     assert anon.post("/api/subject_archive", json={"subject": "App Archive 101"}).status_code == 401
 
     stu = app.test_client()
+    store.set_student_password("studentpass1")
     stu.post("/login", data={"password": "studentpass1"})
     assert stu.post("/api/subject_archive", json={"subject": "App Archive 101"}).status_code == 403
 

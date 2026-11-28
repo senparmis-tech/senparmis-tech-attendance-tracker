@@ -1,37 +1,84 @@
+# Python
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+
+# Virtual environments
+venv/
+ENV/
+env/
+
+# IDEs
+.vscode/
+.idea/
+*.iml
+*.ipr
+*.iws
+
+# Testing
 .pytest_cache/
+.coverage
+htmlcov/
+
+# Environment and secrets
 .env
+.env.local
+.env.*.local
 api_key.txt
 secret_key.txt
 passwords.txt
 settings.json
-attendance_records.xlsx
-attendance_records.xlsx.tmp
-*.tmp
+SECURITY_ASSESSMENT.md
+
+# Databases
+*.db
+*.db-journal
+*.db.new
+attendance.db
+attendance.db.new
+attendance.db-journal
+
+# Application data
 changes_log.jsonl
 meet_aliases.json
 name_aliases.json
 backups/
 subject_images/
-attendance.db
-attendance.db-journal
-*.db.new
+attendance_records.xlsx
+attendance_records.xlsx.tmp
+*.tmp
 
-# Nested extracted zip duplicate folder
-senparmis-tech-attendance-tracker/
-
-# Android Studio & Gradle
+# Android/Gradle
 .gradle/
 **/.gradle/
 build/
 **/build/
-.idea/
-**/.idea/
-*.iml
 local.properties
 **/local.properties
 .cxx/
 Captures/
 *.apk
 *.aab
+*.jks
+*.keystore
+keystore.properties
+
+# Nested extracted zip duplicate
+senparmis-tech-attendance-tracker/

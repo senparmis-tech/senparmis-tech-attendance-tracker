@@ -421,7 +421,7 @@ def api_teacher_password():
         t = get_teacher(tid)
         update_teacher_password(tid, _s(b, "password"))
         if tid == getattr(g, "teacher_id", None):          # keep this sign-in valid after the change
-            session["pv"] = auth.pw_version("teacher_db", auth.read_passwords(), get_teacher(tid)["password_hash"])
+            session["pv"] = auth.pw_version("teacher_db", get_teacher(tid)["password_hash"])
     except ValueError as err:
         return _fail(str(err))
     log_change("Password updated", "", f"Updated password for '{t['username'] if t else tid}'")

@@ -1,0 +1,18 @@
+<!doctype html>
+<meta charset='utf-8'>
+<meta name='viewport' content='width=device-width, initial-scale=1'>
+<title>Initial Setup</title>
+<body style="font:16px/1.5 system-ui,Segoe UI,Arial;max-width:640px;margin:40px auto;padding:0 16px;background:#f8fafc;color:#0f172a">
+    <div style='background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.05)'>
+        <h1 style='margin-top:0'>Initial Setup</h1>
+        {% if error %}
+            <p style='color:#dc2626;font-weight:700'>{{ error }}</p>
+        {% endif %}
+        <form method="post" action="{{ url_for('setup') }}">
+            <p><label>Admin Username:<br><input type="text" name="username" required></label></p>
+            <p><label>Admin Password:<br><input type="password" name="admin_password" required></label></p>
+            <p><label>Student Access Key (Password):<br><input type="password" name="student_password" required></label></p>
+            <button type="submit">Complete Setup</button>
+        </form>
+    </div>
+</body>

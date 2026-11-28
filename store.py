@@ -141,6 +141,27 @@ def ensure_db():
         os.replace(tmp, DB_FILE)
 
 
+def db_ready():
+    """Return True if database exists and has been migrated and has teacher accounts."""
+    if not os.path.exists(DB_FILE):
+        return False
+    try:
+        conn = db.connect()
+        # Ensure migrations are applied before checking teacher table
+        db.migrate(conn)
+        version = conn.execute("PRAGMA user_version").fetchone()[0]
+        # Need at least migration 2 for teachers table
+        if version < 2:
+            conn.close()
+            return False
+        # Check teachers table exists and has rows
+        count = conn.execute("SELECT COUNT(*) FROM teachers").fetchone()[0]
+        conn.close()
+        return count > 0
+    except Exception:
+        return False
+
+
 class _Tx:
     def __init__(self):
         ensure_db()
@@ -1047,6 +1068,34 @@ def list_teachers():
         return [dict(r) for r in rows]
 
 
+def set_student_password(new_password):
+    if not new_password or len(new_password) < MIN_PASSWORD:
+        raise ValueError(f"Password must be at least {MIN_PASSWORD} characters.")
+    pw_hash = generate_password_hash(new_password)
+
+    def run(conn):
+        conn.execute("DELETE FROM student_auth")
+        conn.execute("INSERT INTO student_auth (hash) VALUES (?)", (pw_hash,))
+
+    mutate(run)
+
+
+def verify_student_password(password):
+    # Check database first
+    with _Tx() as conn:
+        row = conn.execute("SELECT hash FROM student_auth").fetchone()
+        if row and check_password_hash(row["hash"], password):
+            return True
+    return False
+
+
+def get_student_hash():
+    """Return the stored student password hash, or None if not set."""
+    with _Tx() as conn:
+        row = conn.execute("SELECT hash FROM student_auth").fetchone()
+        return row["hash"] if row else None
+
+
 def get_teacher(teacher_id):
     with _Tx() as conn:
         row = conn.execute(
@@ -1056,10 +1105,32 @@ def get_teacher(teacher_id):
         return dict(row) if row else None
 
 
-def verify_teacher(username_or_pw, password=None):
-    """Verify a teacher by (username, password), or if username is blank, check password against all teachers."""
+def verify_teacher(username_or_pw, password=None, *, by_username=False):
+    """Verify a teacher.
+
+    Args:
+        username_or_pw: username or password to check
+        password: if provided, used together with username_or_pw as (username, password)
+        by_username: if True, username_or_pw is treated as a username and checked against all teacher records
+                     without password verification (returns the first matching teacher dict).
+
+    Returns:
+        dict with teacher data if found, None otherwise.
+
+    Usage:
+        # Normal: verify (username, password)
+        verify_teacher("admin", "mypassword")
+
+        # Username-only lookup (e.g. set_password.py to find teacher account by name)
+        verify_teacher("admin", by_username=True)
+    """
     with _Tx() as conn:
         cols = "id, username, display_name, password_hash, is_admin, is_monitor, monitor_section_id"
+        if by_username:
+            # Treat username_or_pw as a username, find first match without password check
+            row = conn.execute(f"SELECT {cols} FROM teachers WHERE username = ?",
+                               (username_or_pw.strip(),)).fetchone()
+            return dict(row) if row else None
         if password is not None and username_or_pw:
             row = conn.execute(f"SELECT {cols} FROM teachers WHERE username = ?",
                                (username_or_pw.strip(),)).fetchone()

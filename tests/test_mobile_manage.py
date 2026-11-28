@@ -4,23 +4,36 @@ import sys
 import tempfile
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-os.environ.setdefault("ATTENDANCE_DATA_DIR", tempfile.mkdtemp(prefix="attendance_test_"))
-os.environ.setdefault("ATTENDANCE_TEACHER_PASSWORD", "teacherpass1")
-os.environ.setdefault("ATTENDANCE_STUDENT_PASSWORD", "studentpass1")
+_tmp = tempfile.mkdtemp(prefix="attendance_test_mobile_")
+os.environ["ATTENDANCE_DATA_DIR"] = _tmp
 
 import flask_app  # noqa: E402
+import auth  # noqa: E402
+import store  # noqa: E402
 
 app = flask_app.app
+
+# Create teacher and student accounts with hashed passwords in the temp database
+# so that verify_student_password and verify_teacher work without env var fallbacks.
+try:
+    teacher = store.create_teacher("admin", "Administrator", "teacherpass1", is_admin=True)
+except ValueError:
+    teacher = None  # already exists (another test module may share this DB)
+store.set_student_password("studentpass1")
 
 
 def _teacher():
     c = app.test_client()
-    assert c.post("/api/login", json={"password": "teacherpass1"}).status_code == 200
+    auth._fails.clear()
+    # Login via /api/login using DB-verified teacher password (not env var fallback)
+    assert c.post("/api/login", json={"username": "admin", "password": "teacherpass1"}).status_code == 200
     return c
 
 
 def test_students_and_sections_api():
     c = _teacher()
+    import auth as _auth
+    _auth._fails.clear()
     assert c.post("/api/subject_add", json={"name": "Mob 101", "section_name": "M1"}).get_json()["ok"]
     r = c.post("/api/students_add", json={"subject": "Mob 101", "section": "M1", "names": ["Ana Cruz", "Ben Lee"]})
     assert r.get_json()["added"] == 2

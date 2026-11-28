@@ -3,85 +3,40 @@ Password configuration, per-teacher sign-in/sign-out routes, and request authent
 """
 import hashlib
 import hmac
-import os
 import time
 import urllib.parse
 
 from flask import flash, g, jsonify, redirect, render_template, request, session, url_for
 from markupsafe import escape
 
-from config import MIN_PASSWORD, OPEN_MODE, PASSWORD_FILE
+from config import MIN_PASSWORD, OPEN_MODE
 from helpers import log_change
 from store import (assign_subject_teacher, create_teacher, delete_teacher,
-                   get_teacher, list_all_sections, list_subjects_with_owners, list_teachers,
-                   update_teacher_password, verify_teacher)
+                   get_teacher, get_student_hash, list_all_sections, list_subjects_with_owners, list_teachers,
+                   update_teacher_password, verify_teacher, set_student_password, verify_student_password)
 from web import app
 
 
-def read_passwords():
-    out = {"teacher": [], "student": []}
-    env_t = os.environ.get("ATTENDANCE_TEACHER_PASSWORD", "").strip()
-    if env_t:
-        out["teacher"].extend([p.strip() for p in env_t.split(",") if p.strip()])
-    env_s = os.environ.get("ATTENDANCE_STUDENT_PASSWORD", "").strip()
-    if env_s:
-        out["student"].extend([p.strip() for p in env_s.split(",") if p.strip()])
-    try:
-        with open(PASSWORD_FILE, encoding="utf-8-sig") as f:
-            for line in f:
-                line = line.strip()
-                if not line or line.startswith("#") or "=" not in line:
-                    continue
-                k, v = line.split("=", 1)
-                k = k.strip().lower()
-                if k in ("teacher", "student"):
-                    for p in v.split(","):
-                        cleaned = p.strip().strip("'\"")
-                        if cleaned and cleaned not in out[k]:
-                            out[k].append(cleaned)
-    except OSError:
-        pass
-    return out
-
-
-def password_problem(cfg):
-    """None when the passwords or teacher accounts are usable, otherwise a short explanation."""
-    t, s = cfg["teacher"], cfg["student"]
-    has_db_teachers = bool(list_teachers())
-    if not t and not has_db_teachers:
-        return "No teacher password is set yet in passwords.txt."
-    for p in t:
-        if len(p) < MIN_PASSWORD:
-            return f"A teacher password is too short (use at least {MIN_PASSWORD} characters)."
-    for p in s:
-        if len(p) < MIN_PASSWORD:
-            return f"A student password is too short (use at least {MIN_PASSWORD} characters)."
-    if any(p in t for p in s):
-        return "Student passwords must be different from teacher passwords."
-    return None
-
-
-def pw_version(role, cfg, extra=""):
-    pws = ",".join(sorted(cfg.get(role, [])))
-    return hmac.new(app.secret_key.encode(), f"{role}:{pws}:{extra}".encode(), hashlib.sha256).hexdigest()[:20]
+def pw_version(role, extra=""):
+    return hmac.new(app.secret_key.encode(), f"{role}:{extra}".encode(), hashlib.sha256).hexdigest()[:20]
 
 
 def _resolve_session():
     """Return (role, teacher_id, teacher_name, is_admin, monitor_section_id) for the current session."""
-    cfg = read_passwords()
     role = session.get("role")
     tid = session.get("teacher_id")
     if role == "teacher" and tid:
         t = get_teacher(tid)
-        if t and hmac.compare_digest(str(session.get("pv", "")), pw_version("teacher_db", cfg, t["password_hash"])):
+        if t and hmac.compare_digest(str(session.get("pv", "")), pw_version("teacher_db", t["password_hash"])):
             mon_sec = t.get("monitor_section_id")
             # Preview-as-monitor: admin toggles session["preview_section_id"]
             preview_sec = session.get("preview_section_id")
             return "teacher", t["id"], t["display_name"], bool(t["is_admin"]), mon_sec, preview_sec
         return None, None, None, False, None, None
-    if role in ("teacher", "student") and cfg.get(role) and hmac.compare_digest(
-            str(session.get("pv", "")), pw_version(role, cfg)):
-        return role, None, ("Admin" if role == "teacher" else None), (role == "teacher"), None, None
+    if role == "student":
+        student_hash = get_student_hash()
+        if student_hash and hmac.compare_digest(str(session.get("pv", "")), pw_version("student_db", student_hash)):
+            return "student", None, None, False, None, None
     return None, None, None, False, None, None
 
 
@@ -90,19 +45,14 @@ def current_role():
 
 
 def locked_page(problem):
-    path = escape(PASSWORD_FILE)
     html = (
         "<!doctype html><meta charset='utf-8'><meta name='viewport' content='width=device-width, initial-scale=1'>"
         "<title>Site locked</title><body style=\"font:16px/1.5 system-ui,Segoe UI,Arial;max-width:640px;margin:40px auto;padding:0 16px;background:#f8fafc;color:#0f172a\">"
         "<div style='background:#fff;border:1px solid #e2e8f0;border-radius:12px;padding:24px;box-shadow:0 2px 8px rgba(0,0,0,0.05)'>"
         "<h1 style='margin-top:0;font-size:22px'>🔒 This site is locked</h1>"
         f"<p style='color:#dc2626;font-weight:700'>{escape(problem)}</p>"
-        "<p>To protect student names on PythonAnywhere, a teacher password must be set before opening the site.</p>"
-        "<p>Open or create a plain text file at this location:</p>"
-        f"<pre style='background:#f1f5f9;padding:12px;border-radius:8px;white-space:pre-wrap;word-break:break-all;font-size:14px'>{path}</pre>"
-        "<p>and add these lines (at least " + str(MIN_PASSWORD) + " characters for security):</p>"
-        "<pre style='background:#f1f5f9;padding:12px;border-radius:8px;font-size:14px'>teacher=your-teacher-password\nstudent=your-student-password</pre>"
-        "<p>You can also add multiple teacher passwords separated by commas.</p>"
+        "<p>To protect student names on PythonAnywhere, a teacher account must be created before opening the site.</p>"
+        "<p>Open the <code>/setup</code> page from localhost to create the first teacher account.</p>"
         "<p>Then refresh this page.</p></div></body>")
     return html, 503
 
@@ -114,7 +64,7 @@ def fail_key():
     return (request.remote_addr or "") + "|" + request.headers.get("X-Forwarded-For", "").split(",")[0].strip()
 
 
-PUBLIC_ENDPOINTS = {"login", "logout", "static", "subject_image", "api_login"}
+PUBLIC_ENDPOINTS = {"login", "logout", "static", "subject_image", "api_login", "setup"}
 STUDENT_ENDPOINTS = {"records", "api_records", "api_me", "api_logout"}
 MONITOR_ALLOWED_ENDPOINTS = {
     "dashboard",
@@ -147,7 +97,6 @@ MONITOR_ALLOWED_ENDPOINTS = {
 
 @app.context_processor
 def inject_auth():
-    cfg = read_passwords()
     return {
         "role": getattr(g, "role", None),
         "teacher_id": getattr(g, "teacher_id", None),
@@ -158,7 +107,7 @@ def inject_auth():
         "monitor_sec_name": getattr(g, "monitor_sec_name", None),
         "monitor_sub_name": getattr(g, "monitor_sub_name", None),
         "preview_section_id": getattr(g, "preview_section_id", None),
-        "auth_on": bool(cfg["teacher"] or list_teachers()),
+        "auth_on": bool(list_teachers()),
     }
 
 
@@ -182,15 +131,8 @@ def gate():
             return (jsonify(ok=False, error=msg), 403) if request.path.startswith("/api/") else (msg, 403)
     if request.endpoint is None:
         return None
-    cfg = read_passwords()
-    if OPEN_MODE and not cfg["teacher"] and not list_teachers():
-        g.role = "teacher"
-        g.teacher_name = "Admin"
-        g.is_admin = True
-        return None
-    problem = password_problem(cfg)
-    if problem:
-        return locked_page(problem)
+    if not list_teachers() and request.endpoint != "setup" and request.endpoint not in PUBLIC_ENDPOINTS:
+        return redirect(url_for("setup"))
     role, tid, tname, is_adm, mon_sec, preview_sec = _resolve_session()
     g.role, g.teacher_id, g.teacher_name, g.is_admin = role, tid, tname, is_adm
     g.monitor_section_id = mon_sec or preview_sec
@@ -239,12 +181,29 @@ def secure_headers(resp):
     return resp
 
 
+@app.route("/setup", methods=["GET", "POST"])
+def setup():
+    if list_teachers():
+        return redirect(url_for("login"))
+    if request.remote_addr != "127.0.0.1" and request.remote_addr != "::1":
+        return "Setup is only allowed from localhost for security reasons.", 403
+    error = ""
+    if request.method == "POST":
+        username = request.form.get("username", "").strip()
+        admin_pw = request.form.get("admin_password", "").strip()
+        student_pw = request.form.get("student_password", "").strip()
+        try:
+            create_teacher(username or "admin", "Administrator", admin_pw, is_admin=True)
+            set_student_password(student_pw)
+            return redirect(url_for("login"))
+        except ValueError as err:
+            error = str(err)
+    return render_template("setup.html", error=error)
+
+
 @app.route("/login", methods=["GET", "POST"])
 def login():
-    cfg = read_passwords()
     teachers = list_teachers()
-    if OPEN_MODE and not cfg["teacher"] and not teachers:
-        return redirect(url_for("dashboard"))
     error = ""
     username = ""
     if request.method == "POST":
@@ -255,34 +214,37 @@ def login():
         else:
             username = request.form.get("username", "").strip()
             pw = request.form.get("password", "").strip()
-            matched_teacher = verify_teacher(username, pw) if username else verify_teacher(pw)
-            role = None
-            if matched_teacher:
-                session.clear()
-                session.update(role="teacher", teacher_id=matched_teacher["id"],
-                               pv=pw_version("teacher_db", cfg, matched_teacher["password_hash"]))
-                session.permanent = True
-                _fails.pop(key, None)
-                log_change("Sign-in", "", f"Teacher '{matched_teacher['display_name']}' ({matched_teacher['username']}) signed in")
-                return redirect(url_for("dashboard"))
-            if (not username or username.lower() == "admin") and any(
-                    hmac.compare_digest(pw.encode(), t_pw.encode()) for t_pw in cfg["teacher"]):
-                role = "teacher"
-            elif (not username or username.lower() == "student") and any(
-                    hmac.compare_digest(pw.encode(), s_pw.encode()) for s_pw in cfg["student"]):
+            if username:
+                matched_teacher = verify_teacher(username, pw)
+                role = None
+                if matched_teacher:
+                    session.clear()
+                    session.update(role="teacher", teacher_id=matched_teacher["id"],
+                                   pv=pw_version("teacher_db", matched_teacher["password_hash"]))
+                    session.permanent = True
+                    _fails.pop(key, None)
+                    log_change("Sign-in", "", f"Teacher '{matched_teacher['display_name']}' ({matched_teacher['username']}) signed in")
+                    return redirect(url_for("dashboard"))
+                time.sleep(0.5)
+                count += 1
+                _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
+                log_change("Failed sign-in", "", "Wrong password" + (" (locked for 5 minutes)" if count >= 5 else ""))
+                error = "Wrong username or password."
+            elif verify_student_password(pw):
                 role = "student"
-            if role:
                 session.clear()
-                session.update(role=role, pv=pw_version(role, cfg))
+                shash = get_student_hash()
+                session.update(role="student", pv=pw_version("student_db", shash or ""))
                 session.permanent = True
                 _fails.pop(key, None)
                 log_change("Sign-in", "", f"{role.capitalize()} signed in")
-                return redirect(url_for("dashboard") if role == "teacher" else url_for("records"))
-            time.sleep(0.5)
-            count += 1
-            _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
-            log_change("Failed sign-in", "", "Wrong password" + (" (locked for 5 minutes)" if count >= 5 else ""))
-            error = "Wrong username or password." if teachers else "Wrong password."
+                return redirect(url_for("records"))
+            else:
+                time.sleep(0.5)
+                count += 1
+                _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
+                log_change("Failed sign-in", "", "Wrong password" + (" (locked for 5 minutes)" if count >= 5 else ""))
+                error = "Wrong username or password." if teachers else "Wrong password."
     return render_template("login.html", page="login", error=error, username=username, has_teachers=bool(teachers))
 
 
@@ -300,7 +262,6 @@ def api_login():
     pw = str(data.get("password", "")).strip()
     if not pw:
         return jsonify(ok=False, error="Password is required."), 400
-    cfg = read_passwords()
     teachers = list_teachers()
     key, now = fail_key(), time.time()
     count, until = _fails.get(key, (0, 0))
@@ -308,40 +269,31 @@ def api_login():
         mins = int((until - now) // 60) + 1
         return jsonify(ok=False, error=f"Too many wrong attempts. Wait {mins} minute(s)."), 429
 
-    matched_teacher = verify_teacher(username, pw) if username else verify_teacher(pw)
-    role = None
-    user_info = {}
-    if matched_teacher:
-        session.clear()
-        session.update(role="teacher", teacher_id=matched_teacher["id"],
-                       pv=pw_version("teacher_db", cfg, matched_teacher["password_hash"]))
-        session.permanent = True
-        _fails.pop(key, None)
-        log_change("API Sign-in", "", f"Teacher '{matched_teacher['display_name']}' signed in via Mobile App")
-        return jsonify(
-            ok=True,
-            role="teacher",
-            teacher_id=matched_teacher["id"],
-            username=matched_teacher["username"],
-            display_name=matched_teacher["display_name"],
-            is_admin=bool(matched_teacher["is_admin"]),
-            is_monitor=bool(matched_teacher["is_monitor"]),
-            monitor_section_id=matched_teacher.get("monitor_section_id"),
-        )
-    if (not username or username.lower() == "admin") and any(
-            hmac.compare_digest(pw.encode(), t_pw.encode()) for t_pw in cfg["teacher"]):
-        role = "teacher"
-        user_info = {
-            "role": "teacher",
-            "teacher_id": None,
-            "username": "admin",
-            "display_name": "Administrator",
-            "is_admin": True,
-            "is_monitor": False,
-            "monitor_section_id": None,
-        }
-    elif (not username or username.lower() == "student") and any(
-            hmac.compare_digest(pw.encode(), s_pw.encode()) for s_pw in cfg["student"]):
+    if username:
+        matched_teacher = verify_teacher(username, pw)
+        if matched_teacher:
+            session.clear()
+            session.update(role="teacher", teacher_id=matched_teacher["id"],
+                           pv=pw_version("teacher_db", matched_teacher["password_hash"]))
+            session.permanent = True
+            _fails.pop(key, None)
+            log_change("API Sign-in", "", f"Teacher '{matched_teacher['display_name']}' signed in via Mobile App")
+            return jsonify(
+                ok=True,
+                role="teacher",
+                teacher_id=matched_teacher["id"],
+                username=matched_teacher["username"],
+                display_name=matched_teacher["display_name"],
+                is_admin=bool(matched_teacher["is_admin"]),
+                is_monitor=bool(matched_teacher["is_monitor"]),
+                monitor_section_id=matched_teacher.get("monitor_section_id"),
+            )
+        time.sleep(0.5)
+        count += 1
+        _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
+        log_change("Failed API sign-in", "", "Wrong password" + (" (locked for 5 minutes)" if count >= 5 else ""))
+        return jsonify(ok=False, error="Wrong username or password."), 401
+    elif verify_student_password(pw):
         role = "student"
         user_info = {
             "role": "student",
@@ -352,17 +304,19 @@ def api_login():
             "is_monitor": False,
             "monitor_section_id": None,
         }
-    if role:
         session.clear()
-        session.update(role=role, pv=pw_version(role, cfg))
+        shash = get_student_hash()
+        session.update(role="student", pv=pw_version("student_db", shash or ""))
         session.permanent = True
         _fails.pop(key, None)
         log_change("API Sign-in", "", f"{role.capitalize()} signed in via Mobile App")
         return jsonify(ok=True, **user_info)
-
-    count += 1
-    _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
-    return jsonify(ok=False, error="Wrong username or password." if teachers else "Wrong password."), 401
+    else:
+        time.sleep(0.5)
+        count += 1
+        _fails[key] = (0, now + 300) if count >= 5 else (count, 0)
+        log_change("Failed API sign-in", "", "Wrong password" + (" (locked for 5 minutes)" if count >= 5 else ""))
+        return jsonify(ok=False, error="Wrong username or password."), 401
 
 
 @app.route("/api/me", methods=["GET"])
@@ -444,7 +398,7 @@ def teachers_password():
         update_teacher_password(tid, new_pw)
         if tid == g.teacher_id:
             t_updated = get_teacher(tid)
-            session["pv"] = pw_version("teacher_db", read_passwords(), t_updated["password_hash"])
+            session["pv"] = pw_version("teacher_db", t_updated["password_hash"])
         log_change("Password updated", "", f"Updated password for '{t['username'] if t else tid}'")
         flash("Password updated.", "ok")
     except ValueError as err:
